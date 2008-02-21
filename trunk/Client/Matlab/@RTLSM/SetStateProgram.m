@@ -407,7 +407,7 @@ function [sm] = SetStateProgram(varargin)
   input_spec_str = '';
   for i = 1:n_i,
     comma = '';
-    if (i < n_i), comma = ',';  end;
+    if (i > 1), comma = ',';  end;
     input_spec_str = [ input_spec_str comma ...
                        sprintf('%d', sm.input_event_mapping(1,i)) ...
                      ];
