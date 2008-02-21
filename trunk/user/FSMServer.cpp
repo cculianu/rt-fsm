@@ -2594,7 +2594,7 @@ bool ConnectionThread::doSetStateProgram()
         inChanType = block;
       }
       else if (section == "INPUT SPEC STRING") {
-        inSpec = parseInputSpecStr(block); // for now, NOT url encoded!
+        inSpec = parseInputSpecStr(UrlDecode(block)); // for now, *IS* url encoded!
       }
       else if (section == "OUTPUT SPEC STRING") {
         outSpec = parseOutputSpecStr(UrlDecode(block));
