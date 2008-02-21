@@ -2142,7 +2142,7 @@ std::vector<double> splitNumericString(const std::string &str,
     if (pos > str.length()) break;
     bool ok;
     double d = FromString<double>(str.substr(pos), &ok);
-    if (!ok) break;
+    if (!ok) break; /* break if parse error -- don't allow empty tokens.. */
     ret.push_back(d);
   }
   return ret;
