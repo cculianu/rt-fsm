@@ -1,0 +1,2 @@
+- Implement sound triggering in both realtime kernelspace and soft realtime userspace!
+- Write installation and usage documentation

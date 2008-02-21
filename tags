@@ -1,0 +1,1359 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.7	//
+ABS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define ABS(/;"	d	file:
+AFTER_LAST_IN_CHAN	/home/calin/src/rtfsm/kernel/fsm.c	/^#define AFTER_LAST_IN_CHAN(/;"	d	file:
+AI_MODE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define AI_MODE /;"	d	file:
+AI_THRESHOLD_VOLTS_HI	/home/calin/src/rtfsm/kernel/fsm.c	/^#define AI_THRESHOLD_VOLTS_HI /;"	d	file:
+AI_THRESHOLD_VOLTS_LOW	/home/calin/src/rtfsm/kernel/fsm.c	/^#define AI_THRESHOLD_VOLTS_LOW /;"	d	file:
+AI_TYPE	/home/calin/src/rtfsm/include/FSM.h	/^enum { DIO_TYPE = 0, AI_TYPE, UNKNOWN_TYPE };$/;"	e	enum:__anon18
+AOWAVE	/home/calin/src/rtfsm/include/FSM.h	/^    AOWAVE, \/* set\/clear an existing AO wave *\/$/;"	e	enum:ShmMsgID
+AOWAVE_MAX_SAMPLES	/home/calin/src/rtfsm/include/FSM.h	/^#define AOWAVE_MAX_SAMPLES /;"	d
+AOWAVE_MEMORY_BYTES	/home/calin/src/rtfsm/include/FSM.h	/^#define AOWAVE_MEMORY_BYTES /;"	d
+AOWave	/home/calin/src/rtfsm/include/FSM.h	/^struct AOWave$/;"	s
+AOWaveINTERNAL	/home/calin/src/rtfsm/kernel/fsm.c	/^  struct AOWaveINTERNAL $/;"	s	struct:RunState	file:
+AOWaveINTERNAL	/home/calin/src/rtfsm/kernel/fsm.c	/^struct AOWaveINTERNAL;$/;"	x	file:
+ASYNCH_MODE	/home/calin/src/rtfsm/kernel/fsm.c	/^enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };$/;"	e	enum:__anon12	file:
+ActiveWave	/home/calin/src/rtfsm/kernel/fsm.c	/^  struct ActiveWave {$/;"	s	struct:RunState	file:
+Arg	/home/calin/src/rtfsm/kernel/softtask.c	/^  void *Arg;  $/;"	m	struct:SoftTask	file:
+BILLION	/home/calin/src/rtfsm/kernel/fsm.c	/^#define BILLION /;"	d	file:
+BUDDY_TASK_BUSY	/home/calin/src/rtfsm/kernel/fsm.c	/^# define BUDDY_TASK_BUSY /;"	d	file:
+BUDDY_TASK_BUSY	/home/calin/src/rtfsm/kernel/fsm.c	/^# undef BUDDY_TASK_BUSY$/;"	d	file:
+BUDDY_TASK_CLEAR	/home/calin/src/rtfsm/kernel/fsm.c	/^# define BUDDY_TASK_CLEAR /;"	d	file:
+BUDDY_TASK_CLEAR	/home/calin/src/rtfsm/kernel/fsm.c	/^# undef BUDDY_TASK_CLEAR$/;"	d	file:
+BUDDY_TASK_DONE	/home/calin/src/rtfsm/kernel/fsm.c	/^# define BUDDY_TASK_DONE /;"	d	file:
+BUDDY_TASK_DONE	/home/calin/src/rtfsm/kernel/fsm.c	/^# undef BUDDY_TASK_DONE$/;"	d	file:
+BUDDY_TASK_PEND	/home/calin/src/rtfsm/kernel/fsm.c	/^# define BUDDY_TASK_PEND(/;"	d	file:
+BUDDY_TASK_PEND	/home/calin/src/rtfsm/kernel/fsm.c	/^# undef BUDDY_TASK_PEND$/;"	d	file:
+BackInsert	/home/calin/src/rtfsm/user/FSMServer.cpp	/^template <class T> BackInsertFunctor<T> BackInsert(T & t) { return BackInsertFunctor<T>(t); }$/;"	f
+BackInsertFunctor	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  BackInsertFunctor(T & t) : t(t) {}$/;"	f	struct:BackInsertFunctor
+BackInsertFunctor	/home/calin/src/rtfsm/user/FSMServer.cpp	/^template <class T> struct BackInsertFunctor$/;"	s	file:
+CALL_EMBC	/home/calin/src/rtfsm/kernel/fsm.c	/^#define CALL_EMBC(/;"	d	file:
+CALL_EMBC1	/home/calin/src/rtfsm/kernel/fsm.c	/^#define CALL_EMBC1(/;"	d	file:
+CHKPROC	/home/calin/src/rtfsm/user/scanproc.c	/^#define CHKPROC /;"	d	file:
+CHK_AND_DO_EXT_TRIG	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void CHK_AND_DO_EXT_TRIG(FSMID_t f, unsigned which, unsigned t) $/;"	f	file:
+CHK_AND_DO_EXT_TRIG	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void CHK_AND_DO_EXT_TRIG(FSMID_t f, unsigned which, unsigned trig);$/;"	p	file:
+COMEDI_DEVICE_FILE	/home/calin/src/rtfsm/kernel/fsm.c	/^static char COMEDI_DEVICE_FILE[] = "\/dev\/comediXXXXXXXXXXXXXXX";$/;"	v	file:
+ChanTypeAndCount	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^  ChanTypeAndCount() {}$/;"	f	struct:ChanTypeAndCount
+ChanTypeAndCount	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^  ChanTypeAndCount(const std::string & s, unsigned c) : chanType(s), count(c){}$/;"	f	struct:ChanTypeAndCount
+ChanTypeAndCount	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^struct ChanTypeAndCount$/;"	s	file:
+CircBuf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  CircBuf(size_t n_elems) : n(n_elems ? n_elems : 1), ct(0) { buf.resize(n_elems); }$/;"	f	struct:CircBuf
+CircBuf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^template <class T> struct CircBuf$/;"	s	file:
+CompilerPath	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string CompilerPath() { return "tcc\/tcc"; }$/;"	f	namespace:__anon2
+ConnectedThreadsList	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  typedef std::map<ConnectionThread *, ConnectionThread *> ConnectedThreadsList;$/;"	t	namespace:__anon2	file:
+ConnectionThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ConnectionThread();$/;"	p	class:ConnectionThread	file:
+ConnectionThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false) { myid = id++; fsm_id = 0; shm_num = 0; }$/;"	f	class:ConnectionThread
+ConnectionThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class ConnectionThread$/;"	c	file:
+ConnectionThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class ConnectionThread;$/;"	x	file:
+DAQSCAN_MAGIC	/home/calin/src/rtfsm/include/FSM.h	/^#   define DAQSCAN_MAGIC /;"	d
+DAQScan	/home/calin/src/rtfsm/include/FSM.h	/^  struct DAQScan $/;"	s
+DAQScanVec	/home/calin/src/rtfsm/user/FSMServer.cpp	/^struct DAQScanVec : public DAQScan$/;"	s	file:
+DEBUG	/home/calin/src/rtfsm/kernel/fsm.c	/^#define DEBUG(/;"	d	file:
+DEFAULT_AI	/home/calin/src/rtfsm/kernel/fsm.c	/^#define DEFAULT_AI /;"	d	file:
+DEFAULT_AI_SAMPLING_RATE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define DEFAULT_AI_SAMPLING_RATE /;"	d	file:
+DEFAULT_AI_SETTLING_TIME	/home/calin/src/rtfsm/kernel/fsm.c	/^#define DEFAULT_AI_SETTLING_TIME /;"	d	file:
+DEFAULT_TASK_RATE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define DEFAULT_TASK_RATE /;"	d	file:
+DEFAULT_TRIGGER_MS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define DEFAULT_TRIGGER_MS /;"	d	file:
+DEFLATE_HELPER_H	/home/calin/src/rtfsm/include/deflate_helper.h	/^#define DEFLATE_HELPER_H$/;"	d
+DH_FREE	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^#  define DH_FREE /;"	d	file:
+DH_MALLOC	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^#  define DH_MALLOC /;"	d	file:
+DIO_TYPE	/home/calin/src/rtfsm/include/FSM.h	/^enum { DIO_TYPE = 0, AI_TYPE, UNKNOWN_TYPE };$/;"	e	enum:__anon18
+DataChunk	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  DataChunk() { memcpy(chunkID, "data", 4); chunkSize = LE(0); }$/;"	f	struct:DataChunk
+DataChunk	/home/calin/src/rtfsm/utils/WavFile.cpp	/^struct DataChunk$/;"	s	file:
+EMBC_MATRIX_GET	/home/calin/src/rtfsm/kernel/fsm.c	/^#define EMBC_MATRIX_GET(/;"	d	file:
+EMBC_MOD_INTERNAL	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^#define EMBC_MOD_INTERNAL$/;"	d	file:
+EMBC_PTR	/home/calin/src/rtfsm/kernel/fsm.c	/^#define EMBC_PTR(/;"	d	file:
+ERROR	/home/calin/src/rtfsm/kernel/fsm.c	/^#define ERROR(/;"	d	file:
+ERROR_INT	/home/calin/src/rtfsm/kernel/fsm.c	/^#define ERROR_INT(/;"	d	file:
+EmbC	/home/calin/src/rtfsm/include/EmbC.h	/^struct EmbC$/;"	s
+EmbC	/home/calin/src/rtfsm/include/FSM.h	/^struct EmbC;$/;"	x
+EmbCTransition	/home/calin/src/rtfsm/include/EmbC.h	/^struct EmbCTransition $/;"	s
+EmbCTransition	/home/calin/src/rtfsm/include/EmbC.h	/^typedef struct EmbCTransition EmbCTransition;$/;"	t	typeref:struct:EmbCTransition
+EmbC_H	/home/calin/src/rtfsm/include/EmbC.h	/^#define EmbC_H$/;"	d
+Exception	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Exception(const std::string & reason = "") : reason(reason) {}$/;"	f	class:Exception
+Exception	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class Exception$/;"	c	file:
+FIFO	/home/calin/src/rtfsm/user/rtos_utility.h	/^  typedef Fifo * FIFO;$/;"	t	namespace:RTOS
+FIFO_DAQ_SZ	/home/calin/src/rtfsm/include/FSM.h	/^#define FIFO_DAQ_SZ /;"	d
+FIFO_NRT_OUTPUT_SZ	/home/calin/src/rtfsm/include/FSM.h	/^#define FIFO_NRT_OUTPUT_SZ /;"	d
+FIFO_SZ	/home/calin/src/rtfsm/include/FSM.h	/^#define FIFO_SZ /;"	d
+FIFO_TRANS_SZ	/home/calin/src/rtfsm/include/FSM.h	/^#define FIFO_TRANS_SZ /;"	d
+FIRST_IN_CHAN	/home/calin/src/rtfsm/kernel/fsm.c	/^#define FIRST_IN_CHAN(/;"	d	file:
+FIRST_OUT_COL	/home/calin/src/rtfsm/include/FSM.h	/^#define FIRST_OUT_COL(/;"	d
+FMT_TEXT_LEN	/home/calin/src/rtfsm/include/FSM.h	/^#define FMT_TEXT_LEN /;"	d
+FORCEEVENT	/home/calin/src/rtfsm/include/FSM.h	/^    FORCEEVENT, \/* Force a particular event to have occurred. *\/$/;"	e	enum:ShmMsgID
+FORCEOUTPUT	/home/calin/src/rtfsm/include/FSM.h	/^    FORCEOUTPUT, \/* Specify (or clear) the set of channels that are set to$/;"	e	enum:ShmMsgID
+FORCESOUND	/home/calin/src/rtfsm/include/FSM.h	/^    FORCESOUND,  \/* Force the FSM to do some sound outputs for this tick*\/$/;"	e	enum:ShmMsgID
+FORCESTATE	/home/calin/src/rtfsm/include/FSM.h	/^    FORCESTATE, \/* Force the FSM to jump to a specific state, usually 0 or 35 *\/$/;"	e	enum:ShmMsgID
+FORCETIMESUP	/home/calin/src/rtfsm/include/FSM.h	/^    FORCETIMESUP, \/* Force a time's up event to have occurred. *\/$/;"	e	enum:ShmMsgID
+FSM	/home/calin/src/rtfsm/include/FSM.h	/^    FSM, \/* Load an FSM. *\/$/;"	e	enum:ShmMsgID
+FSMExtTimeShm	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^struct FSMExtTimeShm$/;"	s
+FSMExtTrigFn_t	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^typedef int (* FSMExtTrigFn_t)(unsigned, int); $/;"	t
+FSMExtTrigShm	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^struct FSMExtTrigShm$/;"	s
+FSMExternalTime_H	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^#define FSMExternalTime_H$/;"	d
+FSMID_t	/home/calin/src/rtfsm/kernel/fsm.c	/^typedef unsigned FSMID_t;$/;"	t	file:
+FSMSpec	/home/calin/src/rtfsm/include/FSM.h	/^struct FSMSpec$/;"	s
+FSMSpec	/home/calin/src/rtfsm/include/FSM.h	/^typedef struct FSMSpec FSMSpec;$/;"	t	typeref:struct:FSMSpec
+FSMSpecific	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  FSMSpecific() $/;"	f	struct:FSMSpecific
+FSMSpecific	/home/calin/src/rtfsm/user/FSMServer.cpp	/^struct FSMSpecific$/;"	s	file:
+FSM_ERROR_BUF_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_ERROR_BUF_SIZE /;"	d
+FSM_EXT_TIME_GET	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^#define FSM_EXT_TIME_GET(/;"	d
+FSM_EXT_TIME_SHM_IS_VALID	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^#define FSM_EXT_TIME_SHM_IS_VALID(/;"	d
+FSM_EXT_TIME_SHM_MAGIC	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^#define FSM_EXT_TIME_SHM_MAGIC /;"	d
+FSM_EXT_TIME_SHM_NAME	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^#define FSM_EXT_TIME_SHM_NAME /;"	d
+FSM_EXT_TIME_SHM_SIZE	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^#define FSM_EXT_TIME_SHM_SIZE /;"	d
+FSM_EXT_TRIG	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^static inline void FSM_EXT_TRIG(volatile struct FSMExtTrigShm *shm, unsigned target, int trig)$/;"	f
+FSM_EXT_TRIG_H	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^#define FSM_EXT_TRIG_H$/;"	d
+FSM_EXT_TRIG_SHM_IS_VALID	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^static inline int FSM_EXT_TRIG_SHM_IS_VALID(volatile struct FSMExtTrigShm *shm)$/;"	f
+FSM_EXT_TRIG_SHM_MAGIC	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^#define FSM_EXT_TRIG_SHM_MAGIC /;"	d
+FSM_EXT_TRIG_SHM_NAME	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^#define FSM_EXT_TRIG_SHM_NAME /;"	d
+FSM_EXT_TRIG_SHM_SIZE	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^#define FSM_EXT_TRIG_SHM_SIZE /;"	d
+FSM_EXT_UNTRIG	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^static inline void FSM_EXT_UNTRIG(volatile struct FSMExtTrigShm *shm, unsigned target, int trig) $/;"	f
+FSM_GLOBAL_SPINLOCK	/home/calin/src/rtfsm/kernel/fsm.c	/^   static spinlock_t FSM_GLOBAL_SPINLOCK = SPIN_LOCK_UNLOCKED;$/;"	v	file:
+FSM_H	/home/calin/src/rtfsm/include/FSM.h	/^#  define FSM_H$/;"	d
+FSM_MATRIX_GET	/home/calin/src/rtfsm/kernel/fsm.c	/^#define FSM_MATRIX_GET(/;"	d	file:
+FSM_MATRIX_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MATRIX_SIZE /;"	d
+FSM_MAX_IN_CHANS	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MAX_IN_CHANS /;"	d
+FSM_MAX_IN_EVENTS	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MAX_IN_EVENTS /;"	d
+FSM_MAX_OUT_CHANS	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MAX_OUT_CHANS /;"	d
+FSM_MAX_OUT_EVENTS	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MAX_OUT_EVENTS /;"	d
+FSM_MAX_SCHED_WAVES	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MAX_SCHED_WAVES /;"	d
+FSM_MAX_SYMBOL_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MAX_SYMBOL_SIZE /;"	d
+FSM_MEMORY_BYTES	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_MEMORY_BYTES /;"	d
+FSM_NUM_INPUT_COLS	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_NUM_INPUT_COLS(/;"	d
+FSM_NUM_OUTPUT_COLS	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_NUM_OUTPUT_COLS(/;"	d
+FSM_PROGRAM_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_PROGRAM_SIZE /;"	d
+FSM_PTR	/home/calin/src/rtfsm/kernel/fsm.c	/^#define FSM_PTR(/;"	d	file:
+FSM_SHM_MAGIC	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_SHM_MAGIC /;"	d
+FSM_SHM_NAME	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_SHM_NAME /;"	d
+FSM_SHM_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#define FSM_SHM_SIZE /;"	d
+FSM_VERSION_H	/home/calin/src/rtfsm/include/Version.h	/^#define FSM_VERSION_H$/;"	d
+Fifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  Fifo() : handle(-1), key(-1), size(0), refct(0), unlink(false) {}  $/;"	f	struct:RTOS::Fifo
+Fifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^struct RTOS::Fifo$/;"	s	class:RTOS	file:
+Fifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  struct Fifo;$/;"	x
+FifoNotify_t	/home/calin/src/rtfsm/include/FSM.h	/^  typedef int FifoNotify_t;  \/* Write one of these to the fifo to notify$/;"	t
+FileExists	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool FileExists(const std::string & f)$/;"	f	namespace:__anon4
+FileExists	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool FileExists(const std::string &f);$/;"	p	namespace:__anon2	file:
+FormatChunk	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  FormatChunk() $/;"	f	struct:FormatChunk
+FormatChunk	/home/calin/src/rtfsm/utils/WavFile.cpp	/^struct FormatChunk {$/;"	s	file:
+FormatPacketText	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string FormatPacketText(const std::string & str, const NRTOutput *nrt)$/;"	f	namespace:__anon3
+FormatPacketText	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string FormatPacketText(const std::string &, const NRTOutput *);$/;"	p	namespace:__anon2	file:
+FromString	/home/calin/src/rtfsm/user/FSMServer.cpp	/^template <class T> T FromString(const std::string & s, bool *ok = 0)$/;"	f
+Func	/home/calin/src/rtfsm/kernel/softtask.c	/^  SoftTask_Handler Func;$/;"	m	struct:SoftTask	file:
+GETAOMAXDATA	/home/calin/src/rtfsm/include/FSM.h	/^    GETAOMAXDATA, \/* query FSM to find out the maxdata value for its$/;"	e	enum:ShmMsgID
+GETCURRENTSTATE	/home/calin/src/rtfsm/include/FSM.h	/^    GETCURRENTSTATE, \/* Query the state we are currently in.. *\/$/;"	e	enum:ShmMsgID
+GETERROR	/home/calin/src/rtfsm/include/FSM.h	/^    GETERROR, \/* get the alst fsm error -- use this to see if$/;"	e	enum:ShmMsgID
+GETFSM	/home/calin/src/rtfsm/include/FSM.h	/^    GETFSM,$/;"	e	enum:ShmMsgID
+GETFSMSIZE	/home/calin/src/rtfsm/include/FSM.h	/^    GETFSMSIZE, \/* Query the rows,cols of the FSM Matrix. *\/$/;"	e	enum:ShmMsgID
+GETNUMINPUTEVENTS	/home/calin/src/rtfsm/include/FSM.h	/^    GETNUMINPUTEVENTS, \/* Ask the FSM to tell us how many input columns$/;"	e	enum:ShmMsgID
+GETPAUSE	/home/calin/src/rtfsm/include/FSM.h	/^    GETPAUSE = 1,  \/* Query the FSM to find out if it is paused. *\/$/;"	e	enum:ShmMsgID
+GETRUNTIME	/home/calin/src/rtfsm/include/FSM.h	/^    GETRUNTIME, \/* Returns the time, in microseconds, since the last reset. *\/$/;"	e	enum:ShmMsgID
+GETVALID	/home/calin/src/rtfsm/include/FSM.h	/^    GETVALID,  \/* Query the FSM to find out if it has a valid state machine$/;"	e	enum:ShmMsgID
+GetTime_Func	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^typedef unsigned long long (*GetTime_Func)(void);$/;"	t
+HAVEPROC	/home/calin/src/rtfsm/user/scanproc.c	/^#define HAVEPROC /;"	d	file:
+HAVEPROC_	/home/calin/src/rtfsm/user/scanproc.c	/^static int HAVEPROC_ = -1;$/;"	v	file:
+Header	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  Header() { memcpy(riff, "RIFF", 4); memcpy(wave, "WAVE", 4); fileLength = LE(0); }$/;"	f	struct:Header
+Header	/home/calin/src/rtfsm/utils/WavFile.cpp	/^struct Header {$/;"	s	file:
+INPUT_ROUTING	/home/calin/src/rtfsm/kernel/fsm.c	/^#define INPUT_ROUTING(/;"	d	file:
+INVALIDATE	/home/calin/src/rtfsm/include/FSM.h	/^    INVALIDATE, \/* Invalidate (clear) the state machine specification, $/;"	e	enum:ShmMsgID
+INVALID_FIFO	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^RTOS::Fifo * const RTOS::INVALID_FIFO = 0;$/;"	m	class:RTOS::RTOS	file:
+INVALID_FIFO	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern Fifo * const INVALID_FIFO;$/;"	x
+IN_CHAN_TYPE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define IN_CHAN_TYPE(/;"	d	file:
+IOCTL_MBUFF_ALLOCATE	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define IOCTL_MBUFF_ALLOCATE /;"	d
+IOCTL_MBUFF_DEALLOCATE	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define IOCTL_MBUFF_DEALLOCATE /;"	d
+IOCTL_MBUFF_INFO	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define IOCTL_MBUFF_INFO /;"	d
+IOCTL_MBUFF_LAST	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define IOCTL_MBUFF_LAST /;"	d
+IOCTL_MBUFF_SELECT	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define IOCTL_MBUFF_SELECT /;"	d
+IPPROTO_TCP	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#    define IPPROTO_TCP /;"	d	file:
+IP_HOST_LEN	/home/calin/src/rtfsm/include/FSM.h	/^#define IP_HOST_LEN /;"	d
+Impl	/home/calin/src/rtfsm/user/FSMServer.cpp	/^    Impl() : t(0), nrefs(0) {}$/;"	f	struct:shallow_copy::Impl
+Impl	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  struct Impl$/;"	s	class:shallow_copy	file:
+Impl	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  Impl() : nframes(0), bitspersample(0), srate(0), nchans(0) {}$/;"	f	struct:OWavFile::Impl
+Impl	/home/calin/src/rtfsm/utils/WavFile.cpp	/^struct OWavFile::Impl$/;"	s	class:OWavFile	file:
+Impl	/home/calin/src/rtfsm/utils/WavFile.h	/^  struct Impl;$/;"	x
+IncludePath	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string IncludePath() { return ".\/"; }$/;"	f	namespace:__anon2
+InsMod	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string InsMod() { return "\/sbin\/insmod"; }$/;"	f	namespace:__anon2
+IntStringMap	/home/calin/src/rtfsm/user/FSMServer.cpp	/^typedef std::map<int, std::string> IntStringMap;$/;"	t	file:
+IntTypes_H	/home/calin/src/rtfsm/include/IntTypes.h	/^#define IntTypes_H$/;"	d
+InvalidDevFile	/home/calin/src/rtfsm/user/rtos_utility.h	/^    InvalidDevFile,$/;"	e	enum:RTOS::ShmStatus
+JITTER_TOLERANCE_NS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define JITTER_TOLERANCE_NS /;"	d	file:
+KERNELSPACE	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^#define KERNELSPACE /;"	d	file:
+LAST_SHM_MSG_ID	/home/calin/src/rtfsm/include/FSM.h	/^    LAST_SHM_MSG_ID$/;"	e	enum:ShmMsgID
+LE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int16 LE(int16 x) $/;"	f	namespace:__anon11
+LE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int16 LE(int16);$/;"	p	namespace:__anon9	file:
+LE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int32 LE(int32 x)$/;"	f	namespace:__anon11
+LE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int32 LE(int32);$/;"	p	namespace:__anon9	file:
+LE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint16 LE(uint16 x) { return LE(*reinterpret_cast<int16 *>(&x)); }$/;"	f	namespace:__anon9
+LE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint32 LE(uint32 x) { return LE(*reinterpret_cast<int32 *>(&x)); }$/;"	f	namespace:__anon9
+LOGITEMCOUNT	/home/calin/src/rtfsm/include/FSM.h	/^    LOGITEMCOUNT, \/* get the log item count *\/$/;"	e	enum:ShmMsgID
+LOGITEMS	/home/calin/src/rtfsm/include/FSM.h	/^    LOGITEMS, \/* get the log items *\/$/;"	e	enum:ShmMsgID
+LOG_MSG	/home/calin/src/rtfsm/kernel/fsm.c	/^#define LOG_MSG(/;"	d	file:
+LdPath	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string LdPath() { return "ld"; }$/;"	f	namespace:__anon2
+Log	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Log();$/;"	p	class:Log	file:
+Log	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  TLog Log() const { return TLog(myid, remoteHost, fsm_id); }$/;"	f	class:ConnectionThread	file:
+Log	/home/calin/src/rtfsm/user/FSMServer.cpp	/^Log::Log() $/;"	f	class:Log
+Log	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class Log : protected shallow_copy<std::string>$/;"	c	file:
+MAX	/home/calin/src/rtfsm/kernel/fsm.c	/^#define MAX(/;"	d	file:
+MAX	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#  define MAX(/;"	d	file:
+MAX_AI_CHANS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define MAX_AI_CHANS /;"	d	file:
+MAX_HISTORY	/home/calin/src/rtfsm/kernel/fsm.c	/^#define MAX_HISTORY /;"	d	file:
+MAX_IRQ	/home/calin/src/rtfsm/kernel/softtask.c	/^#  define MAX_IRQ /;"	d	file:
+MAX_LINE	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#define MAX_LINE /;"	d	file:
+MAX_NAME_LEN	/home/calin/src/rtfsm/kernel/softtask.c	/^#define MAX_NAME_LEN /;"	d	file:
+MBUFF_DEV_NAME	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define MBUFF_DEV_NAME /;"	d
+MBUFF_DEV_NAME2	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define MBUFF_DEV_NAME2 /;"	d
+MBUFF_MAX_MMAPS	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define MBUFF_MAX_MMAPS /;"	d
+MBUFF_NAME_LEN	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define MBUFF_NAME_LEN /;"	d
+MBUFF_VERSION	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define MBUFF_VERSION /;"	d
+MDEC	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^#  define MDEC /;"	d	file:
+MDEC	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^#undef MDEC$/;"	d	file:
+MDEC	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^#  define MDEC /;"	d
+MILLION	/home/calin/src/rtfsm/kernel/fsm.c	/^#define MILLION /;"	d	file:
+MIN	/home/calin/src/rtfsm/kernel/fsm.c	/^#define MIN(/;"	d	file:
+MIN	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#  define MIN(/;"	d	file:
+MINC	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^#  define MINC /;"	d	file:
+MINC	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^#undef MINC$/;"	d	file:
+MINC	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^#  define MINC /;"	d
+MODULE_NAME	/home/calin/src/rtfsm/kernel/fsm.c	/^#define MODULE_NAME /;"	d	file:
+MSG_MAX_LOG_ITEMS	/home/calin/src/rtfsm/include/FSM.h	/^#define MSG_MAX_LOG_ITEMS /;"	d
+MSG_MAX_TRANSITIONS	/home/calin/src/rtfsm/include/FSM.h	/^#define MSG_MAX_TRANSITIONS /;"	d
+MSG_NOSIGNAL	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#  define MSG_NOSIGNAL /;"	d	file:
+Matrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix(const Matrix & mat) : d(0) { *this = mat; }$/;"	f	struct:Matrix
+Matrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix(int m, int n) : m(m), n(n) { d = new double[m*n]; }$/;"	f	struct:Matrix
+Matrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^struct Matrix$/;"	s	file:
+Matrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^struct Matrix;$/;"	x	file:
+Matrix	/home/calin/src/rtfsm/utils/GetMatrix.c	/^struct Matrix$/;"	s	file:
+Matrix	/home/calin/src/rtfsm/utils/SendMatrix.c	/^struct Matrix$/;"	s	file:
+Micro2Sec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline long Micro2Sec(long long micro, unsigned long *remainder)$/;"	f	file:
+Micro2Sec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline long Micro2Sec(long long micro, unsigned long *remainder);$/;"	p	file:
+MissingDevFile	/home/calin/src/rtfsm/user/rtos_utility.h	/^    MissingDevFile,$/;"	e	enum:RTOS::ShmStatus
+ModList	/home/calin/src/rtfsm/user/scanproc.h	/^  struct ModList$/;"	s
+ModWrapperPath	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string ModWrapperPath() { return ".\/embc_mod_wrapper.o"; }$/;"	f	namespace:__anon2
+ModeFlag	/home/calin/src/rtfsm/user/rtos_utility.h	/^  enum ModeFlag { Read = 1, Write = 2, ReadWrite = Read|Write };$/;"	g	namespace:RTOS
+Mutex	/home/calin/src/rtfsm/user/Mutex.h	/^  Mutex() { pthread_mutex_init(&mut, 0); }$/;"	f	struct:Mutex
+Mutex	/home/calin/src/rtfsm/user/Mutex.h	/^struct Mutex$/;"	s
+MutexLocker	/home/calin/src/rtfsm/user/Mutex.h	/^  MutexLocker(Mutex & m) : mut(m.mut) { pthread_mutex_lock(&mut); }$/;"	f	struct:MutexLocker
+MutexLocker	/home/calin/src/rtfsm/user/Mutex.h	/^  MutexLocker(pthread_mutex_t  & m) : mut(m) { pthread_mutex_lock(&m); }$/;"	f	struct:MutexLocker
+MutexLocker	/home/calin/src/rtfsm/user/Mutex.h	/^  MutexLocker(pthread_mutex_t *m) : mut(*m) { pthread_mutex_lock(m); }$/;"	f	struct:MutexLocker
+MutexLocker	/home/calin/src/rtfsm/user/Mutex.h	/^  friend struct MutexLocker;$/;"	x
+MutexLocker	/home/calin/src/rtfsm/user/Mutex.h	/^struct MutexLocker$/;"	s
+Mutex_H	/home/calin/src/rtfsm/user/Mutex.h	/^#define Mutex_H$/;"	d
+NEXT_COL	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#define NEXT_COL(/;"	d	file:
+NEXT_COL	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#undef NEXT_COL$/;"	d	file:
+NO_DEFLATE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NO_DEFLATE /;"	d	file:
+NO_DEFLATE	/home/calin/src/rtfsm/kernel/fsm.c	/^#undef NO_DEFLATE$/;"	d	file:
+NO_EMBC_TYPEDEFS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NO_EMBC_TYPEDEFS$/;"	d	file:
+NRTOUTPUT_DATA_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#   define NRTOUTPUT_DATA_SIZE /;"	d
+NRTOUTPUT_MAGIC	/home/calin/src/rtfsm/include/FSM.h	/^#   define NRTOUTPUT_MAGIC /;"	d
+NRTOutput	/home/calin/src/rtfsm/include/FSM.h	/^  struct NRTOutput {$/;"	s
+NRTOutputType	/home/calin/src/rtfsm/include/FSM.h	/^  enum NRTOutputType {$/;"	g
+NRT_TCP	/home/calin/src/rtfsm/include/FSM.h	/^    NRT_TCP = 0,$/;"	e	enum:NRTOutputType
+NRT_UDP	/home/calin/src/rtfsm/include/FSM.h	/^    NRT_UDP,$/;"	e	enum:NRTOutputType
+NUM_AI_CHANS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_AI_CHANS /;"	d	file:
+NUM_AO_CHANS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_AO_CHANS /;"	d	file:
+NUM_COLS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_COLS(/;"	d	file:
+NUM_DIO_CHANS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_DIO_CHANS /;"	d	file:
+NUM_INPUT_EVENTS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_INPUT_EVENTS(/;"	d	file:
+NUM_IN_CHANS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_IN_CHANS(/;"	d	file:
+NUM_IN_EVT_CHANS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_IN_EVT_CHANS(/;"	d	file:
+NUM_IN_EVT_COLS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_IN_EVT_COLS(/;"	d	file:
+NUM_LOG_ITEMS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_LOG_ITEMS(/;"	d	file:
+NUM_OUT_COLS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_OUT_COLS(/;"	d	file:
+NUM_ROWS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_ROWS(/;"	d	file:
+NUM_STATE_MACHINES	/home/calin/src/rtfsm/include/FSM.h	/^# define NUM_STATE_MACHINES /;"	d
+NUM_TRANSITIONS	/home/calin/src/rtfsm/kernel/fsm.c	/^#define NUM_TRANSITIONS(/;"	d	file:
+Nano2Sec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long long Nano2Sec(unsigned long long nano)$/;"	f	file:
+Nano2Sec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long long Nano2Sec(unsigned long long nano);$/;"	p	file:
+Nano2USec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long long Nano2USec(unsigned long long nano)$/;"	f	file:
+Nano2USec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long long Nano2USec(unsigned long long nano);$/;"	p	file:
+NoRTOSFound	/home/calin/src/rtfsm/user/rtos_utility.h	/^    NoRTOSFound$/;"	e	enum:RTOS::ShmStatus
+None	/home/calin/src/rtfsm/user/rtos_utility.h	/^    None = Unknown,$/;"	e	enum:RTOS::RTOS
+NotFound	/home/calin/src/rtfsm/user/rtos_utility.h	/^    NotFound,$/;"	e	enum:RTOS::ShmStatus
+OSPEC_DOUT	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OSPEC_NOOP	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OSPEC_SCHED_WAVE	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OSPEC_SOUND	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OSPEC_TCP	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OSPEC_TRIG	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OSPEC_UDP	/home/calin/src/rtfsm/include/FSM.h	/^enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };$/;"	e	enum:__anon13
+OTHER_EMBC_PTR	/home/calin/src/rtfsm/kernel/fsm.c	/^#define OTHER_EMBC_PTR(/;"	d	file:
+OTHER_FSM_PTR	/home/calin/src/rtfsm/kernel/fsm.c	/^#define OTHER_FSM_PTR(/;"	d	file:
+OUTPUT_ROUTING	/home/calin/src/rtfsm/kernel/fsm.c	/^#define OUTPUT_ROUTING(/;"	d	file:
+OUTPUT_SPEC_DATA_SIZE	/home/calin/src/rtfsm/include/FSM.h	/^#define OUTPUT_SPEC_DATA_SIZE /;"	d
+OWavFile	/home/calin/src/rtfsm/utils/WavFile.cpp	/^OWavFile::OWavFile()$/;"	f	class:OWavFile
+OWavFile	/home/calin/src/rtfsm/utils/WavFile.h	/^  OWavFile();$/;"	p	class:OWavFile
+OWavFile	/home/calin/src/rtfsm/utils/WavFile.h	/^class OWavFile$/;"	c
+Ok	/home/calin/src/rtfsm/user/rtos_utility.h	/^    Ok = 0,$/;"	e	enum:RTOS::ShmStatus
+OutputSpec	/home/calin/src/rtfsm/include/FSM.h	/^struct OutputSpec$/;"	s
+PAUSEUNPAUSE	/home/calin/src/rtfsm/include/FSM.h	/^    PAUSEUNPAUSE, \/* Halt the state machine (temporarily).  No variables$/;"	e	enum:ShmMsgID
+PROCPATH	/home/calin/src/rtfsm/user/scanproc.c	/^#define PROCPATH /;"	d	file:
+READYFORTRIAL	/home/calin/src/rtfsm/include/FSM.h	/^    READYFORTRIAL, \/* Unimplemented for now.. *\/$/;"	e	enum:ShmMsgID
+READY_FOR_TRIAL_JUMPSTATE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define READY_FOR_TRIAL_JUMPSTATE(/;"	d	file:
+RESET	/home/calin/src/rtfsm/kernel/fsm.c	/^#undef RESET /;"	d	file:
+RESET_	/home/calin/src/rtfsm/include/FSM.h	/^    RESET_, \/* Reset\/Initialize the state machine.  All variables are cleared$/;"	e	enum:ShmMsgID
+RESET_TIMER	/home/calin/src/rtfsm/kernel/fsm.c	/^#define RESET_TIMER(/;"	d	file:
+RTAI	/home/calin/src/rtfsm/user/rtos_utility.h	/^    RTAI    $/;"	e	enum:RTOS::RTOS
+RTAI3_SHM_DEV	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define RTAI3_SHM_DEV /;"	d
+RTAI_IOCTL_CMD_ATTACH	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define RTAI_IOCTL_CMD_ATTACH /;"	d
+RTAI_IOCTL_CMD_FREE	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define RTAI_IOCTL_CMD_FREE /;"	d
+RTAI_IOCTL_CMD_GET_SZ	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define RTAI_IOCTL_CMD_GET_SZ /;"	d
+RTAI_SHM_DEV	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define RTAI_SHM_DEV /;"	d
+RTF_FREE	/home/calin/src/rtfsm/kernel/fsm.c	/^   #define RTF_FREE(/;"	d	file:
+RTF_NO	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define RTF_NO /;"	d	file:
+RTLinux	/home/calin/src/rtfsm/user/rtos_utility.h	/^    RTLinux, $/;"	e	enum:RTOS::RTOS
+RTOS	/home/calin/src/rtfsm/user/rtos_utility.h	/^  enum RTOS {$/;"	g	namespace:RTOS
+RTOS	/home/calin/src/rtfsm/user/rtos_utility.h	/^namespace RTOS$/;"	n
+RTOS_UTILITY_H	/home/calin/src/rtfsm/user/rtos_utility.h	/^#define RTOS_UTILITY_H$/;"	d
+Read	/home/calin/src/rtfsm/user/rtos_utility.h	/^  enum ModeFlag { Read = 1, Write = 2, ReadWrite = Read|Write };$/;"	e	enum:RTOS::ModeFlag
+ReadWrite	/home/calin/src/rtfsm/user/rtos_utility.h	/^  enum ModeFlag { Read = 1, Write = 2, ReadWrite = Read|Write };$/;"	e	enum:RTOS::ModeFlag
+RmProg	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string RmProg() { return "rm -f"; }$/;"	f	namespace:__anon2
+Routing	/home/calin/src/rtfsm/include/FSM.h	/^  struct Routing {$/;"	s	struct:FSMSpec
+RunState	/home/calin/src/rtfsm/kernel/fsm.c	/^struct RunState {$/;"	s	file:
+SCANPROCS_H	/home/calin/src/rtfsm/user/scanproc.h	/^#define SCANPROCS_H /;"	d
+SDevChanMap	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^typedef std::map<unsigned, ChanTypeAndCount> SDevChanMap;$/;"	t	file:
+SET_EXT_TRIG	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void SET_EXT_TRIG(unsigned which, unsigned trig)$/;"	f	file:
+SET_EXT_TRIG	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void SET_EXT_TRIG(unsigned which, unsigned trig);$/;"	p	file:
+SOL_TCP	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#  define SOL_TCP /;"	d	file:
+STARTDAQ	/home/calin/src/rtfsm/include/FSM.h	/^    STARTDAQ, \/* Do data acquisition. *\/$/;"	e	enum:ShmMsgID
+STATE_COL	/home/calin/src/rtfsm/kernel/fsm.c	/^#define STATE_COL(/;"	d	file:
+STATE_OUTPUT	/home/calin/src/rtfsm/kernel/fsm.c	/^#define STATE_OUTPUT(/;"	d	file:
+STATE_TIMEOUT_STATE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define STATE_TIMEOUT_STATE(/;"	d	file:
+STATE_TIMEOUT_US	/home/calin/src/rtfsm/kernel/fsm.c	/^#define STATE_TIMEOUT_US(/;"	d	file:
+STOPDAQ	/home/calin/src/rtfsm/include/FSM.h	/^    STOPDAQ, \/* Stop data acquisition. *\/$/;"	e	enum:ShmMsgID
+STR	/home/calin/src/rtfsm/kernel/fsm.c	/^#define STR(/;"	d	file:
+STR1	/home/calin/src/rtfsm/kernel/fsm.c	/^#define STR1(/;"	d	file:
+SW_INPUT_ROUTING	/home/calin/src/rtfsm/kernel/fsm.c	/^#define SW_INPUT_ROUTING(/;"	d	file:
+SW_OUTPUT_ROUTING	/home/calin/src/rtfsm/kernel/fsm.c	/^#define SW_OUTPUT_ROUTING(/;"	d	file:
+SYNCH_MODE	/home/calin/src/rtfsm/kernel/fsm.c	/^enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };$/;"	e	enum:__anon12	file:
+SchedWave	/home/calin/src/rtfsm/include/FSM.h	/^struct SchedWave$/;"	s
+SchedWaveSpec	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class SchedWaveSpec;$/;"	x	file:
+SchedWaveSpec	/home/calin/src/rtfsm/user/FSMServer.cpp	/^struct SchedWaveSpec : public SchedWave$/;"	s	file:
+Sec2Nano	/home/calin/src/rtfsm/kernel/fsm.c	/^#define Sec2Nano(/;"	d	file:
+Shm	/home/calin/src/rtfsm/include/FSM.h	/^  struct Shm $/;"	s
+Shm	/home/calin/src/rtfsm/include/FSM.h	/^  typedef struct Shm Shm;$/;"	t	typeref:struct:Shm
+ShmInfo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  ShmInfo() : size(0), address(0), rtos(RTOS::Unknown) {}$/;"	f	struct:ShmInfo
+ShmInfo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^struct ShmInfo$/;"	s	file:
+ShmMap	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^typedef std::map<unsigned long, ShmInfo> ShmMap;$/;"	t	file:
+ShmMsg	/home/calin/src/rtfsm/include/FSM.h	/^struct ShmMsg {$/;"	s
+ShmMsgID	/home/calin/src/rtfsm/include/FSM.h	/^enum ShmMsgID $/;"	g
+ShmStatus	/home/calin/src/rtfsm/user/rtos_utility.h	/^  enum ShmStatus {$/;"	g	namespace:RTOS
+SoftTask	/home/calin/src/rtfsm/kernel/softtask.c	/^struct SoftTask$/;"	s	file:
+SoftTask	/home/calin/src/rtfsm/kernel/softtask.c	/^typedef struct SoftTask SoftTask;$/;"	t	typeref:struct:SoftTask	file:
+SoftTask	/home/calin/src/rtfsm/kernel/softtask.h	/^struct SoftTask;$/;"	x
+SoftTask_Handler	/home/calin/src/rtfsm/kernel/softtask.h	/^typedef void (*SoftTask_Handler)(void *);$/;"	t
+StateHistory	/home/calin/src/rtfsm/kernel/fsm.c	/^struct StateHistory$/;"	s	file:
+StateTransition	/home/calin/src/rtfsm/include/FSM.h	/^struct StateTransition $/;"	s
+String2Long	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  long String2Long(const std::string & s)$/;"	f	namespace:__anon8
+String2Long	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  long String2Long(const std::string & s);  $/;"	p	namespace:__anon6	file:
+StringMatrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  StringMatrix(unsigned m, unsigned n);$/;"	p	struct:StringMatrix	file:
+StringMatrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^StringMatrix::StringMatrix(unsigned m, unsigned n)$/;"	f	class:StringMatrix
+StringMatrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class StringMatrix;$/;"	x	file:
+StringMatrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^struct StringMatrix : public std::vector<std::vector<std::string> >$/;"	s	file:
+System	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool System(const std::string &cmd) const;$/;"	p	class:ConnectionThread	file:
+System	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::System(const std::string &cmd) const$/;"	f	class:ConnectionThread
+TASK_STACKSIZE	/home/calin/src/rtfsm/kernel/fsm.c	/^#define TASK_STACKSIZE /;"	d	file:
+TIMEOUT_STATE_COL	/home/calin/src/rtfsm/include/FSM.h	/^#define TIMEOUT_STATE_COL(/;"	d
+TIMEOUT_TIME_COL	/home/calin/src/rtfsm/include/FSM.h	/^#define TIMEOUT_TIME_COL(/;"	d
+TIMER_EXPIRED	/home/calin/src/rtfsm/kernel/fsm.c	/^#define TIMER_EXPIRED(/;"	d	file:
+TLog	/home/calin/src/rtfsm/user/FSMServer.cpp	/^    TLog(int myid, const std::string & remoteHost, int fsm_id) { (*this) << "[" << TimeText() << " FSM " << fsm_id << " Thread " << myid << "  (" << remoteHost << ")] "; }$/;"	f	struct:ConnectionThread::TLog
+TLog	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  struct TLog : public ::Log$/;"	s	class:ConnectionThread	file:
+TRANSITIONCOUNT	/home/calin/src/rtfsm/include/FSM.h	/^    TRANSITIONCOUNT, \/* Get a count of the number of transitions that have$/;"	e	enum:ShmMsgID
+TRANSITIONS	/home/calin/src/rtfsm/include/FSM.h	/^    TRANSITIONS, \/* Query about past state transitions (EventIDs in matlab$/;"	e	enum:ShmMsgID
+TimeText	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::string TimeText () $/;"	f
+Timer	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Timer() { reset(); }$/;"	f	class:Timer
+Timer	/home/calin/src/rtfsm/user/FSMServer.cpp	/^class Timer$/;"	c	file:
+TmpPath	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string TmpPath() { return "\/tmp\/"; }$/;"	f	namespace:__anon2
+ToString	/home/calin/src/rtfsm/user/FSMServer.cpp	/^template <class T> std::string ToString(const T & t)$/;"	f
+UNIX_PATH_MAX	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^#define UNIX_PATH_MAX /;"	d	file:
+UNKNOWN_MODE	/home/calin/src/rtfsm/kernel/fsm.c	/^enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };$/;"	e	enum:__anon12	file:
+UNKNOWN_TYPE	/home/calin/src/rtfsm/include/FSM.h	/^enum { DIO_TYPE = 0, AI_TYPE, UNKNOWN_TYPE };$/;"	e	enum:__anon18
+UNSET_EXT_TRIG	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig)$/;"	f	file:
+UNSET_EXT_TRIG	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig);$/;"	p	file:
+USERSPACE	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^#define USERSPACE /;"	d	file:
+Unknown	/home/calin/src/rtfsm/user/rtos_utility.h	/^    Unknown = 0,$/;"	e	enum:RTOS::RTOS
+UrlDecode	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string UrlDecode(const std::string & str)$/;"	f	namespace:__anon3
+UrlDecode	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string UrlDecode(const std::string &);$/;"	p	namespace:__anon2	file:
+UrlEncode	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string UrlEncode(const std::string & str)$/;"	f	namespace:__anon3
+UrlEncode	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string UrlEncode(const std::string &);$/;"	p	namespace:__anon2	file:
+VarLogItem	/home/calin/src/rtfsm/include/FSM.h	/^struct VarLogItem$/;"	s
+VersionNUM	/home/calin/src/rtfsm/include/Version.h	/^#define VersionNUM /;"	d
+VersionSTR	/home/calin/src/rtfsm/include/Version.h	/^#define VersionSTR /;"	d
+WARNING	/home/calin/src/rtfsm/kernel/fsm.c	/^#define WARNING(/;"	d	file:
+WIN32_LEAN_AND_MEAN	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^#  define WIN32_LEAN_AND_MEAN$/;"	d	file:
+WaitQ	/home/calin/src/rtfsm/kernel/softtask.c	/^  wait_queue_head_t WaitQ;$/;"	m	struct:SoftTask	file:
+WavFile_H	/home/calin/src/rtfsm/utils/WavFile.h	/^#define WavFile_H$/;"	d
+Write	/home/calin/src/rtfsm/user/rtos_utility.h	/^  enum ModeFlag { Read = 1, Write = 2, ReadWrite = Read|Write };$/;"	e	enum:RTOS::ModeFlag
+WrongSize	/home/calin/src/rtfsm/user/rtos_utility.h	/^    WrongSize,$/;"	e	enum:RTOS::ShmStatus
+_GNU_SOURCE	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#define _GNU_SOURCE$/;"	d	file:
+_GNU_SOURCE	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^#define _GNU_SOURCE$/;"	d	file:
+_GNU_SOURCE	/home/calin/src/rtfsm/utils/GetMatrix.c	/^#define _GNU_SOURCE$/;"	d	file:
+_GNU_SOURCE	/home/calin/src/rtfsm/utils/GetValue.c	/^#define _GNU_SOURCE$/;"	d	file:
+_GNU_SOURCE	/home/calin/src/rtfsm/utils/SendMatrix.c	/^#define _GNU_SOURCE$/;"	d	file:
+_REENTRANT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^#define _REENTRANT$/;"	d	file:
+_RTOS_SHARED_MEMORY_H	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^#define _RTOS_SHARED_MEMORY_H$/;"	d
+__always_inline	/home/calin/src/rtfsm/kernel/fsm.c	/^#undef __always_inline$/;"	d	file:
+__attribute_pure__	/home/calin/src/rtfsm/kernel/fsm.c	/^#undef __attribute_pure__ /;"	d	file:
+__attribute_used__	/home/calin/src/rtfsm/kernel/fsm.c	/^#undef __attribute_used__$/;"	d	file:
+__embc	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^struct EmbC *__embc = 0;$/;"	v	typeref:struct:EmbC
+__embc	/home/calin/src/rtfsm/include/EmbC.h	/^extern struct EmbC *__embc;$/;"	x
+__embc_ShmName	/home/calin/src/rtfsm/include/EmbC.h	/^extern const char *__embc_ShmName;$/;"	x
+__embc_cleanup	/home/calin/src/rtfsm/include/EmbC.h	/^extern void (*__embc_cleanup)(void);$/;"	x
+__embc_fsm_do_state_entry	/home/calin/src/rtfsm/include/EmbC.h	/^extern void __embc_fsm_do_state_entry(ushort state);$/;"	p
+__embc_fsm_do_state_exit	/home/calin/src/rtfsm/include/EmbC.h	/^extern void __embc_fsm_do_state_exit(ushort state);$/;"	p
+__embc_fsm_get_at	/home/calin/src/rtfsm/include/EmbC.h	/^extern unsigned long __embc_fsm_get_at(ushort row, ushort col);$/;"	p
+__embc_init	/home/calin/src/rtfsm/include/EmbC.h	/^extern void (*__embc_init)(void);$/;"	x
+__embc_tick	/home/calin/src/rtfsm/include/EmbC.h	/^extern void (*__embc_tick)(void);$/;"	x
+__embc_transition	/home/calin/src/rtfsm/include/EmbC.h	/^extern void (*__embc_transition)(void);$/;"	x
+__ffs	/home/calin/src/rtfsm/kernel/fsm.c	/^static __inline__ int __ffs(int x) { return ffs(x)-1; }$/;"	f	file:
+__isnan	/home/calin/src/rtfsm/kernel/fsm.c	/^int __isnan(double x) { return 0; }$/;"	f
+acosh	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*acosh)(double);$/;"	m	struct:EmbC
+acosh	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double acosh(double d) { return __embc->acosh(d); }$/;"	f
+active_ao_wave_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned active_ao_wave_mask; $/;"	m	struct:RunState	file:
+active_wave	/home/calin/src/rtfsm/kernel/fsm.c	/^  } active_wave[FSM_MAX_SCHED_WAVES];$/;"	m	struct:RunState	typeref:struct:RunState::ActiveWave	file:
+active_wave_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned active_wave_mask;$/;"	m	struct:RunState	file:
+address	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  void *address;$/;"	m	struct:ShmInfo	file:
+ai	/home/calin/src/rtfsm/kernel/fsm.c	/^char *ai = DEFAULT_AI;$/;"	v
+ai_asynch_buf	/home/calin/src/rtfsm/kernel/fsm.c	/^void *ai_asynch_buf = 0; \/* pointer to driver's DMA circular buffer for AI. *\/$/;"	v
+ai_asynch_buffer_size	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned long ai_asynch_buffer_size = 0; \/* Size of driver's DMA circ. buf. *\/$/;"	v
+ai_bits	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;$/;"	v
+ai_bits_prev	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;$/;"	v
+ai_chans_in_use_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0; $/;"	v
+ai_krange	/home/calin/src/rtfsm/kernel/fsm.c	/^comedi_krange ai_krange, ao_krange; $/;"	v
+ai_mode	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned ai_range = 0, ai_mode = UNKNOWN_MODE, ao_range = 0;$/;"	v
+ai_n_overflows	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long ai_n_overflows = 0;$/;"	v	file:
+ai_range	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned ai_range = 0, ai_mode = UNKNOWN_MODE, ao_range = 0;$/;"	v
+ai_samples	/home/calin/src/rtfsm/kernel/fsm.c	/^sampl_t ai_samples[MAX_AI_CHANS]; \/* comedi_command callback copies samples to here, or our grabAI synch function puts samples here *\/$/;"	v
+ai_sampling_rate	/home/calin/src/rtfsm/kernel/fsm.c	/^    ai_sampling_rate = DEFAULT_AI_SAMPLING_RATE, $/;"	v
+ai_settling_time	/home/calin/src/rtfsm/kernel/fsm.c	/^    ai_settling_time = DEFAULT_AI_SETTLING_TIME,  \/* in microsecs. *\/$/;"	v
+ai_thresh_hi	/home/calin/src/rtfsm/kernel/fsm.c	/^lsampl_t ai_thresh_hi = 0, \/* Threshold, above which we consider it $/;"	v
+ai_thresh_low	/home/calin/src/rtfsm/kernel/fsm.c	/^         ai_thresh_low = 0; \/* Below this we consider it a digital 0. *\/$/;"	v
+aoMaxData	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned daqNumChans, daqMaxData, aoMaxData;$/;"	m	struct:FSMSpecific	file:
+ao_0V_sample	/home/calin/src/rtfsm/kernel/fsm.c	/^lsampl_t ao_0V_sample = 0; \/* When we want to write 0V to AO, we write this. *\/$/;"	v
+ao_krange	/home/calin/src/rtfsm/kernel/fsm.c	/^comedi_krange ai_krange, ao_krange; $/;"	v
+ao_maxdata	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned short ao_maxdata;$/;"	m	union:ShmMsg::__anon19
+ao_range	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned ai_range = 0, ai_mode = UNKNOWN_MODE, ao_range = 0;$/;"	v
+aoline	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned aoline;$/;"	m	struct:AOWave
+aoline	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned aoline, nsamples, loop, cur;$/;"	m	struct:RunState::AOWaveINTERNAL	file:
+aowave	/home/calin/src/rtfsm/include/FSM.h	/^      struct AOWave aowave;$/;"	m	union:ShmMsg::__anon19	typeref:struct:ShmMsg::__anon19::AOWave
+aowaves	/home/calin/src/rtfsm/kernel/fsm.c	/^  } aowaves[FSM_MAX_SCHED_WAVES];$/;"	m	struct:RunState	typeref:struct:RunState::AOWaveINTERNAL	file:
+asin	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*asin)(double);$/;"	m	struct:EmbC
+asin	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double asin(double d) { return __embc->asin(d); }$/;"	f
+asinh	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*asinh)(double);$/;"	m	struct:EmbC
+asinh	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double asinh(double d) { return __embc->asinh(d); }$/;"	f
+assign	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void assign(const DAQScan *ds, unsigned maxData, double rangeMin, double rangeMax) { $/;"	f	struct:DAQScanVec
+at	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  const double & at(int r, int c) const { return const_cast<Matrix *>(this)->at(r,c, true); }$/;"	f	struct:Matrix
+at	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  const std::string &at(unsigned r, unsigned c) const { return (*this)[r][c]; }$/;"	f	struct:StringMatrix
+at	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  double & at(int r, int c, bool = false)  { return *const_cast<double *>(d + c*m + r); }$/;"	f	struct:Matrix
+at	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string &at(unsigned r, unsigned c) { return (*this)[r][c]; }$/;"	f	struct:StringMatrix
+at	/home/calin/src/rtfsm/utils/GetMatrix.c	/^static double *at(struct Matrix *m, int row, int col)$/;"	f	file:
+at	/home/calin/src/rtfsm/utils/SendMatrix.c	/^static double *at(struct Matrix *m, int row, int col)$/;"	f	file:
+atan	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*atan)(double);$/;"	m	struct:EmbC
+atan	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double atan(double d) { return __embc->atan(d); }$/;"	f
+atanh	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*atanh)(double);$/;"	m	struct:EmbC
+atanh	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double atanh(double d) { return __embc->atanh(d); }$/;"	f
+attachShm	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void attachShm()$/;"	f	file:
+autoclean_flg	/home/calin/src/rtfsm/user/scanproc.h	/^    char autoclean_flg;$/;"	m	struct:ModList
+avoid_redundant_writes	/home/calin/src/rtfsm/kernel/fsm.c	/^    avoid_redundant_writes = 0;$/;"	v
+bits	/home/calin/src/rtfsm/utils/WavFile.cpp	/^unsigned OWavFile::bits() const { return p->bitspersample; }$/;"	f	class:OWavFile
+bits	/home/calin/src/rtfsm/utils/WavFile.h	/^  unsigned bits() const; $/;"	p	class:OWavFile
+bitspersample	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  unsigned nframes, bitspersample, srate, nchans;$/;"	m	struct:OWavFile::Impl	file:
+buddyTask	/home/calin/src/rtfsm/kernel/fsm.c	/^static struct SoftTask *buddyTask[NUM_STATE_MACHINES] = {0}, \/* non-RT kernel-side process context buddy 'tasklet' *\/$/;"	v	typeref:struct:SoftTask	file:
+buddyTaskCmd	/home/calin/src/rtfsm/kernel/fsm.c	/^# define buddyTaskCmd /;"	d	file:
+buddyTaskCmd	/home/calin/src/rtfsm/kernel/fsm.c	/^# undef buddyTaskCmd$/;"	d	file:
+buddyTaskCmds	/home/calin/src/rtfsm/kernel/fsm.c	/^static int buddyTaskCmds[NUM_STATE_MACHINES] = {0};$/;"	v	file:
+buddyTaskComedi	/home/calin/src/rtfsm/kernel/fsm.c	/^                       *buddyTaskComedi = 0;$/;"	v	typeref:struct:	file:
+buddyTaskComediHandler	/home/calin/src/rtfsm/kernel/fsm.c	/^static void buddyTaskComediHandler(void *arg)$/;"	f	file:
+buddyTaskComediHandler	/home/calin/src/rtfsm/kernel/fsm.c	/^static void buddyTaskComediHandler(void *arg);$/;"	p	file:
+buddyTaskHandler	/home/calin/src/rtfsm/kernel/fsm.c	/^static void buddyTaskHandler(void *arg)$/;"	f	file:
+buddyTaskHandler	/home/calin/src/rtfsm/kernel/fsm.c	/^static void buddyTaskHandler(void *arg);$/;"	p	file:
+buf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::vector<T> buf;$/;"	m	struct:CircBuf	file:
+buf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void * buf() const { return static_cast<void *>(const_cast<Matrix *>(this)->d); }$/;"	f	struct:Matrix
+bufSize	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned bufSize() const { return sizeof(*d)*m*n; }$/;"	f	struct:Matrix
+busy	/home/calin/src/rtfsm/kernel/softtask.c	/^  atomic_t busy;$/;"	m	struct:SoftTask	file:
+cb_eos_skipped_scans	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long cb_eos_skips = 0, cb_eos_skipped_scans = 0;$/;"	v	file:
+cb_eos_skips	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long cb_eos_skips = 0, cb_eos_skipped_scans = 0;$/;"	v	file:
+ceil	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*ceil)(double);$/;"	m	struct:EmbC
+ceil	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double ceil(double d) { return __embc->ceil(d); }$/;"	f
+chanType	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^  std::string chanType;$/;"	m	struct:ChanTypeAndCount	file:
+chan_mask	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned chan_mask; \/**< Mask of channel id's from 0-31. *\/$/;"	m	struct:ShmMsg::__anon19::__anon22
+chunkID	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  char           chunkID[4]; \/\/ not zero terminated!, should be "fmt "$/;"	m	struct:FormatChunk	file:
+chunkID	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  char          chunkID[4];$/;"	m	struct:DataChunk	file:
+chunkSize	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int32          chunkSize; \/\/ does not include first 8 bytes used by first 2 fields.. refers to size of remaining fields and should be set to 16 for wFormatTag = 1$/;"	m	struct:FormatChunk	file:
+chunkSize	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int32         chunkSize; \/\/ does not include the first 8 bytes$/;"	m	struct:DataChunk	file:
+cleanup	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^module_exit(cleanup);$/;"	v
+cleanup	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^void cleanup(void)$/;"	f
+cleanup	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*cleanup)(void);$/;"	m	struct:EmbC
+cleanup	/home/calin/src/rtfsm/kernel/fsm.c	/^module_exit(cleanup);$/;"	v
+cleanup	/home/calin/src/rtfsm/kernel/fsm.c	/^void cleanup (void)$/;"	f
+cleanup	/home/calin/src/rtfsm/kernel/fsm.c	/^void cleanup(void); \/**< Cleanup.. *\/$/;"	p	file:
+cleanup	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void cleanup(void)$/;"	f	file:
+cleanupAOWave	/home/calin/src/rtfsm/kernel/fsm.c	/^static void cleanupAOWave(volatile struct AOWaveINTERNAL *, FSMID_t fsm_id, int bufnum);$/;"	p	file:
+cleanupAOWave	/home/calin/src/rtfsm/kernel/fsm.c	/^static void cleanupAOWave(volatile struct AOWaveINTERNAL *wint, FSMID_t f, int bufnum)$/;"	f	file:
+cleanupAOWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static void cleanupAOWaves(FSMID_t f)$/;"	f	file:
+cleanupAOWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static void cleanupAOWaves(FSMID_t);$/;"	p	file:
+clear	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void clear() { ct = 0; }$/;"	f	struct:CircBuf
+clearAllOutputLines	/home/calin/src/rtfsm/kernel/fsm.c	/^static void clearAllOutputLines(FSMID_t f)$/;"	f	file:
+clearAllOutputLines	/home/calin/src/rtfsm/kernel/fsm.c	/^static void clearAllOutputLines(FSMID_t);$/;"	p	file:
+clearTriggerLines	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void clearTriggerLines(FSMID_t f)$/;"	f	file:
+clearTriggerLines	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void clearTriggerLines(FSMID_t);$/;"	p	file:
+clock_gettime	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void clock_gettime(clockid_t clk, struct timespec *ts)$/;"	f	file:
+clock_gettime	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void clock_gettime(clockid_t clk, struct timespec *ts);$/;"	p	file:
+close	/home/calin/src/rtfsm/utils/WavFile.cpp	/^void OWavFile::close()$/;"	f	class:OWavFile
+close	/home/calin/src/rtfsm/utils/WavFile.h	/^  void close();$/;"	p	class:OWavFile
+closeFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^void RTOS::closeFifo(FIFO f)$/;"	f	class:RTOS
+closeFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^void RTOS::closeFifo(unsigned key)$/;"	f	class:RTOS
+closeFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern void closeFifo(FIFO);$/;"	p	namespace:RTOS
+closeFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern void closeFifo(unsigned key);$/;"	p	namespace:RTOS
+closeFifos	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void closeFifos()$/;"	f	file:
+col	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned char col;  \/* the state machine column *\/$/;"	m	struct:NRTOutput
+cols	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int cols() const { return n; }$/;"	f	struct:Matrix
+cols	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned cols() const { return rows() ? front().size() : 0; }$/;"	f	struct:StringMatrix
+comediCallback	/home/calin/src/rtfsm/kernel/fsm.c	/^static int comediCallback(unsigned int mask, void *ignored)$/;"	f	file:
+commitDataWrites	/home/calin/src/rtfsm/kernel/fsm.c	/^static void commitDataWrites(void)$/;"	f	file:
+commitDataWrites	/home/calin/src/rtfsm/kernel/fsm.c	/^static void commitDataWrites(void);$/;"	p	file:
+compileProgram	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool compileProgram(const std::string & prog_name, const std::string & prog_txt) const;$/;"	p	class:ConnectionThread	file:
+compileProgram	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::compileProgram(const std::string & fsm_name, const std::string & program_text) const$/;"	f	class:ConnectionThread
+connectedThreads	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ConnectedThreadsList connectedThreads;$/;"	v
+connectedThreadsLock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_mutex_t connectedThreadsLock = PTHREAD_MUTEX_INITIALIZER;$/;"	v
+cos	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*cos)(double);$/;"	m	struct:EmbC
+cos	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double cos(double d) { return __embc->cos(d); }$/;"	f
+cosh	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*cosh)(double);$/;"	m	struct:EmbC
+cosh	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double cosh(double d) { return __embc->cosh(d); }$/;"	f
+count	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned long long count() const { return ct; }$/;"	f	struct:CircBuf
+count	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^  unsigned count;$/;"	m	struct:ChanTypeAndCount	file:
+countNormalized	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned long countNormalized() const { return ct > n ? ct%n : ct; }$/;"	f	struct:CircBuf
+countlist	/home/calin/src/rtfsm/user/scanproc.c	/^static int countlist(void **);$/;"	p	file:
+countlist	/home/calin/src/rtfsm/user/scanproc.c	/^static int countlist(void **list)$/;"	f	file:
+create	/home/calin/src/rtfsm/utils/WavFile.cpp	/^bool OWavFile::create(const char *filename, unsigned n_chans, unsigned bits_per_sample, unsigned srate)$/;"	f	class:OWavFile
+create	/home/calin/src/rtfsm/utils/WavFile.h	/^  bool create(const char *filename, unsigned n_chans = 2, unsigned bits_per_sample = 16, unsigned srate = 44100);$/;"	p	class:OWavFile
+createDAQReadThreads	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void createDAQReadThreads()$/;"	f	file:
+createFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^RTOS::FIFO RTOS::createFifo(unsigned & key_out, unsigned size)$/;"	f	class:RTOS
+createFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern FIFO createFifo(unsigned & key_out, unsigned size);$/;"	p	namespace:RTOS
+createNRTReadThreads	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void createNRTReadThreads()$/;"	f	file:
+createTransNotifyThreads	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void createTransNotifyThreads()$/;"	f	file:
+ct	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned long long ct;$/;"	m	struct:CircBuf	file:
+cur	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned aoline, nsamples, loop, cur;$/;"	m	struct:RunState::AOWaveINTERNAL	file:
+current_state	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned current_state; \/* The current state *\/$/;"	m	union:ShmMsg::__anon19
+current_state	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned current_state;$/;"	m	struct:RunState	file:
+current_timer_start	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 current_timer_start; \/* When, in ns, the current timer  started $/;"	m	struct:RunState	file:
+current_ts	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 current_ts; \/* Time elapsed, in ns, since init_ts *\/$/;"	m	struct:RunState	file:
+current_ts_secs	/home/calin/src/rtfsm/kernel/fsm.c	/^    double current_ts_secs; \/* current_ts above, normalized to seconds, used$/;"	m	struct:RunState	file:
+cycle	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile uint64 *cycle; \/\/ the count of the number of cycles since the last time the FSM was reset.  The duration of a cycle is 1.0\/rate seconds (see rate variable below).$/;"	m	struct:EmbC
+cycle	/home/calin/src/rtfsm/include/EmbC.h	/^static inline uint64 cycle(void) { return *__embc->cycle; }$/;"	f
+cycle	/home/calin/src/rtfsm/kernel/fsm.c	/^uint64 cycle = 0; \/* the current cycle *\/$/;"	v
+d	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  double *d;$/;"	m	struct:Matrix	file:
+d	/home/calin/src/rtfsm/utils/GetMatrix.c	/^  double *d;$/;"	m	struct:Matrix	file:
+d	/home/calin/src/rtfsm/utils/SendMatrix.c	/^  double *d;$/;"	m	struct:Matrix	file:
+daqBuf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  CircBuf<DAQScanVec> daqBuf;$/;"	m	struct:FSMSpecific	file:
+daqLock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_mutex_t msgFifoLock, transNotifyLock, daqLock;$/;"	m	struct:FSMSpecific	file:
+daqMaxData	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned daqNumChans, daqMaxData, aoMaxData;$/;"	m	struct:FSMSpecific	file:
+daqNumChans	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned daqNumChans, daqMaxData, aoMaxData;$/;"	m	struct:FSMSpecific	file:
+daqRangeMax	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  double daqRangeMin, daqRangeMax;$/;"	m	struct:FSMSpecific	file:
+daqRangeMin	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  double daqRangeMin, daqRangeMax;$/;"	m	struct:FSMSpecific	file:
+daqReadThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_t transNotifyThread, daqReadThread, nrtReadThread;$/;"	m	struct:FSMSpecific	file:
+daqThrFun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void *daqThrFun();$/;"	p	struct:FSMSpecific	file:
+daqThrFun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void *FSMSpecific::daqThrFun()$/;"	f	class:FSMSpecific
+daqThrWrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void *daqThrWrapper(void *);$/;"	p	file:
+daqThrWrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void *daqThrWrapper(void *arg)$/;"	f	file:
+daq_ai_chanmask	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned daq_ai_nchans, daq_ai_chanmask;$/;"	m	struct:RunState	file:
+daq_ai_nchans	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned daq_ai_nchans, daq_ai_chanmask;$/;"	m	struct:RunState	file:
+data	/home/calin/src/rtfsm/include/FSM.h	/^      char data[NRTOUTPUT_DATA_SIZE];$/;"	m	union:NRTOutput::__anon23
+data	/home/calin/src/rtfsm/include/FSM.h	/^    char data[OUTPUT_SPEC_DATA_SIZE]; \/* for other misc types *\/$/;"	m	union:OutputSpec::__anon14
+dataSizeOffset	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  static const unsigned dataSizeOffset = 40, fileSizeOffset = 4;$/;"	m	struct:OWavFile::Impl	file:
+dataWrite	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void dataWrite(unsigned chan, unsigned bit)$/;"	f	file:
+dataWrite	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void dataWrite(unsigned chan, unsigned bit);$/;"	p	file:
+debug	/home/calin/src/rtfsm/kernel/fsm.c	/^    debug = 0,$/;"	v
+debug	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool debug = false; \/\/ set with -d command-line switch to enable debug mode.$/;"	v
+deflateCpy	/home/calin/src/rtfsm/include/deflate_helper.h	/^extern char *deflateCpy(const char *buf, unsigned buflen, unsigned * comp_size_out);$/;"	p
+deflateCpy	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^char *deflateCpy(const char *buf, unsigned buflen, unsigned *cmplen_out)$/;"	f
+deflateInplace	/home/calin/src/rtfsm/include/deflate_helper.h	/^extern int deflateInplace(char *buf, unsigned buflen, unsigned bufsize_max);$/;"	p
+deflateInplace	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^int deflateInplace(char *buf, unsigned buflen, unsigned buftotal)$/;"	f
+destroyAllFifos	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^void RTOS::destroyAllFifos()$/;"	f	class:RTOS
+destroyAllFifos	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern void destroyAllFifos();$/;"	p	namespace:RTOS
+detectInputEvents	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long detectInputEvents(FSMID_t f)$/;"	f	file:
+detectInputEvents	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long detectInputEvents(FSMID_t); \/**< returns 0 on no input detected, otherwise returns bitfield array of all the events detected -- each bit corresponds to a state matrix "in event column" position, eg center in is bit 0, center out is bit 1, left-in is bit 2, etc *\/$/;"	p	file:
+determine	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^RTOS::RTOS RTOS::determine()$/;"	f	class:RTOS
+determine	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern RTOS determine();  $/;"	p	namespace:RTOS
+dev	/home/calin/src/rtfsm/kernel/fsm.c	/^static comedi_t *dev = 0, *dev_ai = 0, *dev_ao = 0;$/;"	v	file:
+dev_ai	/home/calin/src/rtfsm/kernel/fsm.c	/^static comedi_t *dev = 0, *dev_ai = 0, *dev_ao = 0;$/;"	v	file:
+dev_ao	/home/calin/src/rtfsm/kernel/fsm.c	/^static comedi_t *dev = 0, *dev_ai = 0, *dev_ao = 0;$/;"	v	file:
+dh_helper_alloc	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^  static void *dh_helper_alloc(void *opaque, uInt items, uInt size)$/;"	f	file:
+dh_helper_free	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^  static void dh_helper_free(void *opaque, void *address)$/;"	f	file:
+di_chans_in_use_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0; $/;"	v
+didInitRunStates	/home/calin/src/rtfsm/kernel/fsm.c	/^static char didInitRunStates = 0;$/;"	v	file:
+did_init	/home/calin/src/rtfsm/kernel/softtask.c	/^static volatile int did_init = 0;$/;"	v	file:
+dio_bits	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;$/;"	v
+dio_bits_prev	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;$/;"	v
+dio_line	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int dio_line;$/;"	m	struct:SchedWaveSpec	file:
+dispatchEvent	/home/calin/src/rtfsm/kernel/fsm.c	/^static void dispatchEvent(FSMID_t f, unsigned event_id)$/;"	f	file:
+dispatchEvent	/home/calin/src/rtfsm/kernel/fsm.c	/^static void dispatchEvent(FSMID_t, unsigned event_id);$/;"	p	file:
+doCompileLoadProgram	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool doCompileLoadProgram(const std::string &prog_name, const std::string & program_text) const;$/;"	p	class:ConnectionThread	file:
+doCompileLoadProgram	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::doCompileLoadProgram(const std::string & prog_name, const std::string & prog_text) const$/;"	f	class:ConnectionThread
+doDAQ	/home/calin/src/rtfsm/kernel/fsm.c	/^static void doDAQ(void)$/;"	f	file:
+doDAQ	/home/calin/src/rtfsm/kernel/fsm.c	/^static void doDAQ(void); \/* does the data acquisition for remaining channels that grabAI didn't get.  See STARTDAQ fifo cmd. *\/$/;"	p	file:
+doFSM	/home/calin/src/rtfsm/kernel/fsm.c	/^static void *doFSM (void *);$/;"	p	file:
+doFSM	/home/calin/src/rtfsm/kernel/fsm.c	/^static void *doFSM (void *arg)$/;"	f	file:
+doGetTransitionsFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix doGetTransitionsFromRT(int & first) { int dummy = -1; return doGetTransitionsFromRT(first, dummy); }$/;"	f	class:ConnectionThread	file:
+doGetTransitionsFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix doGetTransitionsFromRT(int & first, int & last) { int dummy; return doGetTransitionsFromRT(first, last, dummy); }$/;"	f	class:ConnectionThread	file:
+doGetTransitionsFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix doGetTransitionsFromRT(int & first, int & last, int & state);$/;"	p	class:ConnectionThread	file:
+doGetTransitionsFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^Matrix ConnectionThread::doGetTransitionsFromRT(int & first, int & last, int & state)$/;"	f	class:ConnectionThread
+doNRT_IP	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void doNRT_IP(const NRTOutput *, bool isUDP) const;$/;"	p	struct:FSMSpecific	file:
+doNRT_IP	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP) const$/;"	f	class:FSMSpecific
+doNotifyEvents	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void doNotifyEvents(bool full = false); \/\/\/< if in full mode, actually write out the text of the event, one per line, otherwise write only the character 'e' with no newline$/;"	p	class:ConnectionThread	file:
+doNotifyEvents	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void ConnectionThread::doNotifyEvents(bool verbose)$/;"	f	class:ConnectionThread
+doOutput	/home/calin/src/rtfsm/kernel/fsm.c	/^static void doOutput(FSMID_t f)$/;"	f	file:
+doOutput	/home/calin/src/rtfsm/kernel/fsm.c	/^static void doOutput(FSMID_t);$/;"	p	file:
+doSanityChecksRuntime	/home/calin/src/rtfsm/kernel/fsm.c	/^static int doSanityChecksRuntime(FSMID_t f)$/;"	f	file:
+doSanityChecksRuntime	/home/calin/src/rtfsm/kernel/fsm.c	/^static int doSanityChecksRuntime(FSMID_t); \/**< Checks FSM input\/output params *\/$/;"	p	file:
+doSanityChecksStartup	/home/calin/src/rtfsm/kernel/fsm.c	/^static int doSanityChecksStartup(void)$/;"	f	file:
+doSanityChecksStartup	/home/calin/src/rtfsm/kernel/fsm.c	/^static int doSanityChecksStartup(void); \/**< Checks mod params are sane. *\/$/;"	p	file:
+doServer	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void doServer(void)$/;"	f	file:
+doSetStateProgram	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool doSetStateProgram();$/;"	p	class:ConnectionThread	file:
+doSetStateProgram	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::doSetStateProgram()$/;"	f	class:ConnectionThread
+doSetupThatNeededFloatingPoint	/home/calin/src/rtfsm/kernel/fsm.c	/^static void doSetupThatNeededFloatingPoint(void);$/;"	p	file:
+doSetupThatNeededFloatingPoint	/home/calin/src/rtfsm/kernel/fsm.c	/^void  doSetupThatNeededFloatingPoint(void)$/;"	f
+do_chans_cont_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned do_chans_trig_mask, do_chans_cont_mask;$/;"	m	struct:RunState	file:
+do_chans_in_use_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0; $/;"	v
+do_chans_trig_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned do_chans_trig_mask, do_chans_cont_mask;$/;"	m	struct:RunState	file:
+duplicate	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void duplicate() { Impl * i = new Impl(*p);  i->nrefs = 1; i->t = new T(*p->t); ref_decr(); p = i; }$/;"	f	class:shallow_copy
+dwAvgBytesPerSec	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint32         dwAvgBytesPerSec; \/* = wBlockAlign * dwSamplesPerSec *\/$/;"	m	struct:FormatChunk	file:
+dwSamplesPerSec	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint32         dwSamplesPerSec; \/* samplerate in Hz *\/$/;"	m	struct:FormatChunk	file:
+edge_down_ts	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 edge_down_ts; \/**< from: edge_up_ts + SchedWave::sustain_us        *\/$/;"	m	struct:RunState::ActiveWave	file:
+edge_up_ts	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 edge_up_ts;   \/**< from: current_ts + SchedWave::preamble_us       *\/$/;"	m	struct:RunState::ActiveWave	file:
+elapsed	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  double elapsed() const; \/\/ returns number of seconds since ctor or reset() was called $/;"	p	class:Timer	file:
+elapsed	/home/calin/src/rtfsm/user/FSMServer.cpp	/^double Timer::elapsed() const$/;"	f	class:Timer
+embc	/home/calin/src/rtfsm/include/FSM.h	/^  struct EmbC *embc;$/;"	m	struct:FSMSpec	typeref:struct:FSMSpec::EmbC
+emblib_logArray	/home/calin/src/rtfsm/kernel/fsm.c	/^static void emblib_logArray(unsigned f, const char *nam, const double *v, unsigned n)$/;"	f	file:
+emblib_logArray	/home/calin/src/rtfsm/kernel/fsm.c	/^static void emblib_logArray(unsigned, const char *, const double *, unsigned n);$/;"	p	file:
+emblib_logValue	/home/calin/src/rtfsm/kernel/fsm.c	/^static void emblib_logValue(unsigned f, const char * nam, double v)$/;"	f	file:
+emblib_logValue	/home/calin/src/rtfsm/kernel/fsm.c	/^static void emblib_logValue(unsigned, const char *, double);$/;"	p	file:
+emblib_rand	/home/calin/src/rtfsm/kernel/fsm.c	/^static double emblib_rand(void) $/;"	f	file:
+emblib_rand	/home/calin/src/rtfsm/kernel/fsm.c	/^static double emblib_rand(void);$/;"	p	file:
+emblib_randNormalized	/home/calin/src/rtfsm/kernel/fsm.c	/^static double emblib_randNormalized(void)$/;"	f	file:
+emblib_randNormalized	/home/calin/src/rtfsm/kernel/fsm.c	/^static double emblib_randNormalized(void);$/;"	p	file:
+enabled	/home/calin/src/rtfsm/include/FSM.h	/^  int enabled; \/**< Iff true, actually use this sched_wave.  Otherwise it's$/;"	m	struct:SchedWave
+end_ts	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 end_ts;       \/**< from: edge_down_ts + SchedWave::refractory_us   *\/$/;"	m	struct:RunState::ActiveWave	file:
+entry	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*entry)(unsigned short);$/;"	m	struct:EmbC
+error	/home/calin/src/rtfsm/include/FSM.h	/^      char error[FSM_ERROR_BUF_SIZE];$/;"	m	union:ShmMsg::__anon19
+event	/home/calin/src/rtfsm/include/EmbC.h	/^  uint event; \/\/ the event id that led to this transition$/;"	m	struct:EmbCTransition
+event_id	/home/calin/src/rtfsm/include/FSM.h	/^  signed char event_id; \/* The event_id that *led* to this state.  An event_id$/;"	m	struct:StateTransition
+evt_cols	/home/calin/src/rtfsm/include/FSM.h	/^  signed char evt_cols[AOWAVE_MAX_SAMPLES]; \/**< the state matrix$/;"	m	struct:AOWave
+evt_cols	/home/calin/src/rtfsm/kernel/fsm.c	/^    signed char *evt_cols;$/;"	m	struct:RunState::AOWaveINTERNAL	file:
+exit	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*exit)(unsigned short);$/;"	m	struct:EmbC
+exp	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*exp)(double); \/* e raised to x *\/$/;"	m	struct:EmbC
+exp	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double exp(double d) { return __embc->exp(d); }$/;"	f
+exp10	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*exp10)(double); \/* 10 raised to x *\/$/;"	m	struct:EmbC
+exp10	/home/calin/src/rtfsm/kernel/fsm.c	/^static double exp10(double x) { return pow(10., x); }$/;"	f	file:
+exp2	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*exp2)(double); \/* 2 raised to x *\/$/;"	m	struct:EmbC
+exp2	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double exp2(double d) { return __embc->exp2(d); }$/;"	f
+exp2	/home/calin/src/rtfsm/kernel/fsm.c	/^static double exp2(double x) { return pow(2., x); }$/;"	f	file:
+expn	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*expn)(int,double); \/* exponential inegral n *\/$/;"	m	struct:EmbC
+expn	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double expn(int i, double d) { return __embc->expn(i,d); }$/;"	f
+expn	/home/calin/src/rtfsm/kernel/fsm.c	/^static double expn(int i, double d) { (void)i; (void)d; return 0.; }$/;"	f	file:
+extTimeShm	/home/calin/src/rtfsm/kernel/fsm.c	/^static volatile struct FSMExtTimeShm *extTimeShm = 0; \/* for external time synch. *\/$/;"	v	typeref:struct:FSMExtTimeShm	file:
+extTrigShm	/home/calin/src/rtfsm/kernel/fsm.c	/^static volatile struct FSMExtTrigShm *extTrigShm = 0; \/* For external triggeting (sound, etc..) *\/$/;"	v	typeref:struct:FSMExtTrigShm	file:
+ext_current_ts	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 ext_current_ts; \/** Abs. time from external reference -- $/;"	m	struct:RunState	file:
+ext_ts	/home/calin/src/rtfsm/include/FSM.h	/^  long long ext_ts; \/* Nanosecond timestamp from external reference clock *\/$/;"	m	struct:StateTransition
+f	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  std::ofstream f;$/;"	m	struct:OWavFile::Impl	file:
+fabs	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*fabs)(double);$/;"	m	struct:EmbC
+fabs	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double fabs(double d) { return __embc->fabs(d); }$/;"	f
+fac	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*fac)(int); \/* factorial *\/$/;"	m	struct:EmbC
+fac	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double fac(int i) { return __embc->fac(i); }$/;"	f
+fac	/home/calin/src/rtfsm/kernel/fsm.c	/^static double fac(int i) { double ret = i; while (--i > 0) ret *= i;  return ret; }$/;"	f	file:
+ffwdSpaces	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static const char *ffwdSpaces(const char *p)$/;"	f	file:
+fifoFilePrefix	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^const char *RTOS::fifoFilePrefix(int rtos)$/;"	f	class:RTOS
+fifoFilePrefix	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern const char *fifoFilePrefix(int rtos = -1);$/;"	p	namespace:RTOS
+fifoNReadyForReading	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^int RTOS::fifoNReadyForReading(FIFO f)$/;"	f	class:RTOS
+fifoNReadyForReading	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern int fifoNReadyForReading(FIFO);$/;"	p	namespace:RTOS
+fifoReadAllAvail	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void fifoReadAllAvail(RTOS::FIFO f)$/;"	f	file:
+fifo_daq	/home/calin/src/rtfsm/include/FSM.h	/^    int fifo_daq[NUM_STATE_MACHINES]; \/* Kernel-to-user FIFO that contains DAQ scans.. *\/$/;"	m	struct:Shm
+fifo_daq	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  RTOS::FIFO fifo_in, fifo_out, fifo_trans, fifo_daq, fifo_nrt_output;$/;"	m	struct:FSMSpecific	file:
+fifo_debug	/home/calin/src/rtfsm/include/FSM.h	/^    int fifo_debug; \/* The kernel-to-user FIFO setup for debugging           *\/$/;"	m	struct:Shm
+fifo_in	/home/calin/src/rtfsm/include/FSM.h	/^    int fifo_in[NUM_STATE_MACHINES];  \/* The user-to-kernel FIFO             *\/$/;"	m	struct:Shm
+fifo_in	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  RTOS::FIFO fifo_in, fifo_out, fifo_trans, fifo_daq, fifo_nrt_output;$/;"	m	struct:FSMSpecific	file:
+fifo_map	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  std::map<unsigned, RTOS::Fifo *> fifo_map; \/\/ map of key -> fifo instance$/;"	v
+fifo_nrt_output	/home/calin/src/rtfsm/include/FSM.h	/^    int fifo_nrt_output[NUM_STATE_MACHINES]; \/* Kernel-to-user FIFO that contains NRTOutput structs for non-realtime state machine outputs! *\/$/;"	m	struct:Shm
+fifo_nrt_output	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  RTOS::FIFO fifo_in, fifo_out, fifo_trans, fifo_daq, fifo_nrt_output;$/;"	m	struct:FSMSpecific	file:
+fifo_out	/home/calin/src/rtfsm/include/FSM.h	/^    int fifo_out[NUM_STATE_MACHINES]; \/* The kernel-to-user FIFO             *\/$/;"	m	struct:Shm
+fifo_out	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  RTOS::FIFO fifo_in, fifo_out, fifo_trans, fifo_daq, fifo_nrt_output;$/;"	m	struct:FSMSpecific	file:
+fifo_trans	/home/calin/src/rtfsm/include/FSM.h	/^    int fifo_trans[NUM_STATE_MACHINES]; \/* Kernel-to-user FIFO to notify of $/;"	m	struct:Shm
+fifo_trans	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  RTOS::FIFO fifo_in, fifo_out, fifo_trans, fifo_daq, fifo_nrt_output;$/;"	m	struct:FSMSpecific	file:
+fifos	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  std::set<RTOS::Fifo *> fifos;$/;"	v
+fileLength	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint32 fileLength; \/\/ size of rest of file not including first 8 bytes$/;"	m	struct:Header	file:
+fileSizeOffset	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  static const unsigned dataSizeOffset = 40, fileSizeOffset = 4;$/;"	m	struct:OWavFile::Impl	file:
+find_free_rtf	/home/calin/src/rtfsm/kernel/fsm.c	/^static int find_free_rtf(unsigned *minor, unsigned size)$/;"	f	file:
+find_in_list	/home/calin/src/rtfsm/user/scanproc.c	/^static int find_in_list(void **list, void *val)$/;"	f	file:
+find_in_list	/home/calin/src/rtfsm/user/scanproc.c	/^static int find_in_list(void **list, void *val);$/;"	p	file:
+find_module_in_modlist	/home/calin/src/rtfsm/user/scanproc.c	/^const struct ModList * find_module_in_modlist(const struct ModList *ml,$/;"	f
+find_module_in_modlist	/home/calin/src/rtfsm/user/scanproc.h	/^  extern const struct ModList * find_module_in_modlist(const struct ModList *,$/;"	p
+first_in_chan	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned first_in_chan; \/** <= FSM_MAX_IN_CHANS                      *\/$/;"	m	struct:FSMSpec::Routing
+flags	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^	unsigned int flags;$/;"	m	struct:mbuff_request_struct
+floor	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*floor)(double);$/;"	m	struct:EmbC
+floor	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double floor(double d) { return __embc->floor(d); }$/;"	f
+fmt_text	/home/calin/src/rtfsm/include/FSM.h	/^      char fmt_text[FMT_TEXT_LEN];$/;"	m	struct:OutputSpec::__anon14::__anon17
+forced_event	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned forced_event;$/;"	m	union:ShmMsg::__anon19
+forced_event	/home/calin/src/rtfsm/kernel/fsm.c	/^    int forced_event; \/* If non-negative, force this event. *\/$/;"	m	struct:RunState	file:
+forced_outputs	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned forced_outputs; \/* Bitarray of ABSOLUTE channel id's *\/$/;"	m	union:ShmMsg::__anon19
+forced_outputs_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned int forced_outputs_mask; \/**< Bitmask indexed by DIO channel-id *\/$/;"	m	struct:RunState	file:
+forced_state	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned forced_state;  \/* The forced state *\/$/;"	m	union:ShmMsg::__anon19
+forced_times_up	/home/calin/src/rtfsm/kernel/fsm.c	/^    int forced_times_up; \/* If true, time's up event will be forced this tick,$/;"	m	struct:RunState	file:
+forced_triggers	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned forced_triggers; \/* Bitarray of ABSOLUTE channel id's.. *\/$/;"	m	union:ShmMsg::__anon19
+freeDHBuf	/home/calin/src/rtfsm/include/deflate_helper.h	/^extern void freeDHBuf(void *buf);$/;"	p
+freeDHBuf	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^void freeDHBuf(void *buf) { DH_FREE(buf); }$/;"	f
+free_module_list	/home/calin/src/rtfsm/user/scanproc.c	/^void free_module_list(const struct ModList *ml_in)$/;"	f
+free_module_list	/home/calin/src/rtfsm/user/scanproc.h	/^  extern void free_module_list(const struct ModList *);$/;"	p
+from	/home/calin/src/rtfsm/include/EmbC.h	/^  uint from; \/\/ the state we came from$/;"	m	struct:EmbCTransition
+from	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned from; $/;"	m	struct:ShmMsg::__anon19::__anon20
+from	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned from;$/;"	m	struct:ShmMsg::__anon19::__anon21
+from	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned from; $/;"	m	struct:OutputSpec::__anon14::__anon15
+fromLE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int16 fromLE(int16 x) { return LE(x); }$/;"	f	namespace:__anon11
+fromLE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int16 fromLE(int16);$/;"	p	namespace:__anon9	file:
+fromLE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int32 fromLE(int32 x) { return LE(x); }$/;"	f	namespace:__anon11
+fromLE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int32 fromLE(int32);$/;"	p	namespace:__anon9	file:
+fromLE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint16 fromLE(uint16 x) { return fromLE(*reinterpret_cast<int16 *>(&x)); }$/;"	f	namespace:__anon9
+fromLE	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint32 fromLE(uint32 x) { return fromLE(*reinterpret_cast<int32 *>(&x)); }$/;"	f	namespace:__anon9
+fsm	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile uint *fsm; \/\/ the id number of the fsm.  usually 0 but if 1 machine is running multiple FSMs, maybe larger than 0$/;"	m	struct:EmbC
+fsm	/home/calin/src/rtfsm/include/EmbC.h	/^static inline uint fsm(void) { return *__embc->fsm; }$/;"	f
+fsm	/home/calin/src/rtfsm/include/FSM.h	/^      struct FSMSpec fsm;$/;"	m	union:ShmMsg::__anon19	typeref:struct:ShmMsg::__anon19::FSMSpec
+fsmLinkProgram	/home/calin/src/rtfsm/kernel/fsm.c	/^static int fsmLinkProgram(FSMID_t f, struct FSMSpec *fsmspec_ptr);$/;"	p	file:
+fsmLinkProgram	/home/calin/src/rtfsm/kernel/fsm.c	/^static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)$/;"	f	file:
+fsm_cycle_long_ct	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long fsm_cycle_long_ct = 0, fsm_wakeup_jittered_ct = 0;$/;"	v	file:
+fsm_id	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int sock, myid, fsm_id;$/;"	m	class:ConnectionThread	file:
+fsm_size	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned short fsm_size[2]; \/* [0] == rows, [1] == cols *\/$/;"	m	union:ShmMsg::__anon19
+fsm_wakeup_jittered_ct	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long fsm_cycle_long_ct = 0, fsm_wakeup_jittered_ct = 0;$/;"	v	file:
+fsms	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static FSMSpecific fsms[NUM_STATE_MACHINES];$/;"	v	file:
+func	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^  GetTime_Func func;$/;"	m	struct:FSMExtTimeShm
+function	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^  FSMExtTrigFn_t function;$/;"	m	struct:FSMExtTrigShm
+gamma	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*gamma)(double); \/* see man gamma *\/$/;"	m	struct:EmbC
+gamma	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double gamma(double d) { return __embc->gamma(d); }$/;"	f
+genStringTable	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static std::string genStringTable(const Matrix &m);$/;"	p	class:ConnectionThread	file:
+genStringTable	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static std::string genStringTable(const StringMatrix &m);$/;"	p	class:ConnectionThread	file:
+genStringTable	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::string ConnectionThread::genStringTable(const Matrix &m) $/;"	f	class:ConnectionThread
+genStringTable	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::string ConnectionThread::genStringTable(const StringMatrix &m) $/;"	f	class:ConnectionThread
+get	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  T & get() { return *p->t; }$/;"	f	class:shallow_copy
+get	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  const T & get() const { return *p->t; }$/;"	f	class:shallow_copy
+getDAQScans	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix getDAQScans(); \/**< returns an MxN matrix, where each row is a scan $/;"	p	struct:FSMSpecific	file:
+getDAQScans	/home/calin/src/rtfsm/user/FSMServer.cpp	/^Matrix FSMSpecific::getDAQScans()$/;"	f	class:FSMSpecific
+getFSMSizeFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void getFSMSizeFromRT(unsigned & rows_out, unsigned & cols_out);$/;"	p	class:ConnectionThread	file:
+getFSMSizeFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void ConnectionThread::getFSMSizeFromRT(unsigned & r, unsigned & c)$/;"	f	class:ConnectionThread
+getNumInputEventsFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned getNumInputEventsFromRT(void);$/;"	p	class:ConnectionThread	file:
+getNumInputEventsFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^unsigned ConnectionThread::getNumInputEventsFromRT(void)$/;"	f	class:ConnectionThread
+get_at	/home/calin/src/rtfsm/include/EmbC.h	/^  unsigned long (*get_at)(unsigned short, unsigned short);$/;"	m	struct:EmbC
+get_module_list	/home/calin/src/rtfsm/user/scanproc.c	/^const struct ModList * get_module_list(void)$/;"	f
+get_module_list	/home/calin/src/rtfsm/user/scanproc.h	/^  extern const struct ModList * get_module_list(void);  $/;"	p
+get_my_exe	/home/calin/src/rtfsm/user/scanproc.c	/^static char *get_my_exe(void)$/;"	f	file:
+get_num_chans	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^static int get_num_chans(comedi_t *it, unsigned subdev_type, SDevChanMap * sdevs = 0)$/;"	f	file:
+gethostbyname2_r	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int gethostbyname2_r(const char *name, int af,$/;"	f	namespace:__anon5
+gethostbyname2_r	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int gethostbyname2_r(const char *name, int af,$/;"	p	namespace:__anon1	file:
+gethrtime	/home/calin/src/rtfsm/kernel/fsm.c	/^   static inline hrtime_t gethrtime(void) { return count2nano(rt_get_time()); }$/;"	f	file:
+gotoState	/home/calin/src/rtfsm/kernel/fsm.c	/^static int gotoState(FSMID_t f, unsigned state, int event_id)$/;"	f	file:
+gotoState	/home/calin/src/rtfsm/kernel/fsm.c	/^static int gotoState(FSMID_t, unsigned state_no, int event_id_for_history); \/**< returns 1 if new state, 0 if was the same and no real transition ocurred, -1 on error *\/$/;"	p	file:
+grabAI	/home/calin/src/rtfsm/kernel/fsm.c	/^static void grabAI(void)$/;"	f	file:
+grabAI	/home/calin/src/rtfsm/kernel/fsm.c	/^static void grabAI(void); \/* AI version of above.. *\/$/;"	p	file:
+grabAllDIO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void grabAllDIO(void)$/;"	f	file:
+grabAllDIO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void grabAllDIO(void);$/;"	p	file:
+grab_full_cmd_name_of_pid	/home/calin/src/rtfsm/user/scanproc.c	/^char * grab_full_cmd_name_of_pid(pid_t pid, int *sz)$/;"	f
+grab_full_cmd_name_of_pid	/home/calin/src/rtfsm/user/scanproc.h	/^  extern char * grab_full_cmd_name_of_pid(pid_t pid, int *sz);$/;"	p
+grab_my_full_cmd_name	/home/calin/src/rtfsm/user/scanproc.c	/^char * grab_my_full_cmd_name(int *sz)$/;"	f
+grab_my_full_cmd_name	/home/calin/src/rtfsm/user/scanproc.h	/^  extern char * grab_my_full_cmd_name(int *sz);$/;"	p
+grab_my_stripped_cmd_name	/home/calin/src/rtfsm/user/scanproc.c	/^char * grab_my_stripped_cmd_name(int *sz)$/;"	f
+grab_my_stripped_cmd_name	/home/calin/src/rtfsm/user/scanproc.h	/^  extern char * grab_my_stripped_cmd_name(int *sz);$/;"	p
+grab_parent_of_pid	/home/calin/src/rtfsm/user/scanproc.c	/^pid_t grab_parent_of_pid(pid_t pid) $/;"	f
+grab_parent_of_pid	/home/calin/src/rtfsm/user/scanproc.h	/^  extern pid_t grab_parent_of_pid(pid_t pid);$/;"	p
+grab_stripped_cmd_name_of_pid	/home/calin/src/rtfsm/user/scanproc.c	/^char * grab_stripped_cmd_name_of_pid(pid_t pid, int *sz)$/;"	f
+grab_stripped_cmd_name_of_pid	/home/calin/src/rtfsm/user/scanproc.h	/^  extern char * grab_stripped_cmd_name_of_pid(pid_t pid, int *sz);$/;"	p
+handle	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_t handle;$/;"	m	class:ConnectionThread	file:
+handle	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  long handle; \/* EMULATOR:$/;"	m	struct:RTOS::Fifo	file:
+handleArgs	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void handleArgs(int argc, char *argv[])$/;"	f	file:
+handleFifos	/home/calin/src/rtfsm/kernel/fsm.c	/^static void handleFifos(FSMID_t f)$/;"	f	file:
+handleFifos	/home/calin/src/rtfsm/kernel/fsm.c	/^static void handleFifos(FSMID_t);$/;"	p	file:
+hasRun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool hasRun() const {return thread_ran;}$/;"	f	class:ConnectionThread
+has_sched_waves	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned has_sched_waves;$/;"	m	struct:FSMSpec
+have_proc_fs	/home/calin/src/rtfsm/user/scanproc.c	/^static int have_proc_fs(void)$/;"	f	file:
+have_proc_fs	/home/calin/src/rtfsm/user/scanproc.c	/^static int have_proc_fs(void);$/;"	p	file:
+history	/home/calin/src/rtfsm/kernel/fsm.c	/^    struct StateHistory history;             \/* Our state history record.   *\/$/;"	m	struct:RunState	typeref:struct:RunState::StateHistory	file:
+historyAt	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct StateTransition *historyAt(FSMID_t f, unsigned idx) $/;"	f	file:
+historyAt	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct StateTransition *historyAt(FSMID_t, unsigned);$/;"	p	file:
+historyPush	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void historyPush(FSMID_t f, int event_id)$/;"	f	file:
+historyPush	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void historyPush(FSMID_t, int event_id);$/;"	p	file:
+historyTop	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct StateTransition *historyTop(FSMID_t f)$/;"	f	file:
+historyTop	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct StateTransition *historyTop(FSMID_t);$/;"	p	file:
+host	/home/calin/src/rtfsm/include/FSM.h	/^      char host[IP_HOST_LEN];$/;"	m	struct:OutputSpec::__anon14::__anon17
+host	/home/calin/src/rtfsm/utils/GetMatrix.c	/^static const char *host = "localhost";$/;"	v	file:
+host	/home/calin/src/rtfsm/utils/GetValue.c	/^static const char *host = "localhost";$/;"	v	file:
+host	/home/calin/src/rtfsm/utils/SendMatrix.c	/^static const char *host = "localhost";$/;"	v	file:
+hrtime_t	/home/calin/src/rtfsm/kernel/fsm.c	/^   typedef RTIME hrtime_t;$/;"	t	file:
+id	/home/calin/src/rtfsm/include/FSM.h	/^    int id; \/* One of ShmMsgID above.. *\/$/;"	m	struct:ShmMsg
+id	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned id;$/;"	m	struct:AOWave
+id	/home/calin/src/rtfsm/kernel/fsm.c	/^    FSMID_t id; \/* the ID of this RunState; links to embedded C's 'fsm' var *\/$/;"	m	struct:RunState	file:
+id	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int id;$/;"	m	struct:SchedWaveSpec	file:
+id	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static int id;$/;"	m	class:ConnectionThread	file:
+id	/home/calin/src/rtfsm/user/FSMServer.cpp	/^int ConnectionThread::id = 0;$/;"	m	class:ConnectionThread	file:
+in_chan_type	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned in_chan_type; \/** either AI_TYPE, DIO_TYPE, or UNKNOWN_TYPE *\/$/;"	m	struct:FSMSpec::Routing
+in_evt_col	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int in_evt_col;$/;"	m	struct:SchedWaveSpec	file:
+inflateCpy	/home/calin/src/rtfsm/include/deflate_helper.h	/^extern char *inflateCpy(const char *buf, unsigned buflen, unsigned uncomp_buf_max, unsigned * uncomp_size_out);$/;"	p
+inflateCpy	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^char *inflateCpy(const char *buf, unsigned buflen, unsigned bufmax, unsigned * uncomp_size_out)$/;"	f
+inflateInplace	/home/calin/src/rtfsm/include/deflate_helper.h	/^extern int inflateInplace(char *buf, unsigned buflen_comp, unsigned bufsize_max);$/;"	p
+inflateInplace	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^int inflateInplace(char *buf, unsigned buflen_comp, unsigned bufsize)$/;"	f
+init	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^int init(void)$/;"	f
+init	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^module_init(init);$/;"	v
+init	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*init)(void);$/;"	m	struct:EmbC
+init	/home/calin/src/rtfsm/kernel/fsm.c	/^int init (void)$/;"	f
+init	/home/calin/src/rtfsm/kernel/fsm.c	/^int init(void);  \/**< Initialize data structures and register callback *\/$/;"	p	file:
+init	/home/calin/src/rtfsm/kernel/fsm.c	/^module_init(init);$/;"	v
+init	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void init()$/;"	f	file:
+initAISubdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initAISubdev(void)$/;"	f	file:
+initAISubdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initAISubdev(void); \/* Helper for initComedi() *\/$/;"	p	file:
+initAOSubdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initAOSubdev(void)$/;"	f	file:
+initAOSubdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initAOSubdev(void); \/* Helper for initComedi() *\/$/;"	p	file:
+initBuddyTask	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initBuddyTask(void)$/;"	f	file:
+initBuddyTask	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initBuddyTask(void);$/;"	p	file:
+initComedi	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initComedi(void) $/;"	f	file:
+initComedi	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initComedi(void);$/;"	p	file:
+initFifos	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initFifos(void)$/;"	f	file:
+initFifos	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initFifos(void);$/;"	p	file:
+initRT	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initRT(void)$/;"	f	file:
+initRT	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initRT(void);$/;"	p	file:
+initRunState	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initRunState(FSMID_t f)$/;"	f	file:
+initRunState	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initRunState(FSMID_t);$/;"	p	file:
+initRunStates	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initRunStates(void)$/;"	f	file:
+initRunStates	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initRunStates(void);$/;"	p	file:
+initShm	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initShm(void)$/;"	f	file:
+initShm	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initShm(void);$/;"	p	file:
+initTaskPeriod	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initTaskPeriod(void)$/;"	f	file:
+initTaskPeriod	/home/calin/src/rtfsm/kernel/fsm.c	/^static int initTaskPeriod(void);$/;"	p	file:
+init_ts	/home/calin/src/rtfsm/kernel/fsm.c	/^    int64 init_ts; \/* Time of initialization, in nanoseconds.  Absolute$/;"	m	struct:RunState	file:
+input_routing	/home/calin/src/rtfsm/include/FSM.h	/^    int input_routing[FSM_MAX_IN_EVENTS];$/;"	m	struct:FSMSpec::Routing
+int16	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef int16_t int16;$/;"	t
+int32	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef int32_t int32;$/;"	t
+int64	/home/calin/src/rtfsm/include/EmbC.h	/^typedef long long int64;$/;"	t
+int64	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef int64_t int64;$/;"	t
+int8	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef int8_t int8;$/;"	t
+ip_host	/home/calin/src/rtfsm/include/FSM.h	/^        char ip_host[IP_HOST_LEN];$/;"	m	struct:NRTOutput::__anon23::__anon24
+ip_packet_fmt	/home/calin/src/rtfsm/include/FSM.h	/^        char ip_packet_fmt[FMT_TEXT_LEN];$/;"	m	struct:NRTOutput::__anon23::__anon24
+ip_port	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned short ip_port;$/;"	m	struct:NRTOutput::__anon23::__anon24
+irqTasks	/home/calin/src/rtfsm/kernel/softtask.c	/^static SoftTask *irqTasks[MAX_IRQ]; \/* Table mapping irq -> SoftTask * *\/$/;"	v	file:
+isBigEndian	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  bool isBigEndian()$/;"	f	namespace:__anon11
+isBigEndian	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  bool isBigEndian();$/;"	p	namespace:__anon9	file:
+isOk	/home/calin/src/rtfsm/utils/WavFile.cpp	/^bool OWavFile::isOk() const$/;"	f	class:OWavFile
+isOk	/home/calin/src/rtfsm/utils/WavFile.h	/^  bool isOk() const;$/;"	p	class:OWavFile
+isOpen	/home/calin/src/rtfsm/utils/WavFile.cpp	/^bool OWavFile::isOpen() const$/;"	f	class:OWavFile
+isOpen	/home/calin/src/rtfsm/utils/WavFile.h	/^  bool isOpen() const;$/;"	p	class:OWavFile
+isRunning	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool isRunning() const {return thread_running;}$/;"	f	class:ConnectionThread
+is_paused	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned is_paused; $/;"	m	union:ShmMsg::__anon19
+is_valid	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned is_valid;$/;"	m	union:ShmMsg::__anon19
+isnan	/home/calin/src/rtfsm/include/EmbC.h	/^  int (*isnan)(double); \/* true if x is NaN (not a number) *\/$/;"	m	struct:EmbC
+isnan	/home/calin/src/rtfsm/include/EmbC.h	/^static inline int isnan(double d) { return __embc->isnan(d); }$/;"	f
+isnan	/home/calin/src/rtfsm/kernel/fsm.c	/^int isnan(double x) { return __isnan(x); }$/;"	f
+items	/home/calin/src/rtfsm/include/FSM.h	/^        struct VarLogItem items[MSG_MAX_TRANSITIONS];$/;"	m	struct:ShmMsg::__anon19::__anon21	typeref:struct:ShmMsg::__anon19::__anon21::VarLogItem
+key	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  int key;    \/* the minor specified at open time *\/$/;"	m	struct:RTOS::Fifo	file:
+lastTriggers	/home/calin/src/rtfsm/kernel/fsm.c	/^unsigned int lastTriggers; \/* Remember the trigger lines -- these $/;"	v
+last_ip_outs	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned last_ip_outs[FSM_MAX_OUT_EVENTS];$/;"	m	struct:RunState	file:
+last_ip_outs_is_valid	/home/calin/src/rtfsm/kernel/fsm.c	/^  char last_ip_outs_is_valid[FSM_MAX_OUT_EVENTS];$/;"	m	struct:RunState	file:
+last_transition	/home/calin/src/rtfsm/kernel/fsm.c	/^  struct EmbCTransition last_transition;$/;"	m	struct:RunState	typeref:struct:RunState::EmbCTransition	file:
+list	/home/calin/src/rtfsm/kernel/softtask.c	/^  struct list_head list;$/;"	m	struct:SoftTask	typeref:struct:SoftTask::list_head	file:
+listenPort	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned short listenPort = 3333;$/;"	v
+listen_fd	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int listen_fd = -1; \/* Our listen socket.. *\/$/;"	v
+lldiv	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline long long lldiv(long long ll, long ld, long *r)$/;"	f	file:
+lldiv	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline long long lldiv(long long ll, long ld, long *r);$/;"	p	file:
+loadModule	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool loadModule(const std::string & prog_name) const;$/;"	p	class:ConnectionThread	file:
+loadModule	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::loadModule(const std::string & program_name) const$/;"	f	class:ConnectionThread
+lock	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^static void lock(void) { MINC; }$/;"	f	file:
+lock	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*lock)(void);$/;"	m	struct:EmbC
+lock	/home/calin/src/rtfsm/user/Mutex.h	/^  void lock() { pthread_mutex_lock(&mut); }$/;"	f	struct:Mutex
+log	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*log)(double);$/;"	m	struct:EmbC
+log	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double log(double d) { return __embc->log(d); }$/;"	f
+log10	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*log10)(double);$/;"	m	struct:EmbC
+log10	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double log10(double d) { return __embc->log10(d); }$/;"	f
+log2	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*log2)(double);$/;"	m	struct:EmbC
+log2	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double log2(double d) { return __embc->log2(d); }$/;"	f
+log2	/home/calin/src/rtfsm/kernel/fsm.c	/^static double log2(double d) { (void)d; return 0.; }$/;"	f	file:
+logArray	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*logArray)(uint fsm, const char *varname, const double *array, uint num_elems);$/;"	m	struct:EmbC
+logArray	/home/calin/src/rtfsm/include/EmbC.h	/^static inline void logArray(const char *vn, const double *vv, uint num) {   __embc->logArray(*__embc->fsm, vn, vv, num); }$/;"	f
+logItemAt	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct VarLogItem *logItemAt(FSMID_t f, unsigned idx) $/;"	f	file:
+logItemAt	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct VarLogItem *logItemAt(FSMID_t, unsigned);$/;"	p	file:
+logItemPush	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void logItemPush(FSMID_t f, const char *n, double v)$/;"	f	file:
+logItemPush	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void logItemPush(FSMID_t f, const char *n, double v);$/;"	p	file:
+logItemTop	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct VarLogItem *logItemTop(FSMID_t f)$/;"	f	file:
+logItemTop	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline volatile struct VarLogItem *logItemTop(FSMID_t);$/;"	p	file:
+logValue	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*logValue)(uint fsm, const char *varname, double val);$/;"	m	struct:EmbC
+logValue	/home/calin/src/rtfsm/include/EmbC.h	/^static inline void logValue(const char *vn, double vv) {   __embc->logValue(*__embc->fsm, vn, vv); }$/;"	f
+log_item_count	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned log_item_count;$/;"	m	union:ShmMsg::__anon19
+log_items	/home/calin/src/rtfsm/include/FSM.h	/^      } log_items;$/;"	m	union:ShmMsg::__anon19	typeref:struct:ShmMsg::__anon19::__anon21
+log_items	/home/calin/src/rtfsm/kernel/fsm.c	/^  struct VarLogItem log_items[MAX_HISTORY]; \/* keeps track of variables$/;"	m	struct:StateHistory	typeref:struct:StateHistory::VarLogItem	file:
+logstream	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static std::ostream * volatile logstream;$/;"	m	class:Log::std	file:
+logstream	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::ostream * volatile Log::logstream = 0; \/\/ in case we want to log other than std::cerr..$/;"	m	class:std::Log	file:
+loop	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned loop; \/* if true, playing will loop until untriggered *\/$/;"	m	struct:AOWave
+loop	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned aoline, nsamples, loop, cur;$/;"	m	struct:RunState::AOWaveINTERNAL	file:
+m	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int m, n;$/;"	m	struct:Matrix	file:
+m	/home/calin/src/rtfsm/utils/GetMatrix.c	/^  unsigned int n, m;  $/;"	m	struct:Matrix	file:
+m	/home/calin/src/rtfsm/utils/SendMatrix.c	/^  unsigned int n, m;  $/;"	m	struct:Matrix	file:
+magic	/home/calin/src/rtfsm/include/FSM.h	/^    int    magic;               \/*< Should always equal SHM_MAGIC            *\/$/;"	m	struct:Shm
+magic	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned magic : 24;$/;"	m	struct:DAQScan
+magic	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned short magic;$/;"	m	struct:NRTOutput
+magic	/home/calin/src/rtfsm/include/FSMExternalTime.h	/^  int magic;$/;"	m	struct:FSMExtTimeShm
+magic	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^  int magic;$/;"	m	struct:FSMExtTrigShm
+main	/home/calin/src/rtfsm/kernel/deflate_helper.c	/^int main(void)$/;"	f
+main	/home/calin/src/rtfsm/user/FSMServer.cpp	/^int main(int argc, char *argv[])$/;"	f
+main	/home/calin/src/rtfsm/utils/GetMatrix.c	/^int main(int argc, char *argv[])$/;"	f
+main	/home/calin/src/rtfsm/utils/GetValue.c	/^int main(int argc, char *argv[])$/;"	f
+main	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^int main(void)$/;"	f
+main	/home/calin/src/rtfsm/utils/SendMatrix.c	/^int main(int argc, char *argv[])$/;"	f
+matrixFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  StringMatrix matrixFromRT(); \/\/\/< get the state matrix from the FSM, note it may contain embedded C$/;"	p	class:ConnectionThread	file:
+matrixFromRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^StringMatrix ConnectionThread::matrixFromRT()$/;"	f	class:ConnectionThread
+matrixInit	/home/calin/src/rtfsm/utils/GetMatrix.c	/^void matrixInit(struct Matrix *m)$/;"	f
+matrixInit	/home/calin/src/rtfsm/utils/SendMatrix.c	/^void matrixInit(struct Matrix *m)$/;"	f
+matrixToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool matrixToRT(const Matrix & m, unsigned numEvents, unsigned numSchedWaves, const std::string & inChanType, unsigned readyForTrialState,  const std::string & outputSpecStr, bool state0_fsm_swap_flg);$/;"	p	class:ConnectionThread	file:
+matrixToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool matrixToRT(const StringMatrix & m,$/;"	p	class:ConnectionThread	file:
+matrixToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::matrixToRT(const Matrix & m, $/;"	f	class:ConnectionThread
+matrixToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::matrixToRT(const StringMatrix & m,$/;"	f	class:ConnectionThread
+matrix_len	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned matrix_len; \/**< Number of bytes of uncompressed matrix string,$/;"	m	struct:FSMSpec
+matrix_z	/home/calin/src/rtfsm/include/FSM.h	/^  char matrix_z[FSM_MATRIX_SIZE]; \/**< A *zlib deflated* string version$/;"	m	struct:FSMSpec
+matrix_z_len	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned matrix_z_len; \/**< Number of bytes of compressed matrix data,$/;"	m	struct:FSMSpec
+maxdata	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned maxdata;$/;"	m	struct:ShmMsg::__anon19::__anon22
+maxdata_ai	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+maxdata_ao	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+mbuff_alloc	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define mbuff_alloc(/;"	d	file:
+mbuff_attach	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define mbuff_attach(/;"	d	file:
+mbuff_attach	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static void * mbuff_attach(const char *name, int size) {$/;"	f
+mbuff_attach_at	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static void * mbuff_attach_at(const char *name, int size, void * addr) {$/;"	f
+mbuff_detach	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define mbuff_detach(/;"	d	file:
+mbuff_detach	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static void mbuff_detach(const char *name, void * mbuf) {$/;"	f
+mbuff_free	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define mbuff_free(/;"	d	file:
+mbuff_request_struct	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^struct mbuff_request_struct {$/;"	s
+minordev	/home/calin/src/rtfsm/kernel/fsm.c	/^int minordev = 0, minordev_ai = -1, minordev_ao = -1,$/;"	v
+minordev_ai	/home/calin/src/rtfsm/kernel/fsm.c	/^int minordev = 0, minordev_ai = -1, minordev_ao = -1,$/;"	v
+minordev_ao	/home/calin/src/rtfsm/kernel/fsm.c	/^int minordev = 0, minordev_ai = -1, minordev_ao = -1,$/;"	v
+mod	/home/calin/src/rtfsm/user/scanproc.h	/^    char *mod;$/;"	m	struct:ModList
+msg	/home/calin/src/rtfsm/include/FSM.h	/^    struct ShmMsg msg[NUM_STATE_MACHINES]; $/;"	m	struct:Shm	typeref:struct:Shm::ShmMsg
+msg	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ShmMsg msg; \/\/< needed to put this in class data because it broke the stack it's so freakin' big now$/;"	m	class:ConnectionThread	file:
+msgFifoLock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_mutex_t msgFifoLock, transNotifyLock, daqLock;$/;"	m	struct:FSMSpecific	file:
+mut	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static pthread_mutex_t mut; \/\/ this is what makes it thread safe$/;"	m	class:Log	file:
+mut	/home/calin/src/rtfsm/user/FSMServer.cpp	/^pthread_mutex_t Log::mut = PTHREAD_MUTEX_INITIALIZER;$/;"	m	class:Log	file:
+mut	/home/calin/src/rtfsm/user/Mutex.h	/^  pthread_mutex_t & mut;$/;"	m	struct:MutexLocker
+mut	/home/calin/src/rtfsm/user/Mutex.h	/^  pthread_mutex_t mut;$/;"	m	struct:Mutex
+myid	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int sock, myid, fsm_id;$/;"	m	class:ConnectionThread	file:
+myproc_fops	/home/calin/src/rtfsm/kernel/fsm.c	/^static struct file_operations myproc_fops =$/;"	v	typeref:struct:file_operations	file:
+myseq_open	/home/calin/src/rtfsm/kernel/fsm.c	/^static int myseq_open(struct inode *, struct file *);$/;"	p	file:
+myseq_open	/home/calin/src/rtfsm/kernel/fsm.c	/^static int myseq_open(struct inode *i, struct file *f)$/;"	f	file:
+myseq_show	/home/calin/src/rtfsm/kernel/fsm.c	/^static int myseq_show (struct seq_file *m, void *d);$/;"	p	file:
+myseq_show	/home/calin/src/rtfsm/kernel/fsm.c	/^static int myseq_show (struct seq_file *m, void *dummy)$/;"	f	file:
+n	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int m, n;$/;"	m	struct:Matrix	file:
+n	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  size_t n;$/;"	m	struct:CircBuf	file:
+n	/home/calin/src/rtfsm/utils/GetMatrix.c	/^  unsigned int n, m;  $/;"	m	struct:Matrix	file:
+n	/home/calin/src/rtfsm/utils/SendMatrix.c	/^  unsigned int n, m;  $/;"	m	struct:Matrix	file:
+n_chans_ai_subdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+n_chans_ao_subdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+n_chans_dio_subdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+n_cols	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short n_cols; \/* Corresponds to variable number of input events plus$/;"	m	struct:FSMSpec
+n_refs	/home/calin/src/rtfsm/user/scanproc.h	/^    int n_refs;$/;"	m	struct:ModList
+n_rows	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short n_rows; \/* Corresponds to number of states... *\/$/;"	m	struct:FSMSpec
+n_threads	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned n_threads;$/;"	v
+nam2num	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static inline unsigned long nam2num(const char *name)$/;"	f
+name	/home/calin/src/rtfsm/include/FSM.h	/^  char name[FSM_MAX_SYMBOL_SIZE+1]; \/* The name of the C variable *\/$/;"	m	struct:VarLogItem
+name	/home/calin/src/rtfsm/kernel/softtask.c	/^  char name[MAX_NAME_LEN];$/;"	m	struct:SoftTask	file:
+name	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^	char name[MBUFF_NAME_LEN+1];$/;"	m	struct:mbuff_request_struct
+name	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  std::string name; \/* in Windows the \\\\.\\pipe\\PIPENAME string, otherwise$/;"	m	struct:RTOS::Fifo	file:
+name	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  std::string name;$/;"	m	struct:ShmInfo	file:
+name	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^const char *RTOS::name()$/;"	f	class:RTOS
+name	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern const char *name(); \/\/ returns the string name of the current RTOS$/;"	p	namespace:RTOS
+nano2timespec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void nano2timespec(hrtime_t time, struct timespec *t)$/;"	f	file:
+nano2timespec	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void nano2timespec(hrtime_t time, struct timespec *t);$/;"	p	file:
+nchans	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  unsigned nframes, bitspersample, srate, nchans;$/;"	m	struct:OWavFile::Impl	file:
+nchans	/home/calin/src/rtfsm/utils/WavFile.cpp	/^unsigned OWavFile::nchans() const { return p->nchans; }$/;"	f	class:OWavFile
+nchans	/home/calin/src/rtfsm/utils/WavFile.h	/^  unsigned nchans() const;$/;"	p	class:OWavFile
+newShmName	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string newShmName();$/;"	p	class:ConnectionThread	file:
+newShmName	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::string ConnectionThread::newShmName()$/;"	f	class:ConnectionThread
+next	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  T & next() { return (*this)[count()]; }$/;"	f	struct:CircBuf
+next	/home/calin/src/rtfsm/user/scanproc.h	/^    struct ModList *next;$/;"	m	struct:ModList	typeref:struct:ModList::ModList
+nextWhiteSpaceBlock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static const char *nextWhiteSpaceBlock(const char *p)$/;"	f	file:
+nframes	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  unsigned nframes, bitspersample, srate, nchans;$/;"	m	struct:OWavFile::Impl	file:
+now	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static double now() { struct timeval ts; ::gettimeofday(&ts, 0); return double(ts.tv_sec) + ts.tv_usec\/1e6; }$/;"	f	class:Timer
+nrefs	/home/calin/src/rtfsm/user/FSMServer.cpp	/^    volatile int nrefs;$/;"	m	struct:shallow_copy::Impl	file:
+nrefs	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned nrefs() const { return p->nrefs; }$/;"	f	class:shallow_copy
+nrtReadThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_t transNotifyThread, daqReadThread, nrtReadThread;$/;"	m	struct:FSMSpecific	file:
+nrtThrFun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void *nrtThrFun();$/;"	p	struct:FSMSpecific	file:
+nrtThrFun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void *FSMSpecific::nrtThrFun()$/;"	f	class:FSMSpecific
+nrtThrWrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void *nrtThrWrapper(void *);$/;"	p	file:
+nrtThrWrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void *nrtThrWrapper(void *arg)$/;"	f	file:
+nsamples	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned nsamples;$/;"	m	struct:AOWave
+nsamples	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned aoline, nsamples, loop, cur;$/;"	m	struct:RunState::AOWaveINTERNAL	file:
+nsamps	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned nsamps : 8;$/;"	m	struct:DAQScan
+num	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned num;$/;"	m	struct:ShmMsg::__anon19::__anon20
+num	/home/calin/src/rtfsm/include/FSM.h	/^        unsigned num;$/;"	m	struct:ShmMsg::__anon19::__anon21
+num2nam	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static inline void num2nam(unsigned long num, char *name)$/;"	f
+num_evt_cols	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned num_evt_cols;  \/** <= FSM_MAX_IN_CHANS*2                    *\/$/;"	m	struct:FSMSpec::Routing
+num_in_chans	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned num_in_chans;  \/** <= FSM_MAX_IN_CHANS                      *\/$/;"	m	struct:FSMSpec::Routing
+num_input_events	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned num_input_events;$/;"	m	union:ShmMsg::__anon19
+num_log_items	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned num_log_items; \/* keeps track of variables logged by embedded C *\/$/;"	m	struct:StateHistory	file:
+num_out_cols	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned num_out_cols; \/**< Always <= FSM_MAX_OUT_EVENTS -- defines valid$/;"	m	struct:FSMSpec::Routing
+num_procs_of_exe	/home/calin/src/rtfsm/user/scanproc.c	/^int num_procs_of_exe(const char *exe)$/;"	f
+num_procs_of_exe	/home/calin/src/rtfsm/user/scanproc.h	/^  extern int    num_procs_of_exe(const char *exe_path);$/;"	p
+num_procs_of_exe_no_children	/home/calin/src/rtfsm/user/scanproc.c	/^int num_procs_of_exe_no_children(const char *exe)$/;"	f
+num_procs_of_exe_no_children	/home/calin/src/rtfsm/user/scanproc.h	/^  extern int    num_procs_of_exe_no_children(const char *exe);$/;"	p
+num_procs_of_my_exe	/home/calin/src/rtfsm/user/scanproc.c	/^int num_procs_of_my_exe(void)$/;"	f
+num_procs_of_my_exe	/home/calin/src/rtfsm/user/scanproc.h	/^  extern int    num_procs_of_my_exe(void);$/;"	p
+num_procs_of_my_exe_no_children	/home/calin/src/rtfsm/user/scanproc.c	/^int num_procs_of_my_exe_no_children(void)$/;"	f
+num_procs_of_my_exe_no_children	/home/calin/src/rtfsm/user/scanproc.h	/^  extern int    num_procs_of_my_exe_no_children(void);$/;"	p
+num_transitions	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned num_transitions; \/* Number of total transitions since RESET_ of state$/;"	m	struct:StateHistory	file:
+openFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode)$/;"	f	class:RTOS
+openFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern FIFO openFifo(unsigned key_no, ModeFlag m = Read); $/;"	p	namespace:RTOS
+openFifos	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void openFifos()$/;"	f	file:
+operator ()	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  template <class I> void operator()(I & i) const { t.push_back(static_cast<typename T::value_type>(i)); }$/;"	f	struct:BackInsertFunctor
+operator <<	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  template <typename T> Log & operator<<(const T & t) $/;"	f	class:Log
+operator =	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix & operator=(const Matrix &rhs);$/;"	p	struct:Matrix	file:
+operator =	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  shallow_copy & operator=(const shallow_copy & r) { ref_decr(); p = r.p; ref_incr();  }$/;"	f	class:shallow_copy
+operator =	/home/calin/src/rtfsm/user/FSMServer.cpp	/^Matrix & Matrix::operator=(const Matrix &rhs)$/;"	f	class:Matrix
+operator []	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  T & operator[](unsigned long long i) { return buf[(unsigned)(i%n)]; }$/;"	f	struct:CircBuf
+out_evt_col	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int out_evt_col;$/;"	m	struct:SchedWaveSpec	file:
+output_routing	/home/calin/src/rtfsm/include/FSM.h	/^    struct OutputSpec output_routing[FSM_MAX_OUT_EVENTS];$/;"	m	struct:FSMSpec::Routing	typeref:struct:FSMSpec::Routing::OutputSpec
+p	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  mutable Impl *p;$/;"	m	class:shallow_copy	file:
+p	/home/calin/src/rtfsm/utils/WavFile.h	/^  Impl *p;$/;"	m	class:OWavFile
+parseHostPort	/home/calin/src/rtfsm/utils/GetMatrix.c	/^static int parseHostPort(char *arg)$/;"	f	file:
+parseHostPort	/home/calin/src/rtfsm/utils/GetValue.c	/^static int parseHostPort(char *arg)$/;"	f	file:
+parseHostPort	/home/calin/src/rtfsm/utils/SendMatrix.c	/^static int parseHostPort(char *arg)$/;"	f	file:
+parseInputSpecStr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::vector<int>  parseInputSpecStr(const std::string &);$/;"	p	class:ConnectionThread	file:
+parseInputSpecStr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^ConnectionThread::parseInputSpecStr(const std::string & str)$/;"	f	class:ConnectionThread
+parseIntStringMapBlock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  IntStringMap parseIntStringMapBlock(const std::string &); \/\/\/< not static because it needs object for logging errors$/;"	p	class:ConnectionThread	file:
+parseIntStringMapBlock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^IntStringMap ConnectionThread::parseIntStringMapBlock(const std::string & strblk)$/;"	f	class:ConnectionThread
+parseOutputSpecStr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::vector<OutputSpec> parseOutputSpecStr(const std::string & str);$/;"	p	class:ConnectionThread	file:
+parseOutputSpecStr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::vector<OutputSpec> ConnectionThread::parseOutputSpecStr(const std::string & str)$/;"	f	class:ConnectionThread
+parseSchedWaveSpecStr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::vector<SchedWaveSpec> parseSchedWaveSpecStr(const std::string &);$/;"	p	class:ConnectionThread	file:
+parseSchedWaveSpecStr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^ConnectionThread::parseSchedWaveSpecStr(const std::string & str)$/;"	f	class:ConnectionThread
+parseStringTable	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static void parseStringTable(const char *stable, StringMatrix &m);$/;"	p	class:ConnectionThread	file:
+parseStringTable	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void ConnectionThread::parseStringTable(const char *stable, StringMatrix &m) $/;"	f	class:ConnectionThread
+paused	/home/calin/src/rtfsm/kernel/fsm.c	/^    int paused; \/* If this is true, input lines do not lead to $/;"	m	struct:RunState	file:
+pending_fsm_swap	/home/calin/src/rtfsm/kernel/fsm.c	/^  unsigned pending_fsm_swap; \/**< iff true, need to swap fsms on next state0$/;"	m	struct:RunState	file:
+pending_output_bits	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned pending_output_bits = 0, pending_output_mask = 0;$/;"	v	file:
+pending_output_mask	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned pending_output_bits = 0, pending_output_mask = 0;$/;"	v	file:
+pf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Log & operator << (std::ostream & (*pf)(std::ostream &)) {$/;"	f	class:Log
+pids_of_exe	/home/calin/src/rtfsm/user/scanproc.c	/^pid_t *pids_of_exe(const char *exe)$/;"	f
+pids_of_exe	/home/calin/src/rtfsm/user/scanproc.h	/^  extern pid_t *pids_of_exe(const char *exe_path);$/;"	p
+pids_of_my_exe	/home/calin/src/rtfsm/user/scanproc.c	/^pid_t *pids_of_my_exe(void)$/;"	f
+pids_of_my_exe	/home/calin/src/rtfsm/user/scanproc.h	/^  extern pid_t *pids_of_my_exe(void);$/;"	p
+port	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned short port;$/;"	m	struct:OutputSpec::__anon14::__anon17
+port	/home/calin/src/rtfsm/utils/GetMatrix.c	/^static unsigned short port = 3333;$/;"	v	file:
+port	/home/calin/src/rtfsm/utils/GetValue.c	/^static unsigned short port = 3333;$/;"	v	file:
+port	/home/calin/src/rtfsm/utils/SendMatrix.c	/^static unsigned short port = 3333;$/;"	v	file:
+pow	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*pow)(double x, double y); \/* x raised to y *\/$/;"	m	struct:EmbC
+pow	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double pow(double x, double y) { return __embc->pow(x,y); }$/;"	f
+powi	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*powi)(double, int); \/* y = x to the i *\/$/;"	m	struct:EmbC
+powi	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double powi(double d, int i) { return __embc->powi(d, i); }$/;"	f
+powi	/home/calin/src/rtfsm/kernel/fsm.c	/^static double powi(double d, int i) { (void)d; (void)i; return 0.; }$/;"	f	file:
+preamble_us	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned preamble_us; \/**< the amount of time from when it is triggered$/;"	m	struct:SchedWave
+previous_state	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short previous_state;$/;"	m	struct:StateTransition
+previous_state	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned previous_state; $/;"	m	struct:RunState	file:
+printStats	/home/calin/src/rtfsm/kernel/fsm.c	/^static void printStats(void)$/;"	f	file:
+printStats	/home/calin/src/rtfsm/kernel/fsm.c	/^static void printStats(void);$/;"	p	file:
+printf	/home/calin/src/rtfsm/include/EmbC.h	/^#define printf /;"	d
+proc_ent	/home/calin/src/rtfsm/kernel/fsm.c	/^static struct proc_dir_entry *proc_ent = 0;$/;"	v	typeref:struct:proc_dir_entry	file:
+processSchedWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long processSchedWaves(FSMID_t f)$/;"	f	file:
+processSchedWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long processSchedWaves(FSMID_t); \/**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) *\/$/;"	p	file:
+processSchedWavesAO	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long processSchedWavesAO(FSMID_t f)$/;"	f	file:
+processSchedWavesAO	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long processSchedWavesAO(FSMID_t); \/**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) *\/$/;"	p	file:
+program_len	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned program_len; \/**< Number of bytes of uncompressed program $/;"	m	struct:FSMSpec
+program_z	/home/calin/src/rtfsm/include/FSM.h	/^  char program_z[FSM_PROGRAM_SIZE]; \/**< A *zlib deflated*, $/;"	m	struct:FSMSpec
+program_z_len	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned program_z_len; \/**< Number of bytes of compressed program data -- basically number of valid bytes in program_z. *\/$/;"	m	struct:FSMSpec
+push	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void push() { ct++; }$/;"	f	struct:CircBuf
+push	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void push(const T & t) { (*this)[ct++] = t;  }$/;"	f	struct:CircBuf
+putDebugFifo	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void putDebugFifo(unsigned val)$/;"	f	file:
+putDebugFifo	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void putDebugFifo(unsigned value);$/;"	p	file:
+rand	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*rand)(void);$/;"	m	struct:EmbC
+rand	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double rand(void) {  return __embc->rand(); }$/;"	f
+randNormalized	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*randNormalized)(void);$/;"	m	struct:EmbC
+randNormalized	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double randNormalized(void) {  return __embc->randNormalized(); }$/;"	f
+range_max	/home/calin/src/rtfsm/include/FSM.h	/^        int range_max; \/**< Range min in fixed point -- divide by 1e6 for V*\/$/;"	m	struct:ShmMsg::__anon19::__anon22
+range_min	/home/calin/src/rtfsm/include/FSM.h	/^        int range_min; \/**< Range min in fixed point -- divide by 1e6 for V*\/$/;"	m	struct:ShmMsg::__anon19::__anon22
+rate	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile uint *rate; \/\/ the sampling rate, in Hz, that the FSM is running at.$/;"	m	struct:EmbC
+rate	/home/calin/src/rtfsm/include/EmbC.h	/^static inline uint rate(void) { return *__embc->rate; }$/;"	f
+readFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^int RTOS::readFifo(FIFO f, void *buf, unsigned long bufsz)$/;"	f	class:RTOS
+readFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^int RTOS::readFifo(unsigned key, void *buf, unsigned long bufsz)$/;"	f	class:RTOS
+readFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern int readFifo(FIFO, void *buf, unsigned long bufsz);$/;"	p	namespace:RTOS
+readFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern int readFifo(unsigned key, void *buf, unsigned long bufsz);$/;"	p	namespace:RTOS
+ready_for_trial	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile int *ready_for_trial; \/\/ flag telling FSM we are ready for a new trial$/;"	m	struct:EmbC
+ready_for_trial	/home/calin/src/rtfsm/include/EmbC.h	/^static inline int ready_for_trial(void) { return *__embc->ready_for_trial; }$/;"	f
+ready_for_trial_flg	/home/calin/src/rtfsm/kernel/fsm.c	/^    int ready_for_trial_flg; \/* If true, that means we got a $/;"	m	struct:RunState	file:
+ready_for_trial_jumpstate	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short ready_for_trial_jumpstate; \/**< normally always 35 *\/$/;"	m	struct:FSMSpec
+reason	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string reason;$/;"	m	class:Exception	file:
+receiveData	/home/calin/src/rtfsm/utils/GetMatrix.c	/^static ssize_t receiveData(void *d, size_t dataSize, FILE *f)$/;"	f	file:
+reconfigureIO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void reconfigureIO(void)$/;"	f	file:
+reconfigureIO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void reconfigureIO(void); \/* helper that reconfigures DIO channels $/;"	p	file:
+ref_decr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void ref_decr() const { $/;"	f	class:shallow_copy	file:
+ref_incr	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void ref_incr() const { ++p->nrefs; }$/;"	f	class:shallow_copy	file:
+refct	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  unsigned size, refct;$/;"	m	struct:RTOS::Fifo	file:
+refraction_us	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned refraction_us; \/**< the blanking time for the scheduled waveform.$/;"	m	struct:SchedWave
+refs	/home/calin/src/rtfsm/user/scanproc.h	/^    char **refs; \/* NB: these are modules that depend ON this module! *\/$/;"	m	struct:ModList
+remoteHost	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string remoteHost;$/;"	m	class:ConnectionThread	file:
+reserved	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^	unsigned int reserved[4];$/;"	m	struct:mbuff_request_struct
+reset	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void reset();$/;"	p	class:Timer	file:
+reset	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void Timer::reset()$/;"	f	class:Timer
+resetTriggerTimer	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void resetTriggerTimer(FSMID_t f)$/;"	f	file:
+riff	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  char riff[4]; \/\/ 'RIFF'$/;"	m	struct:Header	file:
+round	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*round)(double);$/;"	m	struct:EmbC
+round	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double round(double d) { return __embc->round(d); }$/;"	f
+round	/home/calin/src/rtfsm/kernel/fsm.c	/^extern double round(double);$/;"	p	file:
+round	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  inline double round(double d) { return double(unsigned(d+0.5)); }$/;"	f	namespace:__anon10
+routing	/home/calin/src/rtfsm/include/FSM.h	/^  } routing;$/;"	m	struct:FSMSpec	typeref:struct:FSMSpec::Routing
+rows	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int rows() const { return m; }$/;"	f	struct:Matrix
+rows	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned rows() const { return size(); }$/;"	f	struct:StringMatrix
+rs	/home/calin/src/rtfsm/kernel/fsm.c	/^volatile static struct RunState rs[NUM_STATE_MACHINES];$/;"	v	typeref:struct:RunState	file:
+rt_printk	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define rt_printk /;"	d	file:
+rt_task_handle	/home/calin/src/rtfsm/kernel/fsm.c	/^static pthread_t rt_task_handle;$/;"	v	file:
+rt_task_running	/home/calin/src/rtfsm/kernel/fsm.c	/^static volatile int rt_task_running = 0;$/;"	v	file:
+rt_task_stop	/home/calin/src/rtfsm/kernel/fsm.c	/^static volatile int rt_task_stop = 0; \/* Internal variable to stop the RT $/;"	v	file:
+rtai_free	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static inline void rtai_free(int name, void *adr)$/;"	f
+rtai_malloc	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static void *rtai_malloc(unsigned long name, int size)$/;"	f
+rtai_malloc_adr	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static inline void *rtai_malloc_adr(void *start_address, unsigned long name, $/;"	f
+rtai_shm_attach	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static void *rtai_shm_attach(const char *name,  int size)$/;"	f
+rtai_shm_detach	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static void rtai_shm_detach(const char *name, void * mbuf) $/;"	f
+rtai_shmrq	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^static inline int rtai_shmrq(int srq, unsigned int whatever)$/;"	f
+rtf_get_if	/home/calin/src/rtfsm/kernel/fsm.c	/^#  define rtf_get_if /;"	d	file:
+rtl_critical	/home/calin/src/rtfsm/kernel/fsm.c	/^   #define rtl_critical(/;"	d	file:
+rtl_end_critical	/home/calin/src/rtfsm/kernel/fsm.c	/^   #define rtl_end_critical(/;"	d	file:
+rtl_printf	/home/calin/src/rtfsm/include/EmbC.h	/^extern int rtl_printf(const char *format, ...);$/;"	p
+rtos	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  RTOS::RTOS rtos;$/;"	m	struct:ShmInfo	file:
+runtime_us	/home/calin/src/rtfsm/include/FSM.h	/^      long long runtime_us; \/* Time since last reset, in micro-seconds *\/$/;"	m	union:ShmMsg::__anon19
+sampSizeBytes	/home/calin/src/rtfsm/utils/WavFile.cpp	/^unsigned OWavFile::sampSizeBytes() const { return nchans()*(bits()\/8); }$/;"	f	class:OWavFile
+sampSizeBytes	/home/calin/src/rtfsm/utils/WavFile.h	/^  unsigned sampSizeBytes() const;$/;"	p	class:OWavFile
+samples	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short samples[AOWAVE_MAX_SAMPLES]; \/** samples already scaled to $/;"	m	struct:AOWave
+samples	/home/calin/src/rtfsm/kernel/fsm.c	/^    unsigned short *samples;$/;"	m	struct:RunState::AOWaveINTERNAL	file:
+samples	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::vector<double> samples;$/;"	m	struct:DAQScanVec	file:
+samps	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned short samps[0];$/;"	m	struct:DAQScan
+sched_get_priority_max	/home/calin/src/rtfsm/kernel/fsm.c	/^   #define sched_get_priority_max(/;"	d	file:
+sched_get_priority_min	/home/calin/src/rtfsm/kernel/fsm.c	/^   #define sched_get_priority_min(/;"	d	file:
+sched_wave_input	/home/calin/src/rtfsm/include/FSM.h	/^    int sched_wave_input[FSM_MAX_SCHED_WAVES*2];$/;"	m	struct:FSMSpec::Routing
+sched_wave_output	/home/calin/src/rtfsm/include/FSM.h	/^    int sched_wave_output[FSM_MAX_SCHED_WAVES];$/;"	m	struct:FSMSpec::Routing
+sched_waves	/home/calin/src/rtfsm/include/FSM.h	/^  struct SchedWave sched_waves[FSM_MAX_SCHED_WAVES];$/;"	m	struct:FSMSpec	typeref:struct:FSMSpec::SchedWave
+scheduleWave	/home/calin/src/rtfsm/kernel/fsm.c	/^static void scheduleWave(FSMID_t f, unsigned wave_id, int op)$/;"	f	file:
+scheduleWave	/home/calin/src/rtfsm/kernel/fsm.c	/^static void scheduleWave(FSMID_t, unsigned wave_id, int op);$/;"	p	file:
+scheduleWaveAO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void scheduleWaveAO(FSMID_t f, unsigned wave_id, int op)$/;"	f	file:
+scheduleWaveAO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void scheduleWaveAO(FSMID_t, unsigned wave_id, int op);$/;"	p	file:
+scheduleWaveDIO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)$/;"	f	file:
+scheduleWaveDIO	/home/calin/src/rtfsm/kernel/fsm.c	/^static void scheduleWaveDIO(FSMID_t, unsigned wave_id, int op);$/;"	p	file:
+select_numeric_dir	/home/calin/src/rtfsm/user/scanproc.c	/^static int select_numeric_dir(const struct dirent *);$/;"	p	file:
+select_numeric_dir	/home/calin/src/rtfsm/user/scanproc.c	/^static int select_numeric_dir(const struct dirent *d)$/;"	f	file:
+sendStringMatrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool sendStringMatrix(const StringMatrix &m);$/;"	p	class:ConnectionThread	file:
+sendStringMatrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::sendStringMatrix(const StringMatrix &m)$/;"	f	class:ConnectionThread
+sendToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void sendToRT(ShmMsg & msg); \/\/ send a complex command, wait for a reply which gets put back into 'msg'.  Upon return we know the command completed.$/;"	p	class:ConnectionThread	file:
+sendToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void sendToRT(ShmMsgID cmd); \/\/ send a simple command, one of RESET_, PAUSEUNPAUSE, INVALIDATE. Upon return we know the command completed.$/;"	p	class:ConnectionThread	file:
+sendToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void ConnectionThread::sendToRT(ShmMsg & msg) \/\/ note param name masks class member$/;"	f	class:ConnectionThread
+sendToRT	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void ConnectionThread::sendToRT(ShmMsgID cmd)$/;"	f	class:ConnectionThread
+setLogStream	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static void setLogStream(std::ostream &);$/;"	p	class:Log	file:
+setLogStream	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void Log::setLogStream(std::ostream &os) $/;"	f	class:Log
+setupComediCmd	/home/calin/src/rtfsm/kernel/fsm.c	/^static int setupComediCmd(void)$/;"	f	file:
+setupComediCmd	/home/calin/src/rtfsm/kernel/fsm.c	/^static int setupComediCmd(void);$/;"	p	file:
+shallow_copy	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  shallow_copy(T * t = new T) {  p = new Impl; p->t = t; ref_incr(); }$/;"	f	class:shallow_copy
+shallow_copy	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  shallow_copy(const shallow_copy &r) { p = r.p; ref_incr();  }$/;"	f	class:shallow_copy
+shallow_copy	/home/calin/src/rtfsm/user/FSMServer.cpp	/^template <typename T> class shallow_copy$/;"	c	file:
+shm	/home/calin/src/rtfsm/kernel/fsm.c	/^static volatile Shm *shm = 0;$/;"	v	file:
+shm	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  volatile struct Shm *shm = 0;$/;"	v	typeref:struct:__anon2::Shm
+shmAttach	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^void *RTOS::shmAttach(const char *SHM_NAME, size_t size, ShmStatus *s, bool create)$/;"	f	class:RTOS
+shmAttach	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern void *shmAttach(const char *shm_name, size_t size, ShmStatus *s=0, bool create = false);$/;"	p	namespace:RTOS
+shmDetach	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^void RTOS::shmDetach(const void *SHM, ShmStatus *s, bool destroy)$/;"	f	class:RTOS
+shmDetach	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern void shmDetach(const void *shm, ShmStatus *status=0, bool destroy = false);$/;"	p	namespace:RTOS
+shmDevFile	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^const char *RTOS::shmDevFile()$/;"	f	class:RTOS
+shmDevFile	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern const char *shmDevFile();  \/\/ returns filename string of shm dev file$/;"	p	namespace:RTOS
+shmDevFileExists	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^bool RTOS::shmDevFileExists()$/;"	f	class:RTOS
+shmDevFileExists	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern bool shmDevFileExists(); $/;"	p	namespace:RTOS
+shmDevFileIsValid	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^bool RTOS::shmDevFileIsValid()$/;"	f	class:RTOS
+shmDevFileIsValid	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern bool shmDevFileIsValid(); $/;"	p	namespace:RTOS
+shmDriverName	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^const char *RTOS::shmDriverName()$/;"	f	class:RTOS
+shmDriverName	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern const char *shmDriverName(); \/\/ returns name of shm driver$/;"	p	namespace:RTOS
+shmMap	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^static ShmMap shmMap;$/;"	v	file:
+shm_name	/home/calin/src/rtfsm/include/FSM.h	/^  char shm_name[64]; \/**< The name of the FSM kernel module's shm to attach *\/$/;"	m	struct:FSMSpec
+shm_num	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  unsigned shm_num;$/;"	m	class:ConnectionThread	file:
+sighandler	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void sighandler(int sig)$/;"	f	file:
+sin	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*sin)(double);$/;"	m	struct:EmbC
+sin	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double sin(double d) { return __embc->sin(d); }$/;"	f
+sinh	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*sinh)(double); \/* inverse hyperbolic sine *\/$/;"	m	struct:EmbC
+sinh	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double sinh (double d) { return __embc->sinh(d); }$/;"	f
+sirq	/home/calin/src/rtfsm/kernel/softtask.c	/^  int sirq;$/;"	m	struct:SoftTask	file:
+size	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  size_t size() const { return n; }$/;"	f	struct:CircBuf
+size	/home/calin/src/rtfsm/user/rtos_shared_memory.h	/^	size_t size;$/;"	m	struct:mbuff_request_struct
+size	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  size_t size;$/;"	m	struct:ShmInfo	file:
+size	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  unsigned size, refct;$/;"	m	struct:RTOS::Fifo	file:
+size	/home/calin/src/rtfsm/user/scanproc.h	/^    size_t size;$/;"	m	struct:ModList
+sizeBytes	/home/calin/src/rtfsm/utils/WavFile.cpp	/^unsigned OWavFile::sizeBytes() const { return sampSizeBytes()*sizeSamps(); }$/;"	f	class:OWavFile
+sizeBytes	/home/calin/src/rtfsm/utils/WavFile.h	/^  unsigned sizeBytes() const;$/;"	p	class:OWavFile
+sizeSamps	/home/calin/src/rtfsm/utils/WavFile.cpp	/^unsigned OWavFile::sizeSamps() const { return p->nframes; }$/;"	f	class:OWavFile
+sizeSamps	/home/calin/src/rtfsm/utils/WavFile.h	/^  unsigned sizeSamps() const;$/;"	p	class:OWavFile
+sock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int sock, myid, fsm_id;$/;"	m	class:ConnectionThread	file:
+sockReceiveData	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int sockReceiveData(void *buf, int size, bool is_binary = true);$/;"	p	class:ConnectionThread	file:
+sockReceiveData	/home/calin/src/rtfsm/user/FSMServer.cpp	/^int ConnectionThread::sockReceiveData(void *buf, int size, bool is_binary)$/;"	f	class:ConnectionThread
+sockReceiveLine	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  std::string sockReceiveLine();$/;"	p	class:ConnectionThread	file:
+sockReceiveLine	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::string ConnectionThread::sockReceiveLine()$/;"	f	class:ConnectionThread
+sockSend	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int sockSend(const std::string & str) ;$/;"	p	class:ConnectionThread	file:
+sockSend	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  int sockSend(const void *buf, size_t len, bool is_binary = false, int flags = 0);$/;"	p	class:ConnectionThread	file:
+sockSend	/home/calin/src/rtfsm/user/FSMServer.cpp	/^int ConnectionThread::sockSend(const std::string & str) $/;"	f	class:ConnectionThread
+sockSend	/home/calin/src/rtfsm/user/FSMServer.cpp	/^int ConnectionThread::sockSend(const void *buf, size_t len, bool is_binary, int flags)$/;"	f	class:ConnectionThread
+softTaskCreate	/home/calin/src/rtfsm/kernel/softtask.c	/^struct SoftTask *softTaskCreate(SoftTask_Handler handler_function,$/;"	f
+softTaskCreate	/home/calin/src/rtfsm/kernel/softtask.h	/^extern struct SoftTask *softTaskCreate(SoftTask_Handler handler_function,$/;"	p
+softTaskDestroy	/home/calin/src/rtfsm/kernel/softtask.c	/^void softTaskDestroy(struct SoftTask *t)$/;"	f
+softTaskDestroy	/home/calin/src/rtfsm/kernel/softtask.h	/^extern void softTaskDestroy(struct SoftTask *);$/;"	p
+softTaskPend	/home/calin/src/rtfsm/kernel/softtask.c	/^int softTaskPend(struct SoftTask *task, void *arg)$/;"	f
+softTaskPend	/home/calin/src/rtfsm/kernel/softtask.h	/^extern int softTaskPend(struct SoftTask *, void *arg);$/;"	p
+soft_irq_handler	/home/calin/src/rtfsm/kernel/softtask.c	/^static void soft_irq_handler(int irq, void *arg, struct pt_regs *regs)$/;"	f	file:
+soft_irq_handler	/home/calin/src/rtfsm/kernel/softtask.c	/^static void soft_irq_handler(int, void *, struct pt_regs *);$/;"	p	file:
+soft_irq_handler	/home/calin/src/rtfsm/kernel/softtask.c	/^static void soft_irq_handler(unsigned, void *);$/;"	p	file:
+softtask_h	/home/calin/src/rtfsm/kernel/softtask.h	/^#define softtask_h$/;"	d
+sound_card	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned sound_card;$/;"	m	struct:OutputSpec::__anon14::__anon16
+splitNumericString	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static std::vector<double> splitNumericString(const std::string & str,$/;"	p	file:
+splitNumericString	/home/calin/src/rtfsm/user/FSMServer.cpp	/^std::vector<double> splitNumericString(const std::string &str,$/;"	f	file:
+splitString	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static std::vector<std::string> splitString(const std::string &str,$/;"	f	file:
+splitString	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static std::vector<std::string> splitString(const std::string &str,$/;"	p	file:
+sqrt	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*sqrt)(double);$/;"	m	struct:EmbC
+sqrt	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double sqrt(double d) { return __embc->sqrt(d); }$/;"	f
+srate	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  unsigned nframes, bitspersample, srate, nchans;$/;"	m	struct:OWavFile::Impl	file:
+srate	/home/calin/src/rtfsm/utils/WavFile.cpp	/^unsigned OWavFile::srate() const { return p->srate; }$/;"	f	class:OWavFile
+srate	/home/calin/src/rtfsm/utils/WavFile.h	/^  unsigned srate() const;$/;"	p	class:OWavFile
+start	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool start(int socket_fd, const std::string & remoteHost = "unknown");$/;"	p	class:ConnectionThread	file:
+start	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::start(int sock_fd, const std::string & rhost)$/;"	f	class:ConnectionThread
+start_daq	/home/calin/src/rtfsm/include/FSM.h	/^      } start_daq;$/;"	m	union:ShmMsg::__anon19	typeref:struct:ShmMsg::__anon19::__anon22
+started_ok	/home/calin/src/rtfsm/include/FSM.h	/^        int started_ok; \/**< Reply from RT to indicate STARTDAQ was accepted*\/$/;"	m	struct:ShmMsg::__anon19::__anon22
+state	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile uint *state; \/\/ the current state we are in$/;"	m	struct:EmbC
+state	/home/calin/src/rtfsm/include/EmbC.h	/^static inline uint state(void) { return *__embc->state; }$/;"	f
+state	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned short state; \/* the state machine state that caused this *\/$/;"	m	struct:NRTOutput
+state	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short state; \/* The state that was entered via this transition.   *\/$/;"	m	struct:StateTransition
+states	/home/calin/src/rtfsm/kernel/fsm.c	/^    struct FSMSpec   *states;$/;"	m	struct:RunState	typeref:struct:RunState::FSMSpec	file:
+states1	/home/calin/src/rtfsm/kernel/fsm.c	/^    struct FSMSpec    states1;$/;"	m	struct:RunState	typeref:struct:RunState::FSMSpec	file:
+states2	/home/calin/src/rtfsm/kernel/fsm.c	/^    struct FSMSpec    states2;$/;"	m	struct:RunState	typeref:struct:RunState::FSMSpec	file:
+statetransition	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*statetransition)(void);$/;"	m	struct:EmbC
+statusString	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^const char *RTOS::statusString(ShmStatus s)$/;"	f	class:RTOS
+statusString	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern const char *statusString(ShmStatus s);$/;"	p	namespace:RTOS
+stopActiveWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static void stopActiveWaves(FSMID_t f) \/* called when FSM starts a new trial *\/$/;"	f	file:
+stopActiveWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static void stopActiveWaves(FSMID_t); \/* called when FSM starts a new trial *\/$/;"	p	file:
+strsep_ne	/home/calin/src/rtfsm/user/scanproc.c	/^static char * strsep_ne(char **stringp, const char *delims)$/;"	f	file:
+subdev	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+subdevTypeToString	/home/calin/src/rtfsm/utils/ProbeComedi.cpp	/^std::string subdevTypeToString(unsigned subdev_type)$/;"	f
+subdev_ai	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+subdev_ao	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;$/;"	v	file:
+sustain_us	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned sustain_us;  \/**< the amount of time from when the waveform fires$/;"	m	struct:SchedWave
+swapFSMs	/home/calin/src/rtfsm/kernel/fsm.c	/^static void swapFSMs(FSMID_t f)$/;"	f	file:
+swapFSMs	/home/calin/src/rtfsm/kernel/fsm.c	/^static void swapFSMs(FSMID_t);$/;"	p	file:
+t	/home/calin/src/rtfsm/user/FSMServer.cpp	/^    T *t;$/;"	m	struct:shallow_copy::Impl	file:
+t	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  mutable T & t;$/;"	m	struct:BackInsertFunctor	file:
+tan	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*tan)(double);$/;"	m	struct:EmbC
+tan	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double tan(double d) { return __embc->tan(d); }$/;"	f
+tanh	/home/calin/src/rtfsm/include/EmbC.h	/^  double (*tanh)(double);$/;"	m	struct:EmbC
+tanh	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double tanh(double d) { return __embc->tanh(d); }$/;"	f
+task	/home/calin/src/rtfsm/kernel/softtask.c	/^  struct tq_struct task;$/;"	m	struct:SoftTask	typeref:struct:SoftTask::tq_struct	file:
+task_period_ns	/home/calin/src/rtfsm/kernel/fsm.c	/^uint64 task_period_ns = BILLION;$/;"	v
+task_rate	/home/calin/src/rtfsm/kernel/fsm.c	/^    task_rate = DEFAULT_TASK_RATE, $/;"	v
+task_wrapper	/home/calin/src/rtfsm/kernel/softtask.c	/^static void task_wrapper(struct work_struct *);$/;"	p	file:
+task_wrapper	/home/calin/src/rtfsm/kernel/softtask.c	/^static void task_wrapper(struct work_struct *work)$/;"	f	file:
+task_wrapper	/home/calin/src/rtfsm/kernel/softtask.c	/^static void task_wrapper(void *);$/;"	p	file:
+task_wrapper	/home/calin/src/rtfsm/kernel/softtask.c	/^static void task_wrapper(void *arg)$/;"	f	file:
+threadFunc	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void *threadFunc();$/;"	p	class:ConnectionThread	file:
+threadFunc	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void *ConnectionThread::threadFunc(void)$/;"	f	class:ConnectionThread
+thread_ran	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  volatile bool thread_running, thread_ran;$/;"	m	class:ConnectionThread	file:
+thread_running	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  volatile bool thread_running, thread_ran;$/;"	m	class:ConnectionThread	file:
+threadfunc_wrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  friend void *threadfunc_wrapper(void *);$/;"	p	class:ConnectionThread	file:
+threadfunc_wrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  static void * threadfunc_wrapper(void *arg)   $/;"	f	file:
+threadfunc_wrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^extern "C" { static void * threadfunc_wrapper(void *arg); }$/;"	p	file:
+tick	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*tick)(void);$/;"	m	struct:EmbC
+time	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile double *time; \/\/ the current time, in seconds$/;"	m	struct:EmbC
+time	/home/calin/src/rtfsm/include/EmbC.h	/^  double time; \/\/ the time in seconds that this transition occurred$/;"	m	struct:EmbCTransition
+time	/home/calin/src/rtfsm/include/EmbC.h	/^static inline double time(void) { return *__embc->time; }$/;"	f
+timespec_to_nano	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline long long timespec_to_nano(const struct timespec *);$/;"	p	file:
+timespec_to_nano	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline long long timespec_to_nano(const struct timespec *ts)$/;"	f	file:
+to	/home/calin/src/rtfsm/include/EmbC.h	/^  uint to; \/\/ the state we went to$/;"	m	struct:EmbCTransition
+to	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned to;$/;"	m	struct:OutputSpec::__anon14::__anon15
+transBuf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  CircBuf<StateTransition> transBuf;$/;"	m	struct:FSMSpecific	file:
+transNotifyCond	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_cond_t transNotifyCond;$/;"	m	struct:FSMSpecific	file:
+transNotifyLock	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_mutex_t msgFifoLock, transNotifyLock, daqLock;$/;"	m	struct:FSMSpecific	file:
+transNotifyThrFun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  void *transNotifyThrFun();$/;"	p	struct:FSMSpecific	file:
+transNotifyThrFun	/home/calin/src/rtfsm/user/FSMServer.cpp	/^void *FSMSpecific::transNotifyThrFun()$/;"	f	class:FSMSpecific
+transNotifyThrWrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void *transNotifyThrWrapper(void *);$/;"	p	file:
+transNotifyThrWrapper	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static void *transNotifyThrWrapper(void *arg)$/;"	f	file:
+transNotifyThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  pthread_t transNotifyThread, daqReadThread, nrtReadThread;$/;"	m	struct:FSMSpecific	file:
+transferCircBuffer	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long transferCircBuffer(void *dest, $/;"	f	file:
+transferCircBuffer	/home/calin/src/rtfsm/kernel/fsm.c	/^static unsigned long transferCircBuffer(void *dest, const void *src, unsigned long offset, unsigned long bytes, unsigned long bufsize);$/;"	p	file:
+transition	/home/calin/src/rtfsm/include/EmbC.h	/^  const struct EmbCTransition *transition;  $/;"	m	struct:EmbC	typeref:struct:EmbC::EmbCTransition
+transition	/home/calin/src/rtfsm/include/EmbC.h	/^static inline struct EmbCTransition transition(void) { return *__embc->transition; }$/;"	f
+transitionNotifyUserspace	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline void transitionNotifyUserspace(FSMID_t f, volatile struct StateTransition *transition)$/;"	f	file:
+transition_count	/home/calin/src/rtfsm/include/FSM.h	/^      unsigned transition_count;$/;"	m	union:ShmMsg::__anon19
+transitions	/home/calin/src/rtfsm/include/EmbC.h	/^  const volatile uint *transitions; \/\/ a count of the number of state transitions thus far for this FSM$/;"	m	struct:EmbC
+transitions	/home/calin/src/rtfsm/include/EmbC.h	/^static inline uint transitions(void) { return *__embc->transitions; }$/;"	f
+transitions	/home/calin/src/rtfsm/include/FSM.h	/^        struct StateTransition transitions[MSG_MAX_TRANSITIONS];$/;"	m	struct:ShmMsg::__anon19::__anon20	typeref:struct:ShmMsg::__anon19::__anon20::StateTransition
+transitions	/home/calin/src/rtfsm/include/FSM.h	/^      } transitions;$/;"	m	union:ShmMsg::__anon19	typeref:struct:ShmMsg::__anon19::__anon20
+transitions	/home/calin/src/rtfsm/kernel/fsm.c	/^  struct StateTransition transitions[MAX_HISTORY];$/;"	m	struct:StateHistory	typeref:struct:StateHistory::StateTransition	file:
+trig	/home/calin/src/rtfsm/include/FSM.h	/^    int trig; \/*  this was the value of the state machine column$/;"	m	struct:NRTOutput
+trig_cycle	/home/calin/src/rtfsm/kernel/fsm.c	/^uint64 trig_cycle[NUM_STATE_MACHINES] = {0}; \/* The cycle at which a trigger occurred, useful for deciding when to clearing a trigger (since we want triggers to last trigger_ms) *\/$/;"	v
+trigger_ms	/home/calin/src/rtfsm/kernel/fsm.c	/^    trigger_ms = DEFAULT_TRIGGER_MS,    $/;"	v
+triggersExpired	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline int triggersExpired(FSMID_t f)$/;"	f	file:
+trimTrailingSpaces	/home/calin/src/rtfsm/utils/GetValue.c	/^static void trimTrailingSpaces(char *str)$/;"	f	file:
+trimWS	/home/calin/src/rtfsm/user/FSMServer.cpp	/^static std::string trimWS(const std::string & s)$/;"	f	file:
+tryLock	/home/calin/src/rtfsm/user/Mutex.h	/^  bool tryLock() { return pthread_mutex_trylock(&mut) == 0; }$/;"	f	struct:Mutex
+ts	/home/calin/src/rtfsm/include/FSM.h	/^  double ts; \/* Timestamp, in seconds *\/$/;"	m	struct:VarLogItem
+ts	/home/calin/src/rtfsm/include/FSM.h	/^  long long ts; \/* When we entered the state, in nanoseconds since FSM reset. *\/$/;"	m	struct:StateTransition
+ts	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  struct timeval ts;$/;"	m	class:Timer	typeref:struct:Timer::timeval	file:
+ts_nanos	/home/calin/src/rtfsm/include/FSM.h	/^    long long ts_nanos;    $/;"	m	struct:DAQScan
+ts_nanos	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned long long ts_nanos;$/;"	m	struct:NRTOutput
+type	/home/calin/src/rtfsm/include/FSM.h	/^    unsigned char type; \/* one of NRTOutputType above *\/$/;"	m	struct:NRTOutput
+type	/home/calin/src/rtfsm/include/FSM.h	/^  int type; \/* one of the OSPEC_ enum above *\/$/;"	m	struct:OutputSpec
+u	/home/calin/src/rtfsm/include/FSM.h	/^    } u;$/;"	m	struct:ShmMsg	typeref:union:ShmMsg::__anon19
+uint	/home/calin/src/rtfsm/include/EmbC.h	/^typedef unsigned int uint;$/;"	t
+uint16	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef uint16_t uint16;$/;"	t
+uint32	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef uint32_t uint32;$/;"	t
+uint64	/home/calin/src/rtfsm/include/EmbC.h	/^typedef unsigned long long uint64;$/;"	t
+uint64	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef uint64_t uint64;$/;"	t
+uint64_to_cstr	/home/calin/src/rtfsm/kernel/fsm.c	/^static const char *uint64_to_cstr(uint64 in);$/;"	p	file:
+uint64_to_cstr	/home/calin/src/rtfsm/kernel/fsm.c	/^static const char *uint64_to_cstr(uint64 num)$/;"	f	file:
+uint64_to_cstr_r	/home/calin/src/rtfsm/kernel/fsm.c	/^static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num)$/;"	f	file:
+uint64_to_cstr_r	/home/calin/src/rtfsm/kernel/fsm.c	/^static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num);$/;"	p	file:
+uint8	/home/calin/src/rtfsm/include/IntTypes.h	/^  typedef uint8_t uint8;$/;"	t
+ulldiv	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long long ulldiv(unsigned long long dividend, unsigned long divisor, unsigned long *remainder);$/;"	p	file:
+ulldiv	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long long ulldiv(unsigned long long ull, unsigned long uld, unsigned long *r)$/;"	f	file:
+ullmod	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long ullmod(unsigned long long dividend, unsigned long divisor);$/;"	p	file:
+ullmod	/home/calin/src/rtfsm/kernel/fsm.c	/^static inline unsigned long ullmod(unsigned long long ull, unsigned long uld)$/;"	f	file:
+ulong	/home/calin/src/rtfsm/include/EmbC.h	/^typedef unsigned long ulong;$/;"	t
+unlink	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^  bool unlink;$/;"	m	struct:RTOS::Fifo	file:
+unlinkModule	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  bool unlinkModule(const std::string & program_name) const;$/;"	p	class:ConnectionThread	file:
+unlinkModule	/home/calin/src/rtfsm/user/FSMServer.cpp	/^bool ConnectionThread::unlinkModule(const std::string & program_name) const$/;"	f	class:ConnectionThread
+unloadDetachFSM	/home/calin/src/rtfsm/kernel/fsm.c	/^static void unloadDetachFSM(struct FSMSpec *fsm)$/;"	f	file:
+unloadDetachFSM	/home/calin/src/rtfsm/kernel/fsm.c	/^static void unloadDetachFSM(struct FSMSpec *fsm);$/;"	p	file:
+unlock	/home/calin/src/rtfsm/both/embc_mod_wrapper.c	/^static void unlock(void) { MDEC; }$/;"	f	file:
+unlock	/home/calin/src/rtfsm/include/EmbC.h	/^  void (*unlock)(void);$/;"	m	struct:EmbC
+unlock	/home/calin/src/rtfsm/user/Mutex.h	/^  void unlock() { pthread_mutex_unlock(&mut); }$/;"	f	struct:Mutex
+unused_flg	/home/calin/src/rtfsm/user/scanproc.h	/^    char unused_flg;$/;"	m	struct:ModList
+updateHasSchedWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static void updateHasSchedWaves(FSMID_t f)$/;"	f	file:
+updateHasSchedWaves	/home/calin/src/rtfsm/kernel/fsm.c	/^static void updateHasSchedWaves(FSMID_t);$/;"	p	file:
+usage	/home/calin/src/rtfsm/utils/GetMatrix.c	/^static void usage(const char *prg)$/;"	f	file:
+usage	/home/calin/src/rtfsm/utils/GetValue.c	/^static void usage(const char *prg)$/;"	f	file:
+usage	/home/calin/src/rtfsm/utils/SendMatrix.c	/^static void usage(const char *prg)$/;"	f	file:
+use_ct	/home/calin/src/rtfsm/user/scanproc.h	/^    int use_ct;$/;"	m	struct:ModList
+ushort	/home/calin/src/rtfsm/include/EmbC.h	/^typedef unsigned short ushort;$/;"	t
+valid	/home/calin/src/rtfsm/include/FSMExternalTrig.h	/^  atomic_t valid;$/;"	m	struct:FSMExtTrigShm
+valid	/home/calin/src/rtfsm/kernel/fsm.c	/^    int valid; \/* If this is true, the FSM task uses the state machine,$/;"	m	struct:RunState	file:
+value	/home/calin/src/rtfsm/include/FSM.h	/^  double value; \/* The value of the C variable *\/$/;"	m	struct:VarLogItem
+vertCat	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  Matrix & vertCat(const Matrix &rhs); \/\/ modified this$/;"	p	struct:Matrix	file:
+vertCat	/home/calin/src/rtfsm/user/FSMServer.cpp	/^Matrix & Matrix::vertCat(const Matrix &rhs)$/;"	f	class:Matrix
+wBitsPerSample	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint16         wBitsPerSample; \/\/ standard rates are 11025 22050 and 44100$/;"	m	struct:FormatChunk	file:
+wBlockAlign	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint16         wBlockAlign; \/\/ = wChannels * (wBitsPerSample \/ 8)$/;"	m	struct:FormatChunk	file:
+wChannels	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  uint16         wChannels; $/;"	m	struct:FormatChunk	file:
+wFormatTag	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  int16          wFormatTag; \/\/ set it to 1$/;"	m	struct:FormatChunk	file:
+wait_for_jump_to_state_0_to_swap_fsm	/home/calin/src/rtfsm/include/FSM.h	/^  unsigned short wait_for_jump_to_state_0_to_swap_fsm;$/;"	m	struct:FSMSpec
+wave	/home/calin/src/rtfsm/utils/WavFile.cpp	/^  char wave[4]; \/\/ 'WAVE'$/;"	m	struct:Header	file:
+why	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  const std::string & why() const { return reason; }$/;"	f	class:Exception
+work	/home/calin/src/rtfsm/kernel/softtask.c	/^  struct work_struct work;$/;"	m	struct:SoftTask	typeref:struct:SoftTask::work_struct	file:
+write	/home/calin/src/rtfsm/utils/WavFile.cpp	/^bool OWavFile::write(const double *data, unsigned size, unsigned srate, double scale_min, double scale_max)$/;"	f	class:OWavFile
+write	/home/calin/src/rtfsm/utils/WavFile.h	/^  bool write(const double *data,  \/**< sample data.. channels are interleaved*\/$/;"	p	class:OWavFile
+writeFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^int RTOS::writeFifo(FIFO f, const void *buf, unsigned long bufsz)$/;"	f	class:RTOS
+writeFifo	/home/calin/src/rtfsm/user/rtos_utility.cpp	/^int RTOS::writeFifo(unsigned key, const void *buf, unsigned long bufsz)$/;"	f	class:RTOS
+writeFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern int writeFifo(FIFO, const void *buf, unsigned long bufsz);$/;"	p	namespace:RTOS
+writeFifo	/home/calin/src/rtfsm/user/rtos_utility.h	/^  extern int writeFifo(unsigned key, const void *buf, unsigned long bufsz);$/;"	p	namespace:RTOS
+~CircBuf	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ~CircBuf() { buf.clear(); }$/;"	f	struct:CircBuf
+~ConnectionThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ~ConnectionThread();$/;"	p	class:ConnectionThread	file:
+~ConnectionThread	/home/calin/src/rtfsm/user/FSMServer.cpp	/^ConnectionThread::~ConnectionThread()$/;"	f	class:ConnectionThread
+~Exception	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  virtual ~Exception() {}$/;"	f	class:Exception
+~FSMSpecific	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ~FSMSpecific() $/;"	f	struct:FSMSpecific
+~Impl	/home/calin/src/rtfsm/user/FSMServer.cpp	/^    ~Impl() {}$/;"	f	struct:shallow_copy::Impl
+~Log	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ~Log() { if (nrefs() == 1) { MutexLocker m(mut); (*logstream) << get(); get() = ""; } }$/;"	f	class:Log
+~Matrix	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ~Matrix() { delete [] d; }$/;"	f	struct:Matrix
+~Mutex	/home/calin/src/rtfsm/user/Mutex.h	/^  ~Mutex() { pthread_mutex_destroy(&mut); }$/;"	f	struct:Mutex
+~MutexLocker	/home/calin/src/rtfsm/user/Mutex.h	/^  ~MutexLocker() { pthread_mutex_unlock(&mut); }$/;"	f	struct:MutexLocker
+~OWavFile	/home/calin/src/rtfsm/utils/WavFile.cpp	/^OWavFile::~OWavFile()$/;"	f	class:OWavFile
+~OWavFile	/home/calin/src/rtfsm/utils/WavFile.h	/^  ~OWavFile();$/;"	p	class:OWavFile
+~shallow_copy	/home/calin/src/rtfsm/user/FSMServer.cpp	/^  ~shallow_copy() { ref_decr(); p = 0; }$/;"	f	class:shallow_copy
