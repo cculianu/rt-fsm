@@ -1,0 +1,37 @@
+README for Realtime FSM
+by Calin Culianu <calin@ajvar.org> 
+
+This is the Realtime FSM originally developed for Cold Spring Harbor Labs.  It
+contains the 'Embedded C' modifications so that you can have your state machines
+execute arbitrary code. 
+
+This system is basically a server that runs on an RTAI-enabled system.  It
+listens for connections on port 3333 and expects clients to upload state-machine
+programs to it via the network.  
+
+There is currently only one client implementation, written in Matlab (see the
+Client/Matlab directory).  This is because most experimentalists use Matlab
+extensively.   However, nothing is stopping you from using the same protocol and
+re-implementing a client in any language.  The protocol is not currently
+documented, but reading the user/FSMServer.cpp or the Matlab @RTLSM class might
+be a place to start if you wish to re-implement the protocol.  It is a simple
+text-based protocol, and is not terribly cryptic.
+
+A NOTE ABOUT THE PLATFORM
+
+Originally, this was developed for RTLinux running on 2.4 kernels with no SMP
+support.  Since RTLinux appears to be a dead platform I have decided to port
+this to RTAI 3.x running on 2.6 kernels *with* SMP support.
+
+So, to get this working, read the INSTALL docs.  
+
+
+NOTE TO KERNEL 2.4 and RTLINUX USERS:
+
+This sourcecode tried to maintain backwards compatibility with 2.4 and RTLinux,
+HOWEVER the build system doesn't know how to build 2.4 kernel modules anymore. 
+To get it to run on old kernels, you have to play with the makefiles yourself to
+get it to point to the right header dirs, and you should set the CPP define
+'RTLINUX' when building the kernel module.
+
+
