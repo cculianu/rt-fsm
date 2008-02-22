@@ -1468,7 +1468,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
              "Cycle count: %s  Task period (in ns): %s\n\n"
              "Real-time Correctness Stats\n"
              "---------------------------\n"
-             "Cycles Overran: %lu  Cycles Skipped: %lu   Wokeup Late/Early: %lu\n"
+             "Cycles Overran: %lu  Cycles Skipped: %lu  Wokeup Late/Early: %lu\n"
              "Latency (in ns):  Cur %s  Avg %s  Min %s  Max %s\n"
              "Cycle cost (in ns):  Cur %s  Avg %s  Min %s  Max %s\n\n",
              BUFFMTU(cycle), BUFFMTU(task_period_ns), 
