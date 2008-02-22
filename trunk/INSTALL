@@ -252,15 +252,19 @@ Once the proper kernel modules are loaded, and your comedi device is configured
 as /dev/comedi0, you can Load the RealtimeFSM.ko kernel module:
 
       # cd /path/to/rtfsm
-      # insmod ./RealtimeFSM
+      # insmod ./RealtimeFSM.ko
   
 Alternatively, you can modify parameters, such as task_rate.
 
-      # insmod ./RealtimeFSM task_rate=6000
+      # insmod ./RealtimeFSM.ko task_rate=6000
   
 There are other optional parameters besides task_rate that the kernel module
-accepts.  Do 'modinfo ./RealtimeFSM.ko' to see other parameters.
-  
+accepts.  Do:
+
+      # modinfo ./RealtimeFSM.ko
+      
+To see other parameters.
+ 
 If it fails to load, do 
 
       # dmesg
