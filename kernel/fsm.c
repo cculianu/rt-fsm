@@ -251,9 +251,9 @@ enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define STATE_COL(_fsm, state, col) (FSM_MATRIX_GET((_fsm), (state), (col)))
 
 static struct proc_dir_entry *proc_ent = 0;
-static volatile int rt_task_stop = 0; /* Internal variable to stop the RT 
-                                         thread. */
-static volatile int rt_task_running = 0;
+static atomic_t rt_task_stop = ATOMIC_INIT(0); /* Internal variable to stop the RT 
+                                                  thread. */
+static atomic_t rt_task_running = ATOMIC_INIT(0);
 
 static struct SoftTask *buddyTask[NUM_STATE_MACHINES] = {0}, /* non-RT kernel-side process context buddy 'tasklet' */
                        *buddyTaskComedi = 0;
@@ -286,6 +286,8 @@ unsigned int lastTriggers; /* Remember the trigger lines -- these
 uint64 cycle = 0; /* the current cycle */
 uint64 trig_cycle[NUM_STATE_MACHINES] = {0}; /* The cycle at which a trigger occurred, useful for deciding when to clearing a trigger (since we want triggers to last trigger_ms) */
 static char didInitRunStates = 0;
+/* some latency statistics */
+int64 lat_min = 0x7fffffffffffffffULL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0;
 
 #define BILLION 1000000000
 #define MILLION 1000000
@@ -487,6 +489,10 @@ static inline long long lldiv(long long ll, long ld, long *r);
 static const char *uint64_to_cstr(uint64 in);
 /* this function is reentrant! */
 static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num);
+/* this function is non-reentrant! */
+static const char *int64_to_cstr(int64 in);
+/* this function is reentrant! */
+static int int64_to_cstr_r(char *buf, unsigned bufsz, int64 num);
 static unsigned long transferCircBuffer(void *dest, const void *src, unsigned long offset, unsigned long bytes, unsigned long bufsize);
 /* Place an unsigned int into the debug fifo.  This is currently used to
    debug AI 0 reads.  Only useful for development.. */
@@ -494,6 +500,7 @@ static inline void putDebugFifo(unsigned value);
 static void printStats(void);
 static void buddyTaskHandler(void *arg);
 static void buddyTaskComediHandler(void *arg);
+static void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup);
 
 /*-----------------------------------------------------------------------------*/
 
@@ -542,8 +549,8 @@ void cleanup (void)
   if (proc_ent)
     remove_proc_entry(MODULE_NAME, 0);
 
-  if (rt_task_running) {
-    rt_task_stop = 1;
+  if (atomic_read(&rt_task_running)) {
+    atomic_set(&rt_task_stop, 1);
     pthread_join(rt_task_handle, 0);
   }
 
@@ -1462,8 +1469,9 @@ static int myseq_show (struct seq_file *m, void *dummy)
   seq_printf(m, 
              "Misc. Stats\n"
              "-----------\n"
-             "Num Cycles Too Long: %lu\t"  "Num Cycles Wokeup Late/Early: %lu\n\n", 
-             fsm_cycle_long_ct, fsm_wakeup_jittered_ct);
+             "Num Cycles Too Long: %lu\t"  "Num Cycles Wokeup Late/Early: %lu\n"
+             "Latency (in ns):  Current %ld    Avg last 100 %ld    Min %ld    Max %ld\n\n", 
+             (unsigned long)fsm_cycle_long_ct, (unsigned long)fsm_wakeup_jittered_ct, (long)lat_cur, (long)lat_min, (long)lat_max, (long)lat_avg);
 
   if (AI_MODE == ASYNCH_MODE) {
     seq_printf(m,
@@ -1626,37 +1634,26 @@ static void *doFSM (void *arg)
 {
   struct timespec next_task_wakeup;
   hrtime_t cycleT0, cycleTf;
-  long long tmpts;
   FSMID_t f;
 
   (void)arg;
 
-  rt_task_running = 1;
+  atomic_set(&rt_task_running, 1);
 
   doSetupThatNeededFloatingPoint();
 
   clock_gettime(CLOCK_REALTIME, &next_task_wakeup);
     
-  while (! rt_task_stop) {
+  while (! atomic_read(&rt_task_stop)) {
 
     cycleT0 = gethrtime();
-
+    ++cycle;
+    
     /* see if we woke up jittery/late.. */
-    tmpts = timespec_to_nano(&next_task_wakeup);
-    tmpts = ((long long)cycleT0) - tmpts;
-    if ( ABS(tmpts) > JITTER_TOLERANCE_NS ) {
-      ++fsm_wakeup_jittered_ct;
-      WARNING("Jittery wakeup! Magnitude: %ld ns (cycle #%lu)\n",
-              (long)tmpts, (unsigned long)cycle);
-      if (tmpts > 0) {
-        /* fudge the task cycle period to avoid lockups? */
-        clock_gettime(CLOCK_REALTIME, &next_task_wakeup);
-      }
-    }
+    tallyJitterStats(cycleT0, &next_task_wakeup);
 
     timespec_add_ns(&next_task_wakeup, (long)task_period_ns);
 
-    ++cycle;
 
 #ifdef DEBUG_CYCLE_TIME
     do {
@@ -1816,7 +1813,7 @@ static void *doFSM (void *arg)
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &next_task_wakeup, 0);
   }
 
-  rt_task_running = 0;
+  atomic_set(&rt_task_running, 0);
   pthread_exit(0);
   return 0;
 }
@@ -2718,6 +2715,39 @@ static inline unsigned long long Nano2USec(unsigned long long nano)
   return ulldiv(nano, 1000, &rem);
 }
 
+static int int64_to_cstr_r(char *buf, unsigned bufsz, int64 num)
+{
+  static const int64 ZEROLL = 0LL;
+  static const int32 dividend = 10;
+  int ct = 0, i;
+  int64 quotient = num;
+  long remainder;
+  char reversebuf[22];
+  unsigned sz = 22;
+
+  if (bufsz < sz) sz = bufsz;
+  if (sz) buf[0] = 0;
+  if (sz <= 1) return 0;
+
+  /* convert to base 10... results will be reversed */
+  do {
+    quotient = lldiv(quotient, dividend, &remainder);
+    reversebuf[ct++] = remainder + '0';
+  } while (quotient != ZEROLL && ct < sz-1);
+
+  /* append negative to negative values.. */
+  if (num < 0) reversebuf[ct++] = '-';
+  
+  /* now reverse the reversed string... */
+  for (i = 0; i < ct && i < sz-1; i++) 
+    buf[i] = reversebuf[(ct-i)-1];
+  
+  /* add nul... */
+  buf[ct] = 0;
+  
+  return ct;
+}
+
 static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num)
 {
   static const uint64 ZEROULL = 0ULL;
@@ -2750,9 +2780,20 @@ static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num)
 
 static const char *uint64_to_cstr(uint64 num)
 {
-  static char buf[21];
-  uint64_to_cstr_r(buf, sizeof(buf), num);
-  return buf;
+  static char buf[10][21];
+  static volatile unsigned i = 0;
+  i %= 10;
+  uint64_to_cstr_r(buf[i], 21, num);
+  return buf[i++];
+}
+
+static const char *int64_to_cstr(int64 num)
+{
+  static char buf[10][22];
+  static volatile unsigned i = 0;
+  i %= 10;
+  int64_to_cstr_r(buf[i], 22, num);
+  return buf[i++];
 }
 
 static inline long Micro2Sec(long long micro, unsigned long *remainder)
@@ -3295,4 +3336,25 @@ void  doSetupThatNeededFloatingPoint(void)
   for (i = 0; i < nchans; ++i) {
     comedi_data_write(dev_ao, subdev_ao, i, ao_range, 0, ao_0V_sample); /* initialize AO to 0V */
   }
+}
+
+void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup)
+{
+   hrtime_t lat_last = lat_cur;
+   int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
+   
+   lat_cur = real_wakeup - timespec_to_nano(next_task_wakeup); 
+   
+   /* see if we woke up jittery/late.. */
+    if ( ABS(lat_cur) > JITTER_TOLERANCE_NS ) {
+      ++fsm_wakeup_jittered_ct;
+      WARNING("Jittery wakeup! Magnitude: %s ns (cycle #%s)\n", int64_to_cstr(lat_cur), uint64_to_cstr(cycle));
+      if (lat_cur > 0 && lat_last > JITTER_TOLERANCE_NS) {
+        /* if 2 consecutive cycles are late, fudge the task cycle period to avoid lockups? */
+        /*clock_gettime(CLOCK_REALTIME, next_task_wakeup);*/
+      }
+    }
+    if (lat_cur > lat_max) lat_max = lat_cur;
+    if (lat_cur < lat_min) lat_min = lat_cur;
+    lat_avg +=  lat_cur/n;
 }
