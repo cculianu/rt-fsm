@@ -1463,8 +1463,8 @@ static int myseq_open(struct inode *i, struct file *f)
 static int myseq_show (struct seq_file *m, void *dummy)
 { 
   FSMID_t f;
-  char buf[12][22];
-  int bufidx = 11;
+  char buf[13][22];
+  int bufidx = 12;
 #define BUFFMTS(s) ({ ++bufidx; bufidx %= 12; int64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), s); buf[bufidx]; })
 #define BUFFMTU(u) ({ ++bufidx; bufidx %= 12; uint64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), u); buf[bufidx]; })
   
@@ -1473,11 +1473,12 @@ static int myseq_show (struct seq_file *m, void *dummy)
   seq_printf(m, 
              "Misc. Stats\n"
              "-----------\n"
-             "Cycle count: %s\n"
+             "Cycle count: %s    Task period (in ns): %s\n"
              "Num Cycles Too Long: %s"  "    Num Cycles Wokeup Late/Early: %s\n"
-             "Latency (in ns):    Cur %s    Avg %s    Min %s    Max %s\n"
-             "Cycle cost (in ns):    Cur %s    Avg %s    Min %s    Max %s\n\n",
-             BUFFMTU(cycle), BUFFMTU(fsm_cycle_long_ct), BUFFMTU(fsm_wakeup_jittered_ct),
+             "Latency (in ns):       Cur %s  Avg %s  Min %s  Max %s\n"
+             "Cycle cost (in ns):    Cur %s  Avg %s  Min %s  Max %s\n\n",
+             BUFFMTU(cycle), BUFFMTU(task_period_ns), 
+             BUFFMTU(fsm_cycle_long_ct), BUFFMTU(fsm_wakeup_jittered_ct),
              BUFFMTS(lat_cur), BUFFMTS(lat_avg), BUFFMTS(lat_min), BUFFMTS(lat_max),
              BUFFMTS(cyc_cur), BUFFMTS(cyc_avg), BUFFMTS(cyc_min), BUFFMTS(cyc_max));
 
