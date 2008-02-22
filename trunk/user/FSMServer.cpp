@@ -271,7 +271,8 @@ static void *nrtThrWrapper(void *);
 static FSMSpecific fsms[NUM_STATE_MACHINES];
 
 static std::vector<double> splitNumericString(const std::string & str,
-                                              const std::string &delims = ",");
+                                              const std::string &delims = ",",
+                                              bool allowEmpties = true);
 static std::vector<std::string> splitString(const std::string &str,
                                             const std::string &delim = ",",
                                             bool trim_whitespace = true,
@@ -2132,18 +2133,26 @@ void *FSMSpecific::nrtThrFun()
 
 static
 std::vector<double> splitNumericString(const std::string &str,
-                                       const std::string &delims)
+                                       const std::string &delims,
+                                       bool allowEmpties)
 {
   std::vector<double> ret;
   if (!str.length() || !delims.length()) return ret;
   std::string::size_type pos;
   for ( pos = 0; pos < str.length() && pos != std::string::npos; pos = str.find_first_of(delims, pos) ) {
-    if (pos) ++pos;
-    if (pos > str.length()) break;
-    bool ok;
-    double d = FromString<double>(str.substr(pos), &ok);
-    if (!ok) break; /* break if parse error -- don't allow empty tokens.. */
-    ret.push_back(d);
+      if (pos) ++pos;
+      bool ok;
+      double d = FromString<double>(str.substr(pos), &ok);
+      if (!ok)
+          // test for zero-length token
+          /* break if parse error -- but conditionally allow empty tokens.. */
+          if (allowEmpties && ( delims.find(str[pos]) != std::string::npos || pos >= str.length() ) ) {
+              if (!pos) ++pos;
+          }      
+          else
+              break; 
+      else
+          ret.push_back(d);
   }
   return ret;
 }
