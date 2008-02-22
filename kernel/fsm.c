@@ -287,7 +287,7 @@ uint64 cycle = 0; /* the current cycle */
 uint64 trig_cycle[NUM_STATE_MACHINES] = {0}; /* The cycle at which a trigger occurred, useful for deciding when to clearing a trigger (since we want triggers to last trigger_ms) */
 static char didInitRunStates = 0;
 /* some latency statistics */
-int64 lat_min = 0x7fffffffffffffffULL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0;
+int64 lat_min = 0x7fffffffffffffffLL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0;
 
 #define BILLION 1000000000
 #define MILLION 1000000
@@ -501,7 +501,7 @@ static void printStats(void);
 static void buddyTaskHandler(void *arg);
 static void buddyTaskComediHandler(void *arg);
 static void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup);
-
+static char *cycleStr(void);
 /*-----------------------------------------------------------------------------*/
 
 /*-----------------------------------------------------------------------------
@@ -628,8 +628,7 @@ static void printStats(void)
   if (debug && cb_eos_skips) 
     DEBUG("skipped %u times, %u scans\n", cb_eos_skips, cb_eos_skipped_scans);
 
-  LOG_MSG("unloaded successfully after %s cycles.\n",
-         uint64_to_cstr(cycle));
+  LOG_MSG("unloaded successfully after %s cycles.\n", cycleStr());
 }
 
 static int initBuddyTask(void)
@@ -1462,16 +1461,20 @@ static int myseq_open(struct inode *i, struct file *f)
 static int myseq_show (struct seq_file *m, void *dummy)
 { 
   FSMID_t f;
-
+  char buf[7][22];
+  int bufidx = 6;
+#define BUFFMTS(s) ({ ++bufidx; bufidx %= 7; int64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), s); buf[bufidx]; })
+#define BUFFMTU(u) ({ ++bufidx; bufidx %= 7; uint64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), u); buf[bufidx]; })
+  
   (void)dummy;
   seq_printf(m, "%s Module\n\nmagic: %08x version: %s\n\n", MODULE_NAME, shm->magic, VersionSTR);
-
   seq_printf(m, 
              "Misc. Stats\n"
              "-----------\n"
-             "Num Cycles Too Long: %lu\t"  "Num Cycles Wokeup Late/Early: %lu\n"
-             "Latency (in ns):  Current %ld    Avg last 100 %ld    Min %ld    Max %ld\n\n", 
-             (unsigned long)fsm_cycle_long_ct, (unsigned long)fsm_wakeup_jittered_ct, (long)lat_cur, (long)lat_min, (long)lat_max, (long)lat_avg);
+             "Cycle count: %s\n"
+             "Num Cycles Too Long: %s"  "    Num Cycles Wokeup Late/Early: %s\n"
+             "Latency (in ns):    Cur %s    Avg %s    Min %s    Max %s\n\n",
+             BUFFMTU(cycle), BUFFMTU(fsm_cycle_long_ct), BUFFMTU(fsm_wakeup_jittered_ct), BUFFMTS(lat_cur), BUFFMTS(lat_avg), BUFFMTS(lat_min), BUFFMTS(lat_max));
 
   if (AI_MODE == ASYNCH_MODE) {
     seq_printf(m,
@@ -3326,7 +3329,7 @@ static void unloadDetachFSM(struct FSMSpec *fsm)
     }     
 }
 
-void  doSetupThatNeededFloatingPoint(void)
+static void  doSetupThatNeededFloatingPoint(void)
 {
   double minV = ao_krange.min * 1e-6, maxV = ao_krange.max * 1e-6;
   lsampl_t maxdata = comedi_get_maxdata(dev_ao, subdev_ao, 0);
@@ -3338,17 +3341,17 @@ void  doSetupThatNeededFloatingPoint(void)
   }
 }
 
-void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup)
+static void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup)
 {
-   hrtime_t lat_last = lat_cur;
-   int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
+   hrtime_t lat_last = lat_cur, quot;
+   const int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
    
    lat_cur = real_wakeup - timespec_to_nano(next_task_wakeup); 
    
    /* see if we woke up jittery/late.. */
     if ( ABS(lat_cur) > JITTER_TOLERANCE_NS ) {
       ++fsm_wakeup_jittered_ct;
-      WARNING("Jittery wakeup! Magnitude: %s ns (cycle #%s)\n", int64_to_cstr(lat_cur), uint64_to_cstr(cycle));
+      WARNING("Jittery wakeup! Magnitude: %s ns (cycle #%s)\n", int64_to_cstr(lat_cur), cycleStr());
       if (lat_cur > 0 && lat_last > JITTER_TOLERANCE_NS) {
         /* if 2 consecutive cycles are late, fudge the task cycle period to avoid lockups? */
         /*clock_gettime(CLOCK_REALTIME, next_task_wakeup);*/
@@ -3356,5 +3359,20 @@ void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup)
     }
     if (lat_cur > lat_max) lat_max = lat_cur;
     if (lat_cur < lat_min) lat_min = lat_cur;
-    lat_avg +=  lat_cur/n;
+    quot = lat_avg * (n-1);
+    quot += lat_cur;
+    do_div(quot, n);
+    lat_avg = quot;
+}
+
+static char *cycleStr(void)
+{
+  static uint64 last = ~0ULL;
+  static char buf[21];
+  
+  if (last != cycle) {
+      last = cycle;
+      uint64_to_cstr_r(buf, sizeof(buf), last);
+  }
+  return buf;
 }
