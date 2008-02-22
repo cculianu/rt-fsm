@@ -286,8 +286,9 @@ unsigned int lastTriggers; /* Remember the trigger lines -- these
 uint64 cycle = 0; /* the current cycle */
 uint64 trig_cycle[NUM_STATE_MACHINES] = {0}; /* The cycle at which a trigger occurred, useful for deciding when to clearing a trigger (since we want triggers to last trigger_ms) */
 static char didInitRunStates = 0;
-/* some latency statistics */
-int64 lat_min = 0x7fffffffffffffffLL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0;
+/* some latency and cycle time statistics */
+int64 lat_min = 0x7fffffffffffffffLL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0, 
+      cyc_min = 0x7fffffffffffffffLL, cyc_max = ~0ULL, cyc_avg = 0, cyc_cur = 0;
 
 #define BILLION 1000000000
 #define MILLION 1000000
@@ -501,6 +502,7 @@ static void printStats(void);
 static void buddyTaskHandler(void *arg);
 static void buddyTaskComediHandler(void *arg);
 static void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wakeup);
+static void tallyCycleTime(hrtime_t t0, hrtime_t tf, struct timespec *next_task_wakeup);
 static char *cycleStr(void);
 /*-----------------------------------------------------------------------------*/
 
@@ -1461,10 +1463,10 @@ static int myseq_open(struct inode *i, struct file *f)
 static int myseq_show (struct seq_file *m, void *dummy)
 { 
   FSMID_t f;
-  char buf[7][22];
-  int bufidx = 6;
-#define BUFFMTS(s) ({ ++bufidx; bufidx %= 7; int64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), s); buf[bufidx]; })
-#define BUFFMTU(u) ({ ++bufidx; bufidx %= 7; uint64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), u); buf[bufidx]; })
+  char buf[12][22];
+  int bufidx = 11;
+#define BUFFMTS(s) ({ ++bufidx; bufidx %= 12; int64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), s); buf[bufidx]; })
+#define BUFFMTU(u) ({ ++bufidx; bufidx %= 12; uint64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), u); buf[bufidx]; })
   
   (void)dummy;
   seq_printf(m, "%s Module\n\nmagic: %08x version: %s\n\n", MODULE_NAME, shm->magic, VersionSTR);
@@ -1473,8 +1475,11 @@ static int myseq_show (struct seq_file *m, void *dummy)
              "-----------\n"
              "Cycle count: %s\n"
              "Num Cycles Too Long: %s"  "    Num Cycles Wokeup Late/Early: %s\n"
-             "Latency (in ns):    Cur %s    Avg %s    Min %s    Max %s\n\n",
-             BUFFMTU(cycle), BUFFMTU(fsm_cycle_long_ct), BUFFMTU(fsm_wakeup_jittered_ct), BUFFMTS(lat_cur), BUFFMTS(lat_avg), BUFFMTS(lat_min), BUFFMTS(lat_max));
+             "Latency (in ns):    Cur %s    Avg %s    Min %s    Max %s\n"
+             "Cycle cost (in ns):    Cur %s    Avg %s    Min %s    Max %s\n\n",
+             BUFFMTU(cycle), BUFFMTU(fsm_cycle_long_ct), BUFFMTU(fsm_wakeup_jittered_ct),
+             BUFFMTS(lat_cur), BUFFMTS(lat_avg), BUFFMTS(lat_min), BUFFMTS(lat_max),
+             BUFFMTS(cyc_cur), BUFFMTS(cyc_avg), BUFFMTS(cyc_min), BUFFMTS(cyc_max));
 
   if (AI_MODE == ASYNCH_MODE) {
     seq_printf(m,
@@ -1795,22 +1800,13 @@ static void *doFSM (void *arg)
     } /* end loop through each state machine */
 
     commitDataWrites();   
-    
-    cycleTf = gethrtime();
-    
-    if ( cycleTf-cycleT0 + 1000LL > task_period_ns) {
-        WARNING("Cycle %lu took %lu ns (task period is %lu ns)!\n", (unsigned long)cycle, ((unsigned long)(cycleTf-cycleT0)), (unsigned long)task_period_ns);
-        ++fsm_cycle_long_ct;
-        if ( (cycleTf - cycleT0) > task_period_ns ) {
-          /* If it broke RT constraints, resynch next task wakeup to ensure
-             we don't monopolize the CPU */
-          clock_gettime(CLOCK_REALTIME, &next_task_wakeup);
-          timespec_add_ns(&next_task_wakeup, (long)task_period_ns);
-        }
-    }
-    
+        
     /* do any necessary data acquisition and writing to shm->fifo_daq */
     doDAQ();
+
+    
+    /* keep some stats on cycle times.. */
+    tallyCycleTime(cycleT0, gethrtime(), &next_task_wakeup);
 
     /* Sleep until next period */    
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &next_task_wakeup, 0);
@@ -3352,9 +3348,10 @@ static void tallyJitterStats(hrtime_t real_wakeup, struct timespec *next_task_wa
     if ( ABS(lat_cur) > JITTER_TOLERANCE_NS ) {
       ++fsm_wakeup_jittered_ct;
       WARNING("Jittery wakeup! Magnitude: %s ns (cycle #%s)\n", int64_to_cstr(lat_cur), cycleStr());
-      if (lat_cur > 0 && lat_last > JITTER_TOLERANCE_NS) {
-        /* if 2 consecutive cycles are late, fudge the task cycle period to avoid lockups? */
-        /*clock_gettime(CLOCK_REALTIME, next_task_wakeup);*/
+      if (ABS(lat_last) > JITTER_TOLERANCE_NS) {
+        /* if 2 consecutive cycles are off, fudge the task cycle period to avoid lockups?? */
+        WARNING("Two consecutive cycles woke up at the wrong time!  Resyncing task wakeup time to avoid lockups!\n");
+        clock_gettime(CLOCK_REALTIME, next_task_wakeup);
       }
     }
     if (lat_cur > lat_max) lat_max = lat_cur;
@@ -3375,4 +3372,29 @@ static char *cycleStr(void)
       uint64_to_cstr_r(buf, sizeof(buf), last);
   }
   return buf;
+}
+
+static void tallyCycleTime(hrtime_t cycleT0, hrtime_t cycleTf, struct timespec *next_task_wakeup)
+{
+    int64 quot;
+    const int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
+    
+    cyc_cur = cycleTf-cycleT0;
+    
+    if ( cyc_cur + 1000LL > task_period_ns) {
+        WARNING("Cycle %s took %s ns (task period is %lu ns)!\n", cycleStr(), int64_to_cstr(cyc_cur), (unsigned long)task_period_ns);
+        ++fsm_cycle_long_ct;
+        if ( cyc_cur > task_period_ns ) {
+          /* If it broke RT constraints, resynch next task wakeup to ensure
+             we don't monopolize the CPU */
+          clock_gettime(CLOCK_REALTIME, next_task_wakeup);
+          timespec_add_ns(next_task_wakeup, (long)task_period_ns);
+        }
+    }
+    if (cyc_cur > cyc_max) cyc_max = cyc_cur;
+    if (cyc_cur < cyc_min) cyc_min = cyc_cur;
+    quot = cyc_avg * (n-1);
+    quot += cyc_cur;
+    do_div(quot, n);
+    cyc_avg = quot;
 }
