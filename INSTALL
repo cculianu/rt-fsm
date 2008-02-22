@@ -1,167 +1,284 @@
-Basic Installation
-==================
+Install Guide for Realtime FSM
+by Calin Culianu <calin@ajvar.org>
+Last Updated: Feb. 22, 2008
 
-   These are generic installation instructions.
+These instructions tell you how to setup a system to run this software.  This
+includes brief instructions for setting up RTAI 3.6, Linux 2.6.23, and compiling
+using the RealtimeFSM.ko module and FSMServer userspace program.
 
-   The `configure' shell script attempts to guess correct values for
-various system-dependent variables used during compilation.  It uses
-those values to create a `Makefile' in each directory of the package.
-It may also create one or more `.h' files containing system-dependent
-definitions.  Finally, it creates a shell script `config.status' that
-you can run in the future to recreate the current configuration, a file
-`config.cache' that saves the results of its tests to speed up
-reconfiguring, and a file `config.log' containing compiler output
-(useful mainly for debugging `configure').
+REQUIREMENTS:
 
-   If you need to do unusual things to compile the package, please try
-to figure out how `configure' could check whether to do them, and mail
-diffs or instructions to the address given in the `README' so they can
-be considered for the next release.  If at some point `config.cache'
-contains results you don't want to keep, you may remove or edit it.
+- an x86 or x86_64 system
+- Linux 2.6.xx
+- RTAI 3.6
+- A DAQ card
+- Comedi 0.7.72 or above
+- Comedilib
+- A distro capable of running the above (some old versions of Gentoo or Debian
+  can't run 2.4 kernels, so upgrade your distro!)
 
-   The file `configure.in' is used to create `configure' by a program
-called `autoconf'.  You only need `configure.in' if you want to change
-it or regenerate `configure' using a newer version of `autoconf'.
+RECOMMENDED (meaning, well tested)
 
-The simplest way to compile this package is:
+- Linux 2.6.23
+- Fedora Core 8
+- Tested with NI DAQ cards
+- Comedilib 0.8.1
+- Comedi 0.7.76
 
-  1. `cd' to the directory containing the package's source code and type
-     `./configure' to configure the package for your system.  If you're
-     using `csh' on an old version of System V, you might need to type
-     `sh ./configure' instead to prevent `csh' from trying to execute
-     `configure' itself.
 
-     Running `configure' takes a while.  While running, it prints some
-     messages telling which features it is checking for.
+STEP 1: OBTAIN RTAI 3.6
 
-  2. Type `make' to compile the package.
+1. Go to www.rtai.org and download rtai-3.6
 
-  3. Type `make install' to install the programs and any data files and
-     documentation.
+2. Untar it into /usr/src so that you have a directory /usr/src/rtai-3.6
 
-  4. You can remove the program binaries and object files from the
-     source code directory by typing `make clean'.  
+3. From the comandline (as root):
 
-Compilers and Options
-=====================
+       # cd /usr/src
+       # ln -sf rtai-3.6 rtai
 
-   Some systems require unusual options for compilation or linking that
-the `configure' script does not know about.  You can give `configure'
-initial values for variables by setting them in the environment.  Using
-a Bourne-compatible shell, you can do that on the command line like
-this:
-     CC=c89 CFLAGS=-O2 LIBS=-lposix ./configure
 
-Or on systems that have the `env' program, you can do it like this:
-     env CPPFLAGS=-I/usr/local/include LDFLAGS=-s ./configure
+STEP 2: OBTAIN LINUX 2.6.23 
 
-Compiling For Multiple Architectures
-====================================
+1. Go to http://www.kernel.org/pub, and download linux-2.6.23.tar.bz2
 
-   You can compile the package for more than one kind of computer at the
-same time, by placing the object files for each architecture in their
-own directory.  To do this, you must use a version of `make' that
-supports the `VPATH' variable, such as GNU `make'.  `cd' to the
-directory where you want the object files and executables to go and run
-the `configure' script.  `configure' automatically checks for the
-source code in the directory that `configure' is in and in `..'.
+2. As root, untar it into /usr/src.  You should have a directory called
+/usr/src/linux-2.6.23
 
-   If you have to use a `make' that does not supports the `VPATH'
-variable, you have to compile the package for one architecture at a time
-in the source code directory.  After you have installed the package for
-one architecture, use `make distclean' before reconfiguring for another
-architecture.
+3. From the comandline (as root):
 
-Installation Names
-==================
+       # cd /usr/src
+       # ln -sf linux-2.6.23 linux  
 
-   By default, `make install' will install the package's files in
-`/usr/local/bin', `/usr/local/man', etc.  You can specify an
-installation prefix other than `/usr/local' by giving `configure' the
-option `--prefix=PATH'.
+NOTE: You don't *have* to specifically use linux-2.6.23, any 2.6 kernel
+supported by the RTAI patches may work, but I recommend 2.6.23 and these
+instructions assume this kernel version.
 
-   You can specify separate installation prefixes for
-architecture-specific files and architecture-independent files.  If you
-give `configure' the option `--exec-prefix=PATH', the package will use
-PATH as the prefix for installing programs and libraries.
-Documentation and other data files will still use the regular prefix.
 
-   If the package supports it, you can cause programs to be installed
-with an extra prefix or suffix on their names by giving `configure' the
-option `--program-prefix=PREFIX' or `--program-suffix=SUFFIX'.
+STEP 3: OBTAIN COMEDI AND COMEDILIB
 
-Optional Features
-=================
+1.  Go to http://www.comedi.org and download comedi-0.7.76 (or newer) and the
+    latest comedilib.
 
-   Some packages pay attention to `--enable-FEATURE' options to
-`configure', where FEATURE indicates an optional part of the package.
-They may also pay attention to `--with-PACKAGE' options, where PACKAGE
-is something like `gnu-as' or `x' (for the X Window System).  The
-`README' should mention any `--enable-' and `--with-' options that the
-package recognizes.
+2.  Untar them to /usr/src
 
-   For packages that use the X Window System, `configure' can usually
-find the X include and library files automatically, but if it doesn't,
-you can use the `configure' options `--x-includes=DIR' and
-`--x-libraries=DIR' to specify their locations.
+3.  Make symlinks:
 
-Specifying the System Type
-==========================
+        # cd /usr/src
+        # ln -sf comedi-0.7.76 comedi       (replace comedi-0.7.76 with whatever comedi version you got)
+        # ln -sf comedilib-0.8.1  comedlib  (replace comedilib-0.8.1 with whatever comedilib version you got)
+  
 
-   There may be some features `configure' can not figure out
-automatically, but needs to determine by the type of host the package
-will run on.  Usually `configure' can figure that out, but if it prints
-a message saying it can not guess the host type, give it the
-`--host=TYPE' option.  TYPE can either be a short name for the system
-type, such as `sun4', or a canonical name with three fields:
-     CPU-COMPANY-SYSTEM
+STEP 4: PATCH THE KERNEL
 
-See the file `config.sub' for the possible values of each field.  If
-`config.sub' isn't included in this package, then this package doesn't
-need to know the host type.
+1. Decide on a patch.  If you are using a 64-bit distro and system, use the patch:
+      /usr/src/rtai/base/arch/x86_64/patches/hal-linux-2.6.23-x86_64-1.4-00.patch
+   If you want to run on an i386 (x86, non-64-bit) system, use the patch:
+       /usr/src/rtai/base/arch/i386/patches/hal-linux-2.6.23-i386-1.12-00.patch
+       
+2.  From the commandline (as root):
 
-   If you are building compiler tools for cross-compiling, you can also
-use the `--target=TYPE' option to select the type of system they will
-produce code for and the `--build=TYPE' option to select the type of
-system on which you are compiling the package.
+        # cd /usr/src/linux-2.6.23
+        # patch -p1 < USE_PATCH_PATH_FROM_STEP_1_ABOVE_HERE
+    
+3.  Make sure the patch applied cleanly.  If it didn't -- something is amiss and
+    you need to make sure you are using the correct kernel version for your
+    patch.
 
-Sharing Defaults
-================
 
-   If you want to set default values for `configure' scripts to share,
-you can create a site shell script called `config.site' that gives
-default values for variables like `CC', `cache_file', and `prefix'.
-`configure' looks for `PREFIX/share/config.site' if it exists, then
-`PREFIX/etc/config.site' if it exists.  Or, you can set the
-`CONFIG_SITE' environment variable to the location of the site script.
-A warning: not all `configure' scripts look for a site script.
+STEP 5: CONFIGURE, BUILD, AND INSTALL THE KERNEL
 
-Operation Controls
-==================
+0. From commandline, switch to the linux dir:
 
-   `configure' recognizes the following options to control how it
-operates.
+        # cd /usr/src/linux
+  
+1. Here, you have a few options.  If you are running Fedora Core 8 From the
+   command-line, as root, do:
+   
+        # cp /boot/config-2.6.23*fc8 .config
+        # make oldconfig
+        
+    (answer 'Y' to the IPIPE and/or Interrupt Pipeline question!)
+    (if it asks you other questions, decide yourself whether to answer Y, N, or
+M)
+ 
+  If you aren't running Fedora Core 8 as your distro, you should still try and
+  use the config file that came with your kernel.  You do that by putting it in
+  the kernel source dir as .config (as above) and running 'make oldconfig'.
+  
+2. Enter kernel config and make sure a few key options are set/unset:
 
-`--cache-file=FILE'
-     Use and save the results of the tests in FILE instead of
-     `./config.cache'.  Set FILE to `/dev/null' to disable caching, for
-     debugging `configure'.
+        # make menuconfig
+        
+    ---->  Processor Type And Features
+        ----> Processor family  ** MAKE SURE TO SET YOUR PROCESSOR TYPE CORRECTLY.  Most x86 users are on Pentium-4's nowadays.  If you are on an x86_64 system set it to whtever processor is closest such as Core2Duo or Athlon64
+        ----> [ ] Tickless System (OFF)
+        ----> [*] Symmetric Multiprocessing (ON)  (this may be off if you are on a uniprocessor system)
+        ----> [*] HPET Timer Support (ON)
+        ----> [ ] Preemption Model (OFF)
+        ----> [ ] Preempt the Big Kernel Lock (OFF)
+        ----> [*] Interrupt Pipeline (ON)
+        ----> High Memory Support (off) --> (OFF) (this option only appears on x86 and not on x86_64)
+        ----> Timer Frequency (100Hz) (I prefer 100Hz but 1000Hz works too)
+        ----> [ ] PAE (Physical Address Extension) Support  (OFF) 
+    ---->  Power Management options (ACPI, APM)
+        ----> [ ] Power Management support (OFF) (power management is BAD BAD BAD for realtime!!)
+        ---->  CPU Frequency scaling 
+            ----> [ ] CPU Frequency scaling (OFF) (you don't want to mess with the frequency of the processor in an RTOS!!!)
+            
+    ---->   Kernel hacking
+        ----> [ ] Use 4Kb for kernel stacks instead of 8Kb (OFF) (we prefer larger stacks, thank you very much!)
+      
+3. Feel free to set/unset any other options.  
+   Hit ESC-ESC, and say 'Y' to saving your config.  Then do:
+   
+        # make -j2 && make -j2 modules && make modules_install
+        
+   To compile and the kernel and compiled and install kernel modules
+  
+4. Install your new kernel.  On Fedora Core 8 this is how it's done:
 
-`--help'
-     Print a summary of the options to `configure', and exit.
+        # cp arch/i386/boot/bzImage /boot/bzImage-2.6.23
+        # mkinitrd -v /boot/initrd-2.6.23.img 2.6.23
+        # (now, edit /boot/grub/grub.conf and add a boot entry for this kernel with this initrd image!!)
+        
+5. Boot into your new kernel.  If you screwed up (4) above it won't boot.  Go
+   back and see why.  Sometimes drivers are missing or the initrd is not ok.  On
+   Fedora Core 8 things should 'just work', though, so that's why I recommend
+   that distro.
 
-`--quiet'
-`--silent'
-`-q'
-     Do not print messages saying which checks are being made.
 
-`--srcdir=DIR'
-     Look for the package's source code in directory DIR.  Usually
-     `configure' can determine that directory automatically.
+STEP 6: COMPILE AND INSTALL RTAI
 
-`--version'
-     Print the version of Autoconf used to generate the `configure'
-     script, and exit.
+1. Make sure you are booted into your new, RTAI-patched kernel (see STEP 4
+above)
 
-`configure' also accepts some other, not widely useful, options.
+2. Do make menuconfig on RTAI
+
+       # cd /usr/src/rtai 
+       # make menuconfig
+   
+3. Make sure the following options are set/unset:
+
+    ----> General
+        (/usr/realtime) Installation directory
+        (/usr/src/linux) Linux source tree 
+        [*] Build RTAI testsuite
+    ----> Base system
+        ----> Scheduling options
+            [*] Busy wait to ensure resume time alignment (I like this option!)
+        ----> Support services
+            <M> Fifo
+            <M> Shared memory         
+            [*] Support for Posix CLOCK_REALTIME APIs
+        ----> Other features
+            [*] New return values of blocking RTAI APIs
+            [*] Immediate Linux syscall in hard real time
+            [*] Mathfuns support in kernel
+            [*]   C99 standard support
+            <*> Real-time malloc support 
+        -----> Add-ons
+            [*] Comedi support over LXRT 
+            (/usr/src/comedi) COMEDI installation directory
+            [*] Real-Time Driver Model over RTAI
+            [*]   Shared interrupts
+          
+3. Feel free to set/unset any other options.  
+   Hit ESC-ESC, and say 'Y' to saving your config.  Then do:
+   
+       # make && make install
+       
+   This will compile RTAI and install it in /usr/realtime
+   
+4. Setup RTAI kernel module symlinks, then run depmod
+
+       # cd /lib/modules/`uname -r` 
+       # mkdir rtai
+       # cd rtai
+       # ln -sf /usr/realtime/modules/* .
+       # depmod -a
+
+
+STEP 7: COMPILE AND INSTALL COMEDI
+
+1. Pretty easy:
+
+       # cd /usr/src/comedi
+       # ./configure --with-rtaidir=/usr/realtime
+       # make -j2 && make install
+   
+   
+STEP 8: COMPILE AND INSTALL COMEDILIB
+
+1. Pretty easy:
+
+       # cd /usr/src/comedilib
+       # ./configure 
+       # make -j2 && make install
+
+
+STEP 9: COMPILE THIS CODE!
+
+1. As root:
+
+       # cd /path/to/rtfsm
+       # make
+   
+
+
+STEP 10: MAKE SURE COMEDI DEVICE IS CONFIGURED AND RTAI KERNEL MODULES ARE
+LOADED 
+
+1. Configure a comedi device.  For example, if you have an NI PCI board, do:
+
+      # modprobe ni_pcimio
+      # /usr/local/sbin/comedi_config /dev/comedi0 ni_pcimio
+
+2. Load the required RTAI modules and other kernel modules:
+
+      # modprobe rtai_sched
+      # modprobe rtai_fifos
+      # modprobe rtai_math
+      # modprobe rtai_shm
+      # modprobe rtai_sem
+      # modprobe kcomedilib
+      # modprobe zlib_deflate
+  
+
+
+RUNNING THE SOFTWARE
+
+Once the proper kernel modules are loaded, and your comedi device is configured
+as /dev/comedi0, you can Load the RealtimeFSM.ko kernel module:
+
+      # cd /path/to/rtfsm
+      # insmod ./RealtimeFSM
+  
+Alternatively, you can modify parameters, such as task_rate.
+
+      # insmod ./RealtimeFSM task_rate=6000
+  
+There are other optional parameters besides task_rate that the kernel module
+accepts.  Do 'modinfo ./RealtimeFSM.ko' to see other parameters.
+  
+If it fails to load, do 
+
+      # dmesg
+  
+To see why it failed. 
+  
+
+Once the RealtimeFSM.ko module is loaded into the kernel, you can start the
+FSMServer:
+
+    # ./FSMServer
+
+It is listening for connections on port 3333.  Use the Client/Matlab classes to
+communicate with the server and send it state machines.
+
+NB: When the system is running, you can query /proc/RealtimeFSM to see runtime
+stats such as latency, jitter, etc.
+  
+
+Email me: <calin@ajvar.org> or <cculianu@yahoo.com> with any questions!
 
