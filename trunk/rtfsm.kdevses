@@ -1,9 +1,9 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
 <!DOCTYPE KDevPrjSession>
 <KDevPrjSession>
- <DocsAndViews NumberOfDocuments="34" >
+ <DocsAndViews NumberOfDocuments="35" >
   <Doc0 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Makefile" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc0>
   <Doc1 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/Makefile" >
    <View0 Encoding="ISO 8859-1" Type="Source" />
@@ -45,7 +45,7 @@
    <View0 Encoding="ISO 8859-1" Type="Source" />
   </Doc13>
   <Doc14 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/utils/GetMatrix.c" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc14>
   <Doc15 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/utils/GetValue.c" >
    <View0 Encoding="ISO 8859-1" Type="Source" />
@@ -104,6 +104,9 @@
   <Doc33 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/README" >
    <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc33>
+  <Doc34 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/NEWS" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  </Doc34>
  </DocsAndViews>
  <pluginList>
   <kdevdebugger>
