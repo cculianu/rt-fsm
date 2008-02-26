@@ -30,35 +30,12 @@
 #  error This sourcecode really requires Kernel 2.6.20 or newer!  Sorry!
 #endif
 
+#include "rtos_compat.h"
+
 #if defined(RTLINUX) && !defined(RTAI)
-#  include <rtl.h>
-#  include <rtl_time.h>
-#  include <rtl_fifo.h>
-#  include <rtl_sched.h>
-#  include <rtl_mutex.h>
-#  include <rtl_sync.h>
-#  include <mbuff.h>
-#  define rt_printk rtl_printf
-#  define rtf_get_if rtf_get
 #elif defined(RTAI) && !defined(RTLINUX) /* RTAI */
-#  include <rtai.h>
-#  include <rtai_sched.h>
-#  include <rtai_fifos.h>
-#  include <rtai_posix.h>
-#  include <rtai_shm.h>
-#  define RTF_NO MAX_FIFOS
-#  define mbuff_alloc(name, size) rt_shm_alloc(nam2num(name), size, USE_VMALLOC)
-#  define mbuff_free(name, ptr) rt_shm_free(nam2num(name))
-#  define mbuff_attach(name, size) rt_shm_alloc(nam2num(name), size, USE_VMALLOC)
-#  define mbuff_detach(name, ptr) rt_shm_free(nam2num(name))
-   typedef RTIME hrtime_t;
-   static spinlock_t FSM_GLOBAL_SPINLOCK = SPIN_LOCK_UNLOCKED;
-   #define rtl_critical(flags) do { flags = rt_spin_lock_irqsave(&FSM_GLOBAL_SPINLOCK); } while (0)
-   #define rtl_end_critical(flags) do { rt_spin_unlock_irqrestore(flags, &FSM_GLOBAL_SPINLOCK); } while (0)
-   #define RTF_FREE(f) (-1) /* unsupported in RTAI */
-   static inline hrtime_t gethrtime(void) { return count2nano(rt_get_time()); }
-   #define sched_get_priority_max(x) MAX_PRIO
-   #define sched_get_priority_min(x) MIN_PRIO
+   spinlock_t FSM_GLOBAL_SPINLOCK = SPIN_LOCK_UNLOCKED;
+   EXPORT_SYMBOL(FSM_GLOBAL_SPINLOCK);
 #else
 #  error Need to define exactly one of RTLINUX or RTAI to compile this file!
 #endif
@@ -154,7 +131,7 @@ module_exit(cleanup);
   Some private 'global' variables...
 -----------------------------------------------------------------------------*/
 static volatile Shm *shm = 0;
-static volatile struct FSMExtTrigShm *extTrigShm = 0; /* For external triggeting (sound, etc..) */
+static volatile struct FSMExtTrigShm *extTrigShm = 0; /* For external triggering (sound, etc..) */
 static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch. */
 
 #define JITTER_TOLERANCE_NS 76000
@@ -671,38 +648,6 @@ static int initShm(void)
   return 0;
 }
 
-#ifdef RTLINUX
-static int find_free_rtf(unsigned *minor, unsigned size)
-{
-  unsigned i;
-  for (i = 0; i < RTF_NO; ++i) {
-    int ret = rtf_create(i, size);
-    if ( ret  == 0 ) {
-      *minor = i;
-      return 0;
-    } else if ( ret != -EBUSY ) 
-      /* Uh oh.. some deeper error occurred rather than just the fifo was
-	 already allocated.. */
-      return ret;
-  }
-  return -EBUSY;
-}
-#else /* RTAI gah! it allows multiple opens on same fifo, so we must figure out what is opened another way */
-static int find_free_rtf(unsigned *minor, unsigned size)
-{
-  unsigned i;
-  char dummybuf[8];
-  for (i = 0; i < RTF_NO; ++i) {
-    int ret = rtf_evdrp(i, dummybuf, sizeof(dummybuf)); /* eavesdrop returns <0 if the fifos is invalid..  which means it's free! */
-    if ( ret  < 0 ) {
-      ret = rtf_create(i, size);
-      if (!ret) *minor = i;
-      return ret;
-    }
-  }
-  return -EBUSY;
-}
-#endif
 static int initFifos(void)
 {
   int32 err;
@@ -1564,7 +1509,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
             case OSPEC_TRIG: 
               seq_printf(m, "%s output on chans %u-%u\n", spec->type == OSPEC_DOUT ? "digital" : "trigger", spec->from, spec->to); 
               break;
-            case OSPEC_SOUND: seq_printf(m, "sound triggering on card %u\n", spec->sound_card); break;
+            case OSPEC_EXT: seq_printf(m, "external triggering on object %u\n", spec->object_num); break;
             case OSPEC_SCHED_WAVE: seq_printf(m, "scheduled wave trigger\n"); break;
             case OSPEC_TCP: 
             case OSPEC_UDP: {
@@ -1977,9 +1922,9 @@ static void doOutput(FSMID_t f)
     case OSPEC_TRIG:
       trigs |= STATE_OUTPUT(fsm, state, i) << spec->from;
       break;
-    case OSPEC_SOUND:
+    case OSPEC_EXT:
       /* Do Ext 'virtual' triggers... */
-      CHK_AND_DO_EXT_TRIG(f, spec->sound_card, STATE_OUTPUT(fsm, state, i));
+      CHK_AND_DO_EXT_TRIG(f, spec->object_num, STATE_OUTPUT(fsm, state, i));
       break;
     case OSPEC_SCHED_WAVE: 
       {
@@ -2387,16 +2332,16 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;
         break;
 
-    case FORCESOUND:
-      { /* umm.. have to figure out which soundcard they want from output 
+    case FORCEEXT:
+      { /* umm.. have to figure out which ext trig object they want from output 
            spec */
-        unsigned whichCard = f, i;
+        unsigned which = f, i;
         for (i = 0; i < NUM_OUT_COLS(f); ++i)
-          if (OUTPUT_ROUTING(f, i)->type == OSPEC_SOUND) {
-            whichCard = OUTPUT_ROUTING(f, i)->sound_card;
+          if (OUTPUT_ROUTING(f, i)->type == OSPEC_EXT) {
+            which = OUTPUT_ROUTING(f, i)->object_num;
             break;
           }
-        CHK_AND_DO_EXT_TRIG(f, whichCard, msg->u.forced_triggers);
+        CHK_AND_DO_EXT_TRIG(f, which, msg->u.forced_triggers);
         do_reply = 1;
       }
       break;

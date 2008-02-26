@@ -151,7 +151,60 @@ bool OWavFile::write(const double *data, unsigned size, unsigned srate, double s
   for (double i = 0; i < nframes; i += factor, ++nwrit) {
     for (unsigned chan = 0; chan < p->nchans; ++chan) {
       unsigned idx = unsigned(round(i))*p->nchans+chan;
-      uint32 samp = uint32((data[idx]-scale_min)/(scale_max-scale_min) * double(~0UL)); // 32-bit unsigned sample
+      uint32 samp = uint32((data[idx]-scale_min)/(scale_max-scale_min) * double(~0U)); // 32-bit unsigned sample
+      if (p->bitspersample != 8) {
+        // argh, deal with signed PCM
+        samp -= 0x7fffffff;
+      }
+      samp = samp >> (32-p->bitspersample); // take the upper BitsPerSample bits
+      samp = LE(samp); // make sure it's little endian so that the write command below 1. succeeds on all platforms (we write the first bitspersaple bits) and 2. wave files are anyway little endian
+      p->f.write((const char *)&samp, p->bitspersample/8);
+    }
+    if (!p->f.good()) break;
+  }
+  p->nframes += nwrit;
+  return isOk();
+}
+
+bool OWavFile::write(const void *v,
+                     unsigned size, 
+                     unsigned bits,
+                     unsigned srate)
+{
+  const int8 *d = static_cast<const int8 *>(v);  
+  double factor = 1.0, scale_min, scale_range;
+
+  switch (bits) {
+    case 8: scale_min = -128., scale_range = 255.; break;
+    case 16: scale_min = 0., scale_range = 65535.; break;
+    case 24: scale_min = 0., scale_range = double((0x1U<<24)-1); break;
+    case 32: scale_min = 0., scale_range = double(~0U); break;
+    default: return false;
+  }
+  
+  // NB: need to upsample/downsample here.. ergh we use a scale factor that turns out to be how much we increment our frame loop index by below..
+  if (srate != p->srate) {
+    factor = double(srate)/double(p->srate);    
+  }
+  
+  unsigned nwrit = 0, nframes = size/p->nchans;
+  for (double i = 0; i < nframes; i += factor, ++nwrit) {
+    for (unsigned chan = 0; chan < p->nchans; ++chan) {
+      unsigned idx = unsigned(round(i))*p->nchans+chan;
+      uint32 samp;
+      double datum;
+      switch (bits) {
+        case 8:  datum = d[idx]; break;
+        case 16: datum = ((uint16 *)d)[idx]; break;
+        case 24: 
+          samp = 0;
+          memcpy(&samp, d+idx*3, 3);
+          if (isBigEndian()) samp >>= 8;
+          datum = samp;
+          break;
+        case 32: datum = ((uint32 *)d)[idx]; break;
+      }
+      samp = uint32((datum-scale_min)/(scale_range) * double(~0U));
       if (p->bitspersample != 8) {
         // argh, deal with signed PCM
         samp -= 0x7fffffff;

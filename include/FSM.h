@@ -51,7 +51,7 @@ struct SchedWave
                               here it is. */
 };
 
-enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_SOUND, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };
+enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_EXT, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };
 
 #define OUTPUT_SPEC_DATA_SIZE 1024
 #define IP_HOST_LEN 80
@@ -65,8 +65,8 @@ struct OutputSpec
       unsigned from; 
       unsigned to;
     };
-    struct { /* for OSPEC_SOUND */
-      unsigned sound_card;
+    struct { /* for OSPEC_EXT */
+      unsigned object_num;
     };
     struct {     /* for OSPEC_TCP or OSPEC_UDP */
       char host[IP_HOST_LEN];
@@ -217,7 +217,7 @@ enum ShmMsgID
     GETFSMSIZE, /* Query the rows,cols of the FSM Matrix. */
     FORCEEVENT, /* Force a particular event to have occurred. */
     FORCETIMESUP, /* Force a time's up event to have occurred. */
-    FORCESOUND,  /* Force the FSM to do some sound outputs for this tick*/
+    FORCEEXT,     /* Force the FSM to do some ext outputs for this tick*/
     FORCEOUTPUT, /* Specify (or clear) the set of channels that are set to
                      'always on'. */
     TRANSITIONS, /* Query about past state transitions (EventIDs in matlab
@@ -423,7 +423,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf0010115)) /*< Magic no. for shm... 'fool0115'  */
+#define FSM_SHM_MAGIC ((int)(0xf0010116)) /*< Magic no. for shm... 'fool0116'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }

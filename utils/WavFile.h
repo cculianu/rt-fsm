@@ -30,6 +30,10 @@ public:
              unsigned this_data_srate, /**< we resample if this srate is different from file srate */
              double scale_min = -1., double scale_max = 1.);
 
+  bool write(const void *data, /**< sample data as this_data_bits-sized integers, channels interleaved */
+             unsigned n, /**< Number of data items in bits-sized pieces */
+             unsigned this_data_bits, /**< one of 8, 16, 32 if differs from file, will auto-convert */
+             unsigned this_data_srate); /**< the sample rate of this data, if differs from file, will auto-convert */
 private:
   struct Impl;
   Impl *p;
