@@ -17,8 +17,11 @@ Makefile
 addons
 addons/SoundTrig
 addons/SoundTrig/LynxTrig.c
+addons/SoundTrig/Makefile
 addons/SoundTrig/SoundServer.cpp
 addons/SoundTrig/SoundTrig.h
+addons/SoundTrig/WavFile.cpp
+addons/SoundTrig/WavFile.h
 addons/UserspaceExtTrig
 addons/UserspaceExtTrig/Makefile
 addons/UserspaceExtTrig/UserspaceExtTrig.h
@@ -57,5 +60,3 @@ utils/GetValue.c
 utils/Makefile
 utils/ProbeComedi.cpp
 utils/SendMatrix.c
-utils/WavFile.cpp
-utils/WavFile.h
