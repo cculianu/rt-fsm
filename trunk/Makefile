@@ -1,7 +1,7 @@
 
 
 
-all:  __KERNEL_MOD__ __USER_APP__ __UTILS__
+all:  __KERNEL_MOD__ __USER_APP__ __USER_EXT_TRIG_MOD__ __UTILS__
 
 __KERNEL_MOD__:
 	$(MAKE) -C kernel && cp -f kernel/RealtimeFSM.ko .
@@ -12,8 +12,13 @@ __USER_APP__:
 __UTILS__:
 	$(MAKE) -C utils
 
+__USER_EXT_TRIG_MOD__:
+	$(MAKE) -C addons/UserspaceExtTrig && cp -f addons/UserspaceExtTrig/UserspaceExtTrig.ko .
+	
 clean: 
 	$(MAKE) -C kernel clean
 	$(MAKE) -C user clean
 	$(MAKE) -C utils clean
-	rm -f RealtimeFSM.ko FSMServer *~ include/*~ both/*~
+	$(MAKE) -C addons/UserspaceExtTrig/ clean
+	rm -f RealtimeFSM.ko UserspaceExtTrig.ko FSMServer *~ include/*~ both/*~
+	find . -type f -name \*~ -exec rm -f {} \;

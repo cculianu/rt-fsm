@@ -889,13 +889,13 @@ void *ConnectionThread::threadFunc(void)
     } else if (line.find("READY TO START TRIAL") == 0 ) { 
       sendToRT(READYFORTRIAL);
       cmd_error = false;
-    } else if (line.find("TRIGSOUND") == 0 ) { 
+    } else if (line.find("TRIGEXT") == 0 ) { 
       int trigmask = 0;
       std::string::size_type pos = line.find_first_of("-0123456789");
       if (pos != std::string::npos) {
         std::stringstream s(line.substr(pos));
         s >> trigmask;
-        msg.id = FORCESOUND;
+        msg.id = FORCEEXT;
         msg.u.forced_triggers = trigmask;
         sendToRT(msg);
         cmd_error = false;
@@ -2308,8 +2308,8 @@ std::vector<OutputSpec> ConnectionThread::parseOutputSpecStr(const std::string &
       spec.type = OSPEC_DOUT;
     } else if (type == "trig") {
       spec.type = OSPEC_TRIG;
-    } else if (type == "sound") {
-      spec.type = OSPEC_SOUND;
+    } else if (type == "ext" || type == "sound") {
+      spec.type = OSPEC_EXT;
     } else if (type == "sched_wave") {
       spec.type = OSPEC_SCHED_WAVE;
     } else if (type == "tcp") {
@@ -2330,11 +2330,11 @@ std::vector<OutputSpec> ConnectionThread::parseOutputSpecStr(const std::string &
         spec.from = 0;
         spec.to = 1;
       }
-    } else if (type == "sound") {
+    } else if (type == "ext" || type == "sound") {
       // parse data range
-      if (sscanf(data.c_str(), "%u", &spec.sound_card) != 1) {
-        Log() << "Could not parse sound card from output spec \"" << typeData << "\" assuming same as fsm id " << fsm_id << "!\n"; 
-        spec.sound_card = fsm_id;
+      if (sscanf(data.c_str(), "%u", &spec.object_num) != 1) {
+        Log() << "Could not parse object id from output spec \"" << typeData << "\" assuming same as fsm id " << fsm_id << "!\n"; 
+        spec.object_num = fsm_id;
       }
     } else if (type == "udp" || type == "tcp") {
       // parse host:port:

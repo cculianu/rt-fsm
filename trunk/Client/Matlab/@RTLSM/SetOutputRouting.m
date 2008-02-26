@@ -69,6 +69,14 @@
 %                          at RTLSM object creation.  Note: when
 %                          changing FSM id via SetStateMachine.m, be
 %                          sure to update this number!
+%                          Note that 'sound' is implemented using 'ext' 
+%                          so the two may not be used at the same time!
+%
+%                'ext'   - The state machine triggers an external module.
+%                          By calling its function pointer.  See
+%                          include/FSMExternalTrig.h and kernel/fsm.c.  
+%                          Note that 'sound' is implemented using 'ext' 
+%                          so the two may not be used at the same time!
 %
 %                'sched_wave' -
 %                          The state machine uses this column to
@@ -181,6 +189,7 @@ function [fsm] = SetOutputRouting(fsm, routing)
       % make type be all lowercase
       routing{i}.type = lower(s.type);
       s = routing{i};
+      extct = 0;
       switch(s.type)
        case { 'dout', 'trig' }
         rng = sscanf(s.data, '%d-%d',2);
@@ -196,6 +205,13 @@ function [fsm] = SetOutputRouting(fsm, routing)
                          ' the second being less than 32!'], s.type));
         end;
        case 'sound'
+         % Server protocol expects 'ext' instead of 'sound' here..
+         warning(sprintf('The FSM now expects ''ext'' as the output routing type for sound triggering --  ''sound'' is still supported but is deprecated.\nPlease change the calling code to say ''ext'' instead of ''sound'''));
+         s.type = 'ext';
+         routing{i} = s; % re-save translated type to the routing spec
+         extct = extct + 1;
+       case 'ext'
+         extct = extct + 1;
        case 'sched_wave'
        case 'noop'
        case { 'tcp', 'udp' }
@@ -217,5 +233,7 @@ function [fsm] = SetOutputRouting(fsm, routing)
         error(sprintf('Unknown output type: %s', s.type));
       end;
     end;
+    if (extct > 1),
+        error(sprintf('Cannot use this output routing spec as type ''ext'' appears %d times!  For now, only 1 ''ext'' trigger per state is allowed.', extct));
+    end;
     fsm.output_routing = routing;
-    

@@ -14,7 +14,15 @@ Client/Matlab/NetClient/Release
 Client/Matlab/NetClient/Socket.cpp
 Client/Matlab/NetClient/Socket.h
 Makefile
-both
+addons
+addons/SoundTrig
+addons/SoundTrig/LynxTrig.c
+addons/SoundTrig/SoundServer.cpp
+addons/SoundTrig/SoundTrig.h
+addons/UserspaceExtTrig
+addons/UserspaceExtTrig/Makefile
+addons/UserspaceExtTrig/UserspaceExtTrig.h
+addons/UserspaceExtTrig/module.c
 include
 include/EmbC.h
 include/FSM.h
@@ -23,6 +31,7 @@ include/FSMExternalTrig.h
 include/IntTypes.h
 include/Version.h
 include/deflate_helper.h
+include/rtos_compat.h
 kernel
 kernel/Makefile
 kernel/deflate_helper.c

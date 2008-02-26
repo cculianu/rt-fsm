@@ -28,12 +28,12 @@
 #include <asm/atomic.h>
 
 typedef int (* FSMExtTrigFn_t)(unsigned, int); 
-struct FSMExtTrigShm
+typedef struct FSMExtTrigShm
 {
   int magic;
   atomic_t valid;
   FSMExtTrigFn_t function;
-};
+} FSMExtTrigShm;
 
 /** The shm will contain a function pointer that should be
     called in RT context to do triggers! */
