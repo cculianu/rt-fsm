@@ -1,6 +1,6 @@
 Install Guide for Realtime FSM
 by Calin Culianu <calin@ajvar.org>
-Last Updated: Feb. 22, 2008
+Last Updated: Feb. 27, 2008
 
 These instructions tell you how to setup a system to run this software.  This
 includes brief instructions for setting up RTAI 3.6, Linux 2.6.23, and compiling
@@ -215,6 +215,18 @@ STEP 8: COMPILE AND INSTALL COMEDILIB
        # cd /usr/src/comedilib
        # ./configure 
        # make -j2 && make install
+       
+   Next, make sure that if the libs were installed in /usr/local/lib, that
+   ld.so.conf scans that directory for libs:
+   
+       # vi /etc/ld.so.conf
+       
+   Make sure the line: /usr/local/lib is found in that file!
+   
+   Now, run ldconfig since you just installed a new library:
+   
+      # ldconfig
+   
 
 
 STEP 9: COMPILE THIS CODE!
