@@ -31,7 +31,8 @@
 static int have_proc_fs(void);
 static int select_numeric_dir(const struct dirent *);
 static int countlist(void **);
-static int find_in_list(void **list, void *val);
+/*static int find_in_list(void **list, void *val);*/
+static int find_pid_in_list(const pid_t *list, pit_t val);
 
 static int HAVEPROC_ = -1;
 #define HAVEPROC (HAVEPROC_ > -1 ? HAVEPROC_ : (HAVEPROC_ = have_proc_fs()))
@@ -219,7 +220,7 @@ int num_procs_of_exe_no_children(const char *exe)
     int pos;
     for (cur = pids; *cur; cur++) {
       ppid = grab_parent_of_pid(*cur);
-      pos = find_in_list((void **)pids, (void *)ppid);
+      pos = find_pid_in_list(pids, ppid);
       if (pos >= 0 && *cur != ppid) ret--; /* ppid is one of our pids, 
                                               so dis-count *cur */
     }
@@ -316,12 +317,23 @@ static int countlist(void **list)
 }
 
 
-static int find_in_list(void **list, void *val)
+/*static int find_in_list(void **list, void *val)
 {
   int ret = 0;
 
   while (list && *(list)) { 
-    if (((int)*list) == ((int)val)) return ret;
+    if (((long)*list) == ((long)val)) return ret;
+    ret++; list++;
+  }
+  return -1;
+}*/
+
+static int find_pid_in_list(const pid_t *list, pid_t val)
+{
+  int ret = 0;
+
+  while (list && *(list)) { 
+    if (*list == val) return ret;
     ret++; list++;
   }
   return -1;
