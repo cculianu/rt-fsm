@@ -1542,7 +1542,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
           /* Print stats on AO Waves */
           for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
             if (ss->aowaves[i].nsamples && ss->aowaves[i].samples) {
-              seq_printf(m, "AO  Sched. Wave %d  %u bytes (%s)\n", i, ss->aowaves[i].nsamples*(sizeof(*ss->aowaves[i].samples)+sizeof(*ss->aowaves[i].evt_cols)), ss->active_ao_wave_mask & 0x1<<i ? "playing" : "idle");
+              seq_printf(m, "AO  Sched. Wave %d  %u bytes (%s)\n", i, (unsigned)(ss->aowaves[i].nsamples*(sizeof(*ss->aowaves[i].samples)+sizeof(*ss->aowaves[i].evt_cols))), ss->active_ao_wave_mask & 0x1<<i ? "playing" : "idle");
             }
           }
           /* Print stats on DIO Sched Waves */
@@ -2088,7 +2088,7 @@ static void handleFifos(FSMID_t f)
 # define BUDDY_TASK_PEND(arg) \
   do { \
     atomic_set(&buddyTaskCmds[f], arg); \
-    softTaskPend(buddyTask[f], (void *)f); \
+    softTaskPend(buddyTask[f], (void *)(long)f); \
   } while(0)
 
   FifoNotify_t dummy = 1;
@@ -2972,7 +2972,7 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
 
 static void buddyTaskHandler(void *arg)
 {
-  FSMID_t f = (FSMID_t)arg;
+  FSMID_t f = (FSMID_t)(long)arg;
   int req;
   struct ShmMsg *msg = 0;
 
