@@ -566,7 +566,7 @@ static void closeFifos()
 
 static void createTransNotifyThreads()
 {
-  for (int f = 0; f < NUM_STATE_MACHINES; ++f) {
+  for (long f = 0; f < NUM_STATE_MACHINES; ++f) {
     int ret = pthread_create(&fsms[f].transNotifyThread, NULL, transNotifyThrWrapper, reinterpret_cast<void *>(f));
     if (ret) 
       throw Exception("Could not create a required thread, 'state transition notify thread'!");
@@ -575,7 +575,7 @@ static void createTransNotifyThreads()
   
 static void createDAQReadThreads()
 {
-  for (int f = 0; f < NUM_STATE_MACHINES; ++f) {
+  for (long f = 0; f < NUM_STATE_MACHINES; ++f) {
     int ret = pthread_create(&fsms[f].daqReadThread, NULL, daqThrWrapper, reinterpret_cast<void *>(f));
     if (ret) 
       throw Exception("Could not create a required thread, 'daq fifo read thread'!");
@@ -584,7 +584,7 @@ static void createDAQReadThreads()
 
 static void createNRTReadThreads()
 {
-  for (int f = 0; f < NUM_STATE_MACHINES; ++f) {
+  for (long f = 0; f < NUM_STATE_MACHINES; ++f) {
     int ret = pthread_create(&fsms[f].nrtReadThread, NULL, nrtThrWrapper, reinterpret_cast<void *>(f));
     if (ret) 
       throw Exception("Could not create a required thread, 'nrt output fifo read thread'!");
@@ -1986,7 +1986,7 @@ std::endl;
 static void *transNotifyThrWrapper(void *arg)
 {
   pthread_detach(pthread_self());
-  int myfsm = reinterpret_cast<int>(arg);
+  long myfsm = reinterpret_cast<long>(arg);
   if (myfsm < 0 || myfsm >= NUM_STATE_MACHINES) return 0;
   return fsms[myfsm].transNotifyThrFun();
 }
@@ -1994,7 +1994,7 @@ static void *transNotifyThrWrapper(void *arg)
 static void *daqThrWrapper(void *arg)
 {
   pthread_detach(pthread_self());
-  int myfsm = reinterpret_cast<int>(arg);
+  long myfsm = reinterpret_cast<long>(arg);
   if (myfsm < 0 || myfsm >= NUM_STATE_MACHINES) return 0;
   return fsms[myfsm].daqThrFun();
 }
@@ -2002,7 +2002,7 @@ static void *daqThrWrapper(void *arg)
 static void *nrtThrWrapper(void *arg)
 {
   pthread_detach(pthread_self());
-  int myfsm = reinterpret_cast<int>(arg);
+  long myfsm = reinterpret_cast<long>(arg);
   if (myfsm < 0 || myfsm >= NUM_STATE_MACHINES) return 0;
   return fsms[myfsm].nrtThrFun();
 }
