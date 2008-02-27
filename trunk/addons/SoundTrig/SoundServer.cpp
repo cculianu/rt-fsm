@@ -193,7 +193,7 @@ private:
   std::ostream &log(int i = -1) 
   { 
     if (i == 0) return ::log(i); // unlock, so don't output anything extra...
-    return ::log(i) << "[Process " << myid << " (" << remoteHost << ")] "; 
+    return ::log(i) << "[Thread " << myid << " (" << remoteHost << ")] "; 
   }
 
   int doConnection();
@@ -229,7 +229,11 @@ void *ConnectedThread::thrFunc(void *arg)
 {
   ConnectedThread *self = reinterpret_cast<ConnectedThread *>(arg);
   pthread_detach(pthread_self());
-  self->myid = (int)pthread_self();
+  static Mutex mut;
+  static volatile int thread_id_ctr = 0;
+  mut.lock();
+  self->myid = thread_id_ctr++;
+  mut.unlock();
   self->running = true;
   self->pleaseStop = false;
   int ret = self->doConnection();
