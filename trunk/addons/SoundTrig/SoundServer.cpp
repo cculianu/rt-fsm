@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <string>
 #include <cstring>
 #include <list>
@@ -29,6 +30,7 @@
 #include <vector>
 #include <memory>
 #include <pthread.h>
+#include <semaphore.h>
 
 #ifndef ABS
 #define ABS(a) ( (a) < 0 ? -(a) : (a) )
@@ -39,7 +41,8 @@ struct Matrix;
 struct SoundBuffer;
 class SoundMachine;
 
-int listen_fd = -1; /* Our listen socket.. */
+int listen_fd = -1, /* Our listen socket.. */  
+    debugLvl = 0; 
 unsigned short listenPort = 3334;
 volatile bool pleaseStop = false;
 SoundMachine *sm = 0;
@@ -95,10 +98,13 @@ class KernelSM : public SoundMachine
     void sendToRT(unsigned card, FifoMsgID cmd) const; // send a simple command, one of RESET, PAUSEUNPAUSE, INVALIDATE. Upon return we know the command completed.
     void sendToRT(unsigned card, FifoMsg & msg) const; // send a complex command, wait for a reply which gets put back into 'msg'.  Upon return we know the command completed.
     
-public:    
-    KernelSM(void *shm_);
-    virtual ~KernelSM();
+    friend class SoundMachine;
     
+protected:    
+    KernelSM(void *shm_);
+    
+public:    
+    virtual ~KernelSM();
     void reset(unsigned card);
     void halt(unsigned card);
     void run(unsigned card);
@@ -125,32 +131,41 @@ class UserSM : public SoundMachine
 {
     UTShm *shm;
     RTOS::FIFO fifo;
-    pthread_t thr;
+    pthread_t thr, chldThr;
     mutable Mutex mut;
     Timer timer;
-    volatile bool threadRunning;
+    volatile bool threadRunning, chldThreadRunning, chldPleaseStop;
     volatile bool cardRunning;
     volatile int lastEvent;
+    sem_t child_sem;
+    static UserSM * volatile instance;
     
     struct SoundFile {
         std::string filename;
         volatile int pid;
-        SoundFile() : pid(0) {}
+        volatile unsigned playct;
+        bool loops;
+        SoundFile() : pid(0), playct(0), loops(false) {}
     };
     typedef std::map<unsigned, SoundFile> SoundFileMap;
     SoundFileMap soundFileMap;
     
     static void *thrWrapFRT(void *arg) { static_cast<UserSM *>(arg)->fifoReadThr(); return 0; }
-    struct CDArgs;
-    static void *thrWrapChildDone(void *arg);
-
+    static void *thrWrapChildReaper(void *arg) { static_cast<UserSM *>(arg)->childReaper(); return 0; }
+    static void childSH(int);
+    
+    void stopThreads();
     void fifoReadThr(); 
-    bool soundExists(unsigned id);
-    static void childReaper(int sig);
-    void childDone(int pid);
+    bool soundExists(unsigned id) const;
+    void childReaper();
+    void trigger_nolock(unsigned card, int trig);
+    
+    friend class SoundMachine;
+    
+protected:
+    UserSM(void *s);
     
 public:    
-    UserSM(void *s);
     virtual ~UserSM();
     
     void reset(unsigned card);
@@ -171,6 +186,14 @@ static std::ostream & log(int ignored = 0)
 {
   (void)ignored;
   return std::cerr;
+}
+
+static std::ostream & debug(int ignored = 0)
+{
+    static std::ofstream dummy;
+    (void)ignored;
+    if (debugLvl > 0) return log() << "DEBUG: ";
+    return dummy; // is an error to write to this.. so data is discarded
 }
 
 class ConnectedThread
@@ -851,31 +874,58 @@ int KernelSM::getLastEvent(unsigned card) const
     return msg->u.last_event;
 }
 
+// static member var
+UserSM * volatile UserSM::instance = 0;
+
 UserSM::UserSM(void *s)
     : SoundMachine(Userspace, s), shm(static_cast<UTShm *>(s)),
-      threadRunning(false), cardRunning(true), lastEvent(0)
+      threadRunning(false), chldThreadRunning(false), chldPleaseStop(false), cardRunning(true), lastEvent(0)
 {
+    if (instance) 
+        throw Exception("Multiple instances of class UserSM have been constructed.  Only 1 instance allowed globally! Argh!");
+    sem_init(&child_sem, 0, 0);
     if (::access("/usr/bin/play", X_OK))
         throw Exception("Required program /usr/bin/play is missing!");
     fifo = RTOS::openFifo(shm->fifo_out);
     if (!fifo) throw Exception("Could not open RTF fifo_ut for reading");
-    signal(SIGCHLD, childReaper);
     if ( pthread_create(&thr, 0, &thrWrapFRT, (void *)this) ) {
         throw Exception(std::string("Could not create the fifo read thread: ") + strerror(errno));
+    }
+    threadRunning = true;
+    signal(SIGCHLD, childSH);
+    if ( pthread_create(&chldThr, 0, &thrWrapChildReaper, (void *)this ) ) {
+        stopThreads();
+        int err = errno;
+        throw Exception(std::string("Could not create child reaper thread: ") + strerror(err)); 
+    }
+    chldThreadRunning = true;
+    instance = this;
+}
+
+void UserSM::stopThreads()
+{
+    if (threadRunning) {
+        pthread_cancel(thr);
+        pthread_join(thr, 0);
+        threadRunning = false;
+    }
+    if (chldThreadRunning) {
+        chldPleaseStop = true;
+        sem_post(&child_sem);
+        pthread_join(chldThr, 0);
+        chldThreadRunning = false;
     }
 }
 
 UserSM::~UserSM()
 {
+    if (instance == this) instance = 0;
     signal(SIGCHLD, SIG_DFL);
-    if (threadRunning) {
-      pthread_cancel(thr);
-      pthread_join(thr, 0);
-      threadRunning = false;
-    }
+    stopThreads();
     if (fifo) RTOS::closeFifo(fifo);
     fifo = RTOS::INVALID_FIFO;
     reset(0);
+    sem_destroy(&child_sem);
 }
 
 void UserSM::fifoReadThr()
@@ -885,13 +935,29 @@ void UserSM::fifoReadThr()
     
     threadRunning = true;
     
-    while ( (ret = RTOS::readFifo(fifo, &msg, sizeof(msg))) == sizeof(msg) ) {
-        pthread_testcancel();
-        trigger(msg.target, msg.data);
+    // first, clear out possibly stale data in fifo
+    {
+        int n = RTOS::fifoNReadyForReading(fifo), tot = 0;
+        char buf[128];
+        while (n > 0) {
+            int bytes = sizeof(buf);
+            if (n < bytes) bytes = n;
+            ret = RTOS::readFifo(fifo, buf, bytes);
+            if (ret > 0) { n-=ret; tot += ret; }
+            else break; // hmm.. weird error from fifo read..
+        }
+        //log() << "(Discaded " << tot << " bytes of stale data from fifo)" << std::endl;
     }
+    
+    // now, just loop indefinitely reading the fifo with a blocking read
+    while ( (ret = RTOS::readFifo(fifo, &msg, sizeof(msg))) == sizeof(msg) || ret == 0 ) {
+        pthread_testcancel(); 
+        if (ret > 0) trigger(msg.target, msg.data); // ret == 0 when we catch a signal...?
+    }
+    debug() << "exiting fifoReadThr with ret " << ret << " errno: " << strerror(errno) << "\n";
 }
 
-bool UserSM::soundExists(unsigned id)
+bool UserSM::soundExists(unsigned id) const
 {
     return soundFileMap.count(id) > 0;
 }
@@ -899,21 +965,31 @@ bool UserSM::soundExists(unsigned id)
 void UserSM::trigger(unsigned card, int trig)
 {
     MutexLocker ml(mut);
+    trigger_nolock(card, trig);
+}
+
+void UserSM::trigger_nolock(unsigned card, int trig)
+{
+    debug() << "in trigger_nolock with card " << card << " trig " << trig << "\n";
+
     if (card < getNCards() && soundExists(ABS(trig))) {
+        lastEvent = trig;
         SoundFileMap::iterator it = soundFileMap.find(ABS(trig));
         if (it->second.pid) { // untrig always!
+            debug() << "untriggering (killin proc)  " << it->second.pid << "\n";
             ::kill(it->second.pid, SIGTERM);
             it->second.pid = 0;
         } 
         if (trig > 0) { // (re)trigger
+            debug() << "forking..\n";
             int pid = fork();
             if (pid > 0) { // parent
                 it->second.pid = pid;
             } else if (pid == 0) { // child
-                int ret = execl("/usr/bin/play", it->second.filename.c_str(), (char *)NULL);
+                int ret = execl("/usr/bin/play", "/usr/bin/play", it->second.filename.c_str(), (char *)NULL);
                 if (ret)
                     log() << "Error executing command: /usr/bin/play " << it->second.filename << ": " << strerror(errno) << std::endl;
-                std::exit(ret);
+                std::exit(-1);
             } else {
                 log() << "Could not trigger sound #" << trig << ", fork error: " << strerror(errno) << std::endl;
             }
@@ -923,63 +999,45 @@ void UserSM::trigger(unsigned card, int trig)
     }
 }
 
-struct UserSM::CDArgs
+void UserSM::childSH(int sig)
 {
-    UserSM *sm;
-    int pid, status;
-    pthread_cond_t cond;
-    pthread_mutex_t mut;
-    CDArgs() : sm(0), pid(0), status(0) { pthread_cond_init(&cond, 0); pthread_mutex_init(&mut, 0); }
-    ~CDArgs() { pthread_cond_destroy(&cond); pthread_mutex_destroy(&mut); }
-};
+    if (!instance) return;
+    debug() << "in UserSM::childSH, posting to sem\n";
+    if (sig == SIGCHLD) sem_post(&instance->child_sem);
+}
 
-void UserSM::childReaper(int sig)
+void UserSM::childReaper()
 {
     int status, pid;
-    if (sig != SIGCHLD) return;
-    // reap dead children...?
-    while ( (pid = waitpid(-1, &status, WNOHANG)) > 0 ) {
-        UserSM *usm = dynamic_cast<UserSM *>(sm);
-        if (usm) {
-            CDArgs args;
-            args.sm = usm;
-            args.pid = pid;
-            args.status = status;
-            pthread_attr_t attr;
-            pthread_attr_init(&attr);
-            pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-            pthread_t t;
-            if ( !pthread_create(&t, &attr, thrWrapChildDone, (void *)pid) ) {
-                pthread_mutex_lock(&args.mut);
-                pthread_cond_wait(&args.cond, &args.mut);
-                pthread_mutex_unlock(&args.mut);
-            }
-            pthread_attr_destroy(&attr);
+    chldThreadRunning = true;
+    // reap dead children... until we receive a cancellation request which I *think* should cause us to return with EINTR out of wait()?
+    while ( !chldPleaseStop && sem_wait(&child_sem) == 0 ) {
+        debug() << "in UserSM::childReaper woke up from sem\n";
+        while ( !chldPleaseStop && (pid = wait(&status)) > 0 ) {
+            if ( chldPleaseStop ) break;
+            debug() << "in UserSM::childReaper got pid: " << pid << " status " << status << "\n";
+            MutexLocker ml(mut);
+            SoundFileMap::iterator it;
+            for (it = soundFileMap.begin(); it != soundFileMap.end(); ++it)
+                // found it! mark it as done!
+                if (pid == it->second.pid) {
+                    debug() << "in UserSM::childReaper found running sound, clearing its status\n";
+                    it->second.pid = 0;
+                    if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+                        ++it->second.playct;
+                    if (it->second.loops && it->second.playct)
+                        // re-trigger it since it's a looping sound!
+                        trigger_nolock(0, it->first);
+                    break;
+                }
         }
+        debug() << "wait() returned " << pid << " errno is: " << strerror(errno) << "\n";
+        debug() << "in UserSM::childReaeper gunna wait on sem again\n";        
     }
+    if (chldPleaseStop)
+        debug() << "childReaper got chldPleaseStop request, ending thread..\n";
 }
 
-void UserSM::childDone(int pid)
-{
-    MutexLocker ml(mut);
-    SoundFileMap::iterator it;
-    for (it = soundFileMap.begin(); it != soundFileMap.end(); ++it)
-        // found it! mark it as done!
-        if (pid == it->second.pid) {
-            it->second.pid = 0;
-            break;
-        }
-}
-
-void *UserSM::thrWrapChildDone(void *arg)
-{
-    CDArgs *a = (CDArgs *)arg;
-    UserSM *sm = a->sm;
-    int pid = a->pid;
-    pthread_cond_signal(&a->cond);
-    sm->childDone(pid);
-    return 0;
-}
 
 void UserSM::reset(unsigned card)
 {
@@ -1033,6 +1091,12 @@ unsigned UserSM::getNCards()  const { return 1; }
 bool UserSM::setSound(unsigned card, const SoundBuffer & buf)
 {
     if (card >= getNCards()) return false;
+    MutexLocker ml(mut);
+    SoundFileMap::iterator it = soundFileMap.find(buf.id);
+    if (it != soundFileMap.end()) {
+        ::remove(it->second.filename.c_str());
+        soundFileMap.erase(it);
+    }
     OWavFile wav;
     std::ostringstream s;
     s << "/tmp/" << "SoundServerSound_" << getpid() << "_" << card << "_" << buf.id << ".wav";
@@ -1040,16 +1104,11 @@ bool UserSM::setSound(unsigned card, const SoundBuffer & buf)
         log() << "Error creating wav file: " << s.str() << std::endl;
         return false;
     }
-    if (!wav.write(&buf[0], buf.sample_size/8, buf.sample_size, buf.rate))
+    if (!wav.write(&buf[0], buf.size()/(buf.sample_size/8), buf.sample_size, buf.rate))
         return false;
-    MutexLocker ml(mut);
-    SoundFileMap::iterator it = soundFileMap.find(buf.id);
-    if (it != soundFileMap.end()) {
-        ::remove(it->second.filename.c_str());
-        soundFileMap.erase(it);
-    }
     SoundFile f;
     f.filename = s.str();
+    f.loops = buf.loop_flg;
     soundFileMap[buf.id] = f;
     wav.close();
     return true;

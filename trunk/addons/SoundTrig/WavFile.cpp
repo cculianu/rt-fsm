@@ -171,14 +171,14 @@ bool OWavFile::write(const void *v,
                      unsigned bits,
                      unsigned srate)
 {
-  const int8 *d = static_cast<const int8 *>(v);  
+  const uint8 *d = static_cast<const uint8 *>(v);  
   double factor = 1.0, scale_min, scale_range;
 
   switch (bits) {
-    case 8: scale_min = -128., scale_range = 255.; break;
-    case 16: scale_min = 0., scale_range = 65535.; break;
-    case 24: scale_min = 0., scale_range = double((0x1U<<24)-1); break;
-    case 32: scale_min = 0., scale_range = double(~0U); break;
+    case 8: scale_min = 0., scale_range = 256.; break;
+    case 16: scale_min = -32768., scale_range = 65536.; break;
+    case 24: scale_min = -8388608., scale_range = 16777216.; break;
+    case 32: scale_min = -2147483648., scale_range = 4294967296.; break;
     default: return false;
   }
   
@@ -195,14 +195,14 @@ bool OWavFile::write(const void *v,
       double datum;
       switch (bits) {
         case 8:  datum = d[idx]; break;
-        case 16: datum = ((uint16 *)d)[idx]; break;
+        case 16: datum = ((int16 *)d)[idx]; break;
         case 24: 
           samp = 0;
           memcpy(&samp, d+idx*3, 3);
           if (isBigEndian()) samp >>= 8;
           datum = samp;
           break;
-        case 32: datum = ((uint32 *)d)[idx]; break;
+        case 32: datum = ((int32 *)d)[idx]; break;
       }
       samp = uint32((datum-scale_min)/(scale_range) * double(~0U));
       if (p->bitspersample != 8) {
