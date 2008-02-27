@@ -7,7 +7,7 @@ RTAIDIR = /usr/realtime
 COMEDIDIR = /usr/src/comedi
 PWD = $(shell pwd)
 DEST = /lib/modules/$(CURRENT)/kernel/$(MDIR)
-EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(obj)/../../include -I$(COMEDIDIR)/include -I/usr/include -DRTAI
+EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)/../../include -I$(COMEDIDIR)/include -I/usr/include -DRTAI
 
 ifeq ($(KERNELRELEASE),) 
 
@@ -19,12 +19,13 @@ install:
 
 clean:
 	-rm -f *.o *.ko .*.cmd .*.flags *.mod.c *~
+	make -C $(KDIR) M=$(PWD) clean
 
 else	
 
 obj-m      := $(TARGET).o
 
-UserspaceExtTrig-objs := $(OBJS)
+$(TARGET)-objs := $(OBJS)
 
 -include $(KDIR)/Rules.make
 
