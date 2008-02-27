@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  fprintf(stderr, "%d bytes sent, OK.\n", num*sizeof(*matrix.d));
+  fprintf(stderr, "%d bytes sent, OK.\n", (int)(num*sizeof(*matrix.d)));
   fprintf(sock, "EXIT\n");
   fflush(sock);
   free(line);
