@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  fprintf(stderr, "%u bytes read, OK.\n", dataSize);
+  fprintf(stderr, "%lu bytes read, OK.\n", (unsigned long)dataSize);
   
   if ( getline(&line, &linelen, sock) == -1 ) {
     fprintf(stderr, "Did not receive any response, exiting.\n");
