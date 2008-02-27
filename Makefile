@@ -23,6 +23,6 @@ clean:
 	$(MAKE) -C user clean
 	$(MAKE) -C utils clean
 	$(MAKE) -C addons/UserspaceExtTrig/ clean
-	$(MAKE) -C addons/SoundServer/ clean
+	$(MAKE) -C addons/SoundTrig/ clean
 	rm -f RealtimeFSM.ko UserspaceExtTrig.ko FSMServer SoundServer *~ include/*~ both/*~
 	find . -type f -name \*~ -exec rm -f {} \;
