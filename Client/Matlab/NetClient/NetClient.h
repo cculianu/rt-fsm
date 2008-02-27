@@ -7,7 +7,7 @@
 class NetClient : public Socket
 {
 public:
-  NetClient(const std::string & host = "localhost", unsigned short port = 0, unsigned read_timeout_secs = 5);
+  NetClient(const std::string & host = "localhost", unsigned short port = 0, unsigned read_timeout_secs = 30);
   virtual ~NetClient();
 
   unsigned sendString(const std::string &) throw(const SocketException &);
