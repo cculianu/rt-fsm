@@ -140,7 +140,7 @@ class UserSM : public SoundMachine
     typedef std::map<unsigned, SoundFile> SoundFileMap;
     SoundFileMap soundFileMap;
     
-    static void *threadwrapFRT(void *arg) { static_cast<UserSM *>(arg)->fifoReadThr(); return 0; }
+    static void *thrWrapFRT(void *arg) { static_cast<UserSM *>(arg)->fifoReadThr(); return 0; }
     struct CDArgs;
     static void *thrWrapChildDone(void *arg);
 
@@ -465,10 +465,10 @@ int main(int argc, const char *argv[])
 
   try {
   
-    init();
-
     handleArgs(argc, argv);
   
+    init();
+
     // keeps listening on a port, waiting for commands to give to the rt-proc
     doServer();    
 
@@ -856,6 +856,9 @@ UserSM::UserSM(void *s)
     fifo = RTOS::openFifo(shm->fifo_out);
     if (!fifo) throw Exception("Could not open RTF fifo_ut for reading");
     signal(SIGCHLD, childReaper);
+    if ( pthread_create(&thr, 0, &thrWrapFRT, (void *)this) ) {
+        throw Exception(std::string("Could not create the fifo read thread: ") + strerror(errno));
+    }
 }
 
 UserSM::~UserSM()

@@ -84,10 +84,10 @@ static int  initShm(void)
         printk(KERN_ERR MODULE_NAME ": Could not create shm %s\n", UT_SHM_NAME);
         return -EINVAL;
     }
-    shm->magic = UT_SHM_MAGIC;
     ret = initFifos();
-    
+
     if (!ret) {
+        
         extShm = (FSMExtTrigShm *)mbuff_attach(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
         if (!extShm) return -EINVAL;
         if (FSM_EXT_TRIG_SHM_IS_VALID(extShm)) {
@@ -99,6 +99,7 @@ static int  initShm(void)
         extShm->function = &trigFunc;
         extShm->magic = FSM_EXT_TRIG_SHM_MAGIC;
         atomic_set(&extShm->valid, 0); /* force invalid for now.. */
+        shm->magic = UT_SHM_MAGIC;
     }
     
     return ret;
