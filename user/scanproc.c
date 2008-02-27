@@ -32,7 +32,7 @@ static int have_proc_fs(void);
 static int select_numeric_dir(const struct dirent *);
 static int countlist(void **);
 /*static int find_in_list(void **list, void *val);*/
-static int find_pid_in_list(const pid_t *list, pit_t val);
+static int find_pid_in_list(const pid_t *list, pid_t val);
 
 static int HAVEPROC_ = -1;
 #define HAVEPROC (HAVEPROC_ > -1 ? HAVEPROC_ : (HAVEPROC_ = have_proc_fs()))
