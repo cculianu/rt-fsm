@@ -30,6 +30,10 @@
 #include <memory>
 #include <pthread.h>
 
+#ifndef ABS
+#define ABS(a) ( (a) < 0 ? -(a) : (a) )
+#endif
+
 class ConnectedThread;
 struct Matrix;
 struct SoundBuffer;
@@ -107,11 +111,44 @@ public:
     bool setSound(unsigned card, const SoundBuffer &);
 };
 
+class Timer
+{
+public:
+  Timer() { reset(); }
+  void reset();
+  double elapsed() const; // returns number of seconds since ctor or reset() was called 
+private:
+  struct timeval ts;
+};
+
 class UserSM : public SoundMachine
 {
     UTShm *shm;
     RTOS::FIFO fifo;
+    pthread_t thr;
+    mutable Mutex mut;
+    Timer timer;
+    volatile bool threadRunning;
+    volatile bool cardRunning;
+    volatile int lastEvent;
+    
+    struct SoundFile {
+        std::string filename;
+        volatile int pid;
+        SoundFile() : pid(0) {}
+    };
+    typedef std::map<unsigned, SoundFile> SoundFileMap;
+    SoundFileMap soundFileMap;
+    
+    static void *threadwrapFRT(void *arg) { static_cast<UserSM *>(arg)->fifoReadThr(); return 0; }
+    struct CDArgs;
+    static void *thrWrapChildDone(void *arg);
 
+    void fifoReadThr(); 
+    bool soundExists(unsigned id);
+    static void childReaper(int sig);
+    void childDone(int pid);
+    
 public:    
     UserSM(void *s);
     virtual ~UserSM();
@@ -306,17 +343,12 @@ static void handleArgs(int argc, const char *argv[])
 }
 
 extern "C" void sighandler(int sig)
-{
-  
+{  
   switch (sig) {
 
   case SIGPIPE: 
     //std::cerr << "PID " << ::getpid() << " GOT SIGPIPE" << std::endl;
     break; // ignore SIGPIPE..
-
-  case SIGCHLD: 
-    // reap dead children...?
-    break;
 
   default:
     log() << "Caught signal " << sig << " cleaning up..." << std::endl;     
@@ -351,16 +383,6 @@ struct SoundBuffer : public std::vector<char>
       id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg)
   { resize(size); }
   int id, chans, sample_size, rate, stop_ramp_tau_ms, loop_flg;
-};
-
-class Timer
-{
-public:
-  Timer() { reset(); }
-  void reset();
-  double elapsed() const; // returns number of seconds since ctor or reset() was called 
-private:
-  struct timeval ts;
 };
 
 void Timer::reset()
@@ -440,7 +462,6 @@ int main(int argc, const char *argv[])
   signal(SIGQUIT, sighandler);
   signal(SIGHUP, sighandler);
   signal(SIGTERM, sighandler);
-  signal(SIGCHLD, sighandler);
 
   try {
   
@@ -827,14 +848,202 @@ int KernelSM::getLastEvent(unsigned card) const
 }
 
 UserSM::UserSM(void *s)
-    : SoundMachine(Userspace, s), shm(static_cast<UTShm *>(s))
+    : SoundMachine(Userspace, s), shm(static_cast<UTShm *>(s)),
+      threadRunning(false), cardRunning(true), lastEvent(0)
 {
+    if (::access("/usr/bin/play", X_OK))
+        throw Exception("Required program /usr/bin/play is missing!");
     fifo = RTOS::openFifo(shm->fifo_out);
     if (!fifo) throw Exception("Could not open RTF fifo_ut for reading");
+    signal(SIGCHLD, childReaper);
 }
 
 UserSM::~UserSM()
 {
+    signal(SIGCHLD, SIG_DFL);
+    if (threadRunning) {
+      pthread_cancel(thr);
+      pthread_join(thr, 0);
+      threadRunning = false;
+    }
     if (fifo) RTOS::closeFifo(fifo);
     fifo = RTOS::INVALID_FIFO;
+    reset(0);
+}
+
+void UserSM::fifoReadThr()
+{
+    UTFifoMsg msg;
+    int ret;
+    
+    threadRunning = true;
+    
+    while ( (ret = RTOS::readFifo(fifo, &msg, sizeof(msg))) == sizeof(msg) ) {
+        pthread_testcancel();
+        trigger(msg.target, msg.data);
+    }
+}
+
+bool UserSM::soundExists(unsigned id)
+{
+    return soundFileMap.count(id) > 0;
+}
+
+void UserSM::trigger(unsigned card, int trig)
+{
+    MutexLocker ml(mut);
+    if (card < getNCards() && soundExists(ABS(trig))) {
+        SoundFileMap::iterator it = soundFileMap.find(ABS(trig));
+        if (it->second.pid) { // untrig always!
+            ::kill(it->second.pid, SIGTERM);
+            it->second.pid = 0;
+        } 
+        if (trig > 0) { // (re)trigger
+            int pid = fork();
+            if (pid > 0) { // parent
+                it->second.pid = pid;
+            } else if (pid == 0) { // child
+                int ret = execl("/usr/bin/play", it->second.filename.c_str(), (char *)NULL);
+                if (ret)
+                    log() << "Error executing command: /usr/bin/play " << it->second.filename << ": " << strerror(errno) << std::endl;
+                std::exit(ret);
+            } else {
+                log() << "Could not trigger sound #" << trig << ", fork error: " << strerror(errno) << std::endl;
+            }
+        }
+    } else {
+        log() << "WARNING: Kernel told us to play sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";
+    }
+}
+
+struct UserSM::CDArgs
+{
+    UserSM *sm;
+    int pid, status;
+    pthread_cond_t cond;
+    pthread_mutex_t mut;
+    CDArgs() : sm(0), pid(0), status(0) { pthread_cond_init(&cond, 0); pthread_mutex_init(&mut, 0); }
+    ~CDArgs() { pthread_cond_destroy(&cond); pthread_mutex_destroy(&mut); }
+};
+
+void UserSM::childReaper(int sig)
+{
+    int status, pid;
+    if (sig != SIGCHLD) return;
+    // reap dead children...?
+    while ( (pid = waitpid(-1, &status, WNOHANG)) > 0 ) {
+        UserSM *usm = dynamic_cast<UserSM *>(sm);
+        if (usm) {
+            CDArgs args;
+            args.sm = usm;
+            args.pid = pid;
+            args.status = status;
+            pthread_attr_t attr;
+            pthread_attr_init(&attr);
+            pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+            pthread_t t;
+            if ( !pthread_create(&t, &attr, thrWrapChildDone, (void *)pid) ) {
+                pthread_mutex_lock(&args.mut);
+                pthread_cond_wait(&args.cond, &args.mut);
+                pthread_mutex_unlock(&args.mut);
+            }
+            pthread_attr_destroy(&attr);
+        }
+    }
+}
+
+void UserSM::childDone(int pid)
+{
+    MutexLocker ml(mut);
+    SoundFileMap::iterator it;
+    for (it = soundFileMap.begin(); it != soundFileMap.end(); ++it)
+        // found it! mark it as done!
+        if (pid == it->second.pid) {
+            it->second.pid = 0;
+            break;
+        }
+}
+
+void *UserSM::thrWrapChildDone(void *arg)
+{
+    CDArgs *a = (CDArgs *)arg;
+    UserSM *sm = a->sm;
+    int pid = a->pid;
+    pthread_cond_signal(&a->cond);
+    sm->childDone(pid);
+    return 0;
+}
+
+void UserSM::reset(unsigned card)
+{
+    if (card >= getNCards()) return;
+    MutexLocker ml(mut);
+    SoundFileMap::iterator it;
+    for (it = soundFileMap.begin(); it != soundFileMap.end(); ++it) {
+        ::remove(it->second.filename.c_str());
+    }
+    soundFileMap.clear();
+    timer.reset();
+}
+
+void UserSM::halt(unsigned card)
+{
+    if (card >= getNCards()) return;
+    MutexLocker ml(mut);
+    cardRunning = false;
+}
+
+void UserSM::run(unsigned card)
+{
+    if (card >= getNCards()) return;
+    MutexLocker ml(mut);
+    cardRunning = true;
+}
+
+bool UserSM::isRunning(unsigned card) const
+{
+    if (card >= getNCards()) return false;
+    MutexLocker ml(mut);
+    return cardRunning;
+}
+
+double UserSM::getTime(unsigned card) const
+{
+    if (card >= getNCards()) return 0.;
+    MutexLocker ml(mut);
+    return timer.elapsed();
+}
+
+int UserSM::getLastEvent(unsigned card) const
+{
+    if (card >= getNCards()) return 0;
+    MutexLocker ml(mut);
+    return lastEvent;
+}
+
+unsigned UserSM::getNCards()  const { return 1; }
+
+bool UserSM::setSound(unsigned card, const SoundBuffer & buf)
+{
+    if (card >= getNCards()) return false;
+    OWavFile wav;
+    std::ostringstream s;
+    s << "/tmp/" << "SoundServerSound_" << getpid() << "_" << card << "_" << buf.id << ".wav";
+    if (!wav.create(s.str().c_str())) {
+        log() << "Error creating wav file: " << s.str() << std::endl;
+        return false;
+    }
+    if (!wav.write(&buf[0], buf.sample_size/8, buf.sample_size, buf.rate))
+        return false;
+    MutexLocker ml(mut);
+    SoundFileMap::iterator it = soundFileMap.find(buf.id);
+    if (it != soundFileMap.end()) {
+        ::remove(it->second.filename.c_str());
+        soundFileMap.erase(it);
+    }
+    SoundFile f;
+    f.filename = s.str();
+    soundFileMap[buf.id] = f;
+    wav.close();
+    return true;
 }
