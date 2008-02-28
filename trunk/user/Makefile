@@ -25,6 +25,6 @@ $(PRG): $(PRG_OBJS)
 
 clean:
 	-cp -f Makefile.bak Makefile || true
-	rm -f *~ *.o Makefile.bak .deps $(PRG) $(MOD)
+	rm -f *~ *.o Makefile.bak .deps $(PRG)
 
 

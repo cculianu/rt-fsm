@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 
 #if defined(RTLINUX) && !defined(RTAI)
+
 #  include <rtl.h>
 #  include <rtl_time.h>
 #  include <rtl_fifo.h>
@@ -44,12 +45,25 @@
 #  include <mbuff.h>
 #  define rt_printk rtl_printf
 #  define rtf_get_if rtf_get
+#  define rt_critical(flags) rtl_critical(flags)
+#  define rt_end_critical(flags) rtl_end_critical(flags)
+#  define CURRENT_IS_RT() (pthread_self() != pthread_linux())
+#  define CURRENT_IS_LINUX() (pthread_self() == pthread_linux())
+#  define rt_spinlock_t pthread_spinlock_t
+#  define RT_SPINLOCK_INITIALIZER PTHREAD_SPINLOCK_INITIALIZER
+#  define rt_spin_lock_irqsave(x) pthread_spin_lock(x) /* returns flags */
+#  define rt_spin_unlock_irqrestore(flags, x) do { (void)flags; pthread_spin_unlock(x); }
+#  define rt_spin_lock_init(lock) pthread_spin_init(lock, 0 )
+#  define rt_spin_lock_destroy(lock) pthread_spin_destroy(lock)
 #elif defined(RTAI) && !defined(RTLINUX) /* RTAI */
+
 #  include <rtai.h>
 #  include <rtai_sched.h>
 #  include <rtai_fifos.h>
 #  include <rtai_posix.h>
 #  include <rtai_shm.h>
+#  include <rtai_sem.h>
+#  define rt_spinlock_t spinlock_t
 #  define RTF_NO MAX_FIFOS
 #  define mbuff_alloc(name, size) rt_shm_alloc(nam2num(name), size, USE_VMALLOC)
 #  define mbuff_free(name, ptr) rt_shm_free(nam2num(name))
@@ -57,12 +71,18 @@
 #  define mbuff_detach(name, ptr) rt_shm_free(nam2num(name))
    typedef RTIME hrtime_t;
    extern spinlock_t FSM_GLOBAL_SPINLOCK;
-   #define rtl_critical(flags) do { flags = rt_spin_lock_irqsave(&FSM_GLOBAL_SPINLOCK); } while (0)
-   #define rtl_end_critical(flags) do { rt_spin_unlock_irqrestore(flags, &FSM_GLOBAL_SPINLOCK); } while (0)
-   #define RTF_FREE(f) (-1) /* unsupported in RTAI */
+#  define rt_critical(flags) do { flags = rt_spin_lock_irqsave(&FSM_GLOBAL_SPINLOCK); } while (0)
+#  define rt_end_critical(flags) do { rt_spin_unlock_irqrestore(flags, &FSM_GLOBAL_SPINLOCK); } while (0)
+#  define RTF_FREE(f) (-1) /* unsupported in RTAI */
    static inline hrtime_t gethrtime(void) { return count2nano(rt_get_time()); }
-   #define sched_get_priority_max(x) MAX_PRIO
-   #define sched_get_priority_min(x) MIN_PRIO
+#  define sched_get_priority_max(x) MAX_PRIO
+#  define sched_get_priority_min(x) MIN_PRIO
+#  define CURRENT_IS_RT() (rt_get_prio(rt_whoami()) >= 0)
+#  define CURRENT_IS_LINUX() (rt_get_prio(rt_whoami()) < 0)
+#  define rt_spinlock_t spinlock_t
+#  define RT_SPINLOCK_INITIALIZER SPIN_LOCK_UNLOCKED
+#  define rt_spin_lock_init(lock) spin_lock_init(lock)
+#  define rt_spin_lock_destroy(lock) ((void)lock)
 #else
 #  error Need to define exactly one of RTLINUX or RTAI to use this header!
 #endif
@@ -73,7 +93,7 @@
  * @return 0 on succes, or a -errno value if there is a problem allocating or finding the fifo.
  */
 #ifdef RTLINUX
-static int find_free_rtf(unsigned *minor, unsigned size)
+static int rtf_find_free(unsigned *minor, unsigned size)
 {
   unsigned i;
   for (i = 0; i < RTF_NO; ++i) {
@@ -87,9 +107,10 @@ static int find_free_rtf(unsigned *minor, unsigned size)
       return ret;
   }
   return -EBUSY;
+  rtf_find_free(minor, size); /* avoid compiler warnings about unused.. */
 }
 #else /* RTAI gah! it allows multiple opens on same fifo, so we must figure out what is opened another way */
-static int find_free_rtf(unsigned *minor, unsigned size)
+static int rtf_find_free(unsigned *minor, unsigned size)
 {
   unsigned i;
   char dummybuf[8];
@@ -102,6 +123,7 @@ static int find_free_rtf(unsigned *minor, unsigned size)
     }
   }
   return -EBUSY;
+  rtf_find_free(minor, size); /* avoid compiler warnings about unused.. */
 }
 #endif
 

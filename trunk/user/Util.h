@@ -149,4 +149,10 @@ private:
   std::string reason;
 };
 
+class FatalException : public Exception
+{
+public:
+    FatalException(const std::string & s) : Exception(s) {}
+};
+
 #endif

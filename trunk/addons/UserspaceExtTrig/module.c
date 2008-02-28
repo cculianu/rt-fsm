@@ -128,7 +128,7 @@ static int  initFifos(void)
 
     shm->fifo_out = -1;
 
-    ret = find_free_rtf(&minor, UT_FIFO_SZ);
+    ret = rtf_find_free(&minor, UT_FIFO_SZ);
     if (ret) {
         printk(KERN_ERR MODULE_NAME ": Could not create fifo\n");
         return ret;
