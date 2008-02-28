@@ -1,8 +1,5 @@
 /*
- * This file is part of the CNMC Software Experiment System from
- * Cold Spring Harbor Laboratory, NY.
- *
- * Copyright (C) 2005-2006 Calin Culianu <calin@ajvar.org>
+ * Copyright (C) 2005-2008 Calin Culianu <calin@ajvar.org>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,9 +21,9 @@
 /**
  * Trigger RT program that knows how to talk to the LynxTWO-RT driver
  * for triggering sounds.  To avoid any latency, all soundfiles are
- * stored in memory, and they come from userspace via the
- * LynxTrigServer program.  Soundfile memory is allocated at module
- * insertion, and by default about 1/3 of system memory is grabbed.
+ * stored in memory, and they come from userspace via a SHM buff.  Our only 
+ * hope is that the rtos doesn't limit the size and number of RT_SHMs.
+ * On RTAI this shouldn't be much of a problem...
  */
 
 #include <linux/module.h> 
@@ -49,27 +46,25 @@
 #include <linux/mm.h>
 #include <linux/comedilib.h>
 #include <linux/seq_file.h>
-#include <rtl.h>
-#include <rtl_time.h>
-#include <rtl_fifo.h>
-#include <rtl_sched.h>
-#include <rtl_mutex.h>
-#include <rtl_sema.h>
-#include <mbuff.h>
-#include <linux/config.h>
+#include <asm/system.h>
 
-
-#include "LynxTrig.h"
-#include "LynxTrigVirt.h"
+#include "rtos_compat.h"
+#include "IntTypes.h"
+#include "SoundTrig.h"
+#include "FSMExternalTrig.h"
 #include "LynxTWO-RT.h"
 #include "ChanMapper.h"
-#include "libtlsf/src/tlsf.h"
 
-#if MAX_CARDS != L22_MAX_DEVS
-#error  MAX_CARDS needs to equal L22_MAX_DEVS.  Please fix either LynxTWO-RT.h or LynxTrig.h to make these #defines equal!
+#ifdef RTAI
+/* this is a noop on rtai -- all rt tasks use fpu.  */
+static inline int pthread_attr_setfp_np(pthread_attr_t *a, int b) {(void)(a); (void)(b); return 0; }
 #endif
 
-#define MODULE_NAME "LynxTrig-RT"
+#if MAX_CARDS != L22_MAX_DEVS
+#error  MAX_CARDS needs to equal L22_MAX_DEVS.  Please fix either LynxTWO-RT.h or SoundTrig.h to make these #defines equal!
+#endif
+
+#define MODULE_NAME KBUILD_MODNAME
 #ifdef MODULE_LICENSE
   MODULE_LICENSE("GPL");
 #endif
@@ -80,19 +75,19 @@
 #ifndef ABS
 #  define ABS(x) ( (x) < 0 ? -(x) : (x) )
 #endif
-#define LOG_MSG(x...) rtl_printf(KERN_INFO MODULE_NAME": "x)
-#define DEBUG(x...)  do { if(debug) rtl_printf(KERN_DEBUG MODULE_NAME": DEBUG: "x); } while(0)
-#define WARNING(x...)  rtl_printf(KERN_WARNING MODULE_NAME ": WARNING: "x)
-#define ERROR(x...)  rtl_printf(KERN_ERR MODULE_NAME ": INTERNAL ERROR: "x)
+#define LOG_MSG(x...) rt_printk(KERN_INFO MODULE_NAME": "x)
+#define DEBUG(x...)  do { if(debug) { rt_printk(KERN_DEBUG MODULE_NAME":(thr: %p)", (void *)pthread_self()); rt_printk(" DEBUG: "x); } } while(0)
+#define WARNING(x...)  rt_printk(KERN_WARNING MODULE_NAME ": WARNING: "x)
+#define ERROR(x...)  rt_printk(KERN_ERR MODULE_NAME ": INTERNAL ERROR: "x)
+
 MODULE_AUTHOR("Calin A. Culianu");
-MODULE_DESCRIPTION(MODULE_NAME ": A component for CSHL to trigger the Lynx22 board (requires LynxTWO-RT driver).");
+MODULE_DESCRIPTION(MODULE_NAME ": A component for the rtfsm to trigger the Lynx22 board (requires the LynxTWO-RT driver).");
 
 typedef unsigned CardID_t;
 
 int init(void);  /**< Initialize data structures and register callback */
 void cleanup(void); /**< Cleanup.. */
 
-static int initAudioMem(void);
 static int initRunStates(void);
 static int initRunState(CardID_t);
 static int initShm(void);
@@ -121,7 +116,7 @@ static struct file_operations myproc_fops =
    calls the function directly in hardware triggers mode.. 
    Pass a command of the type seen in enum FifoMsgID */
 enum {
-  PLAY_CMD = USER_LYNXTRIG_MSG_ID+1,
+  PLAY_CMD = SOUNDTRIG_MSG_ID_MAX+1,
   STOP_CMD
 };
 static void *doCmdInRTThread(int cmd, void *arg);
@@ -135,20 +130,13 @@ module_exit(cleanup);
   Some private 'global' variables...
 -----------------------------------------------------------------------------*/
 static volatile struct Shm *shm = 0;
-static volatile struct LynxTrigVirtShm *virtShm = 0;
-/* Pointer to TLSF memory pool for audio memory buffers */
-void *audio_memory_pool = 0;
+static volatile struct FSMExtTrigShm *virtShm = 0;
 
 /** array of L22Dev_t for all the devices we have open */
 L22Dev_t *l22dev = 0;
 /** the size of the above array */
 unsigned n_l22dev = 0;
-
-/* Some helper macros to make tlsf usage slightly easier.. */
-#define TLSF_malloc(s) malloc_ex(s, audio_memory_pool)
-#define TLSF_realloc(p,s) realloc_ex(p, s, audio_memory_pool)
-#define TLSF_free(p) free_ex(p, audio_memory_pool)
-
+        
 #define DEFAULT_SAMPLING_RATE 10000
 #define DEFAULT_TRIGGER_MS 1
 
@@ -159,30 +147,21 @@ int minordev = 0,
     first_trig_chan = 0,
     num_trig_chans = 8,
     comedi_triggers = 0,
-    audio_memory = 0,
     trig_on_event_chan = -1;
-MODULE_PARM(minordev, "i");
+module_param(minordev, int, 0444);
 MODULE_PARM_DESC(minordev, "The minor number of the comedi device to use.");
-MODULE_PARM(sampling_rate, "i");
+module_param(sampling_rate, int, 0444);
 MODULE_PARM_DESC(sampling_rate, "The sampling rate, or frequency of the periodic polling task if using comedi_triggers.  Note: Do not confuse this with the sound board's sampling rate which is specified via the userspace program LynxTrigServer. Defaults to " STR(DEFAULT_SAMPLING_RATE) ".");
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "If true, print extra (cryptic) debugging output.  Defaults to 0.");
-MODULE_PARM(first_trig_chan, "i");
+module_param(first_trig_chan, int, 0444);
 MODULE_PARM_DESC(first_trig_chan, "The first DIO channel to use for board triggers.  Note that this plus num_trig_chans determine exact lines we scan to get the binary trigger id.  Defaults to 0.");
-MODULE_PARM(num_trig_chans, "i");
+module_param(num_trig_chans, int, 0444);
 MODULE_PARM_DESC(num_trig_chans, "The number of DIO channels from first_trig_chan to scan for triggers. Defaults to 8.  (0 means take all channels left until the last).");
-MODULE_PARM(comedi_triggers, "i");
-MODULE_PARM_DESC(comedi_triggers, "If set, use COMEDI DIO device to do triggering.  Otherwise use a SHM which contains a singe int for 'virtual' triggering from another RT module.  The SHM name is \""LYNX_TRIG_VIRT_SHM_NAME"\" of size sizeof(int).  Defaults to 0 (virtual).");
-MODULE_PARM(audio_memory, "i");
-MODULE_PARM_DESC(audio_memory, "The number of MB to preallocate for audio buffers.  Note that this should be a large value otherwise you will soon run out of realtime audio buffers when sending sounds from userspace!  Defaults to 1/3 the system's physical RAM.");
-MODULE_PARM(trig_on_event_chan, "i");
+module_param(comedi_triggers, int, 0444);
+MODULE_PARM_DESC(comedi_triggers, "If set, use COMEDI DIO device to do triggering.  Otherwise use a SHM which contains a singe int for 'virtual' triggering from another RT module.  The SHM name is \""FSM_EXT_TRIG_SHM_NAME"\".  Defaults to 0 (virtual).");
+module_param(trig_on_event_chan, int, 0444);
 MODULE_PARM_DESC(trig_on_event_chan, "If non-negative, the DIO channel (not related to first_trig_chan or num_trig_chans at all!) to 'trigger' for one cycle whenever a play event occurs. This feature is intended to be used for debugging the timing of the play command. Defaults to -1 (off).");
-#if defined(CONFIG_BIGPHYS_AREA) && CONFIG_BIGPHYS_AREA
-#include <linux/bigphysarea.h>
-int bigphys = 0;
-MODULE_PARM(bigphys, "i");
-MODULE_PARM_DESC(bigphys, "KB of memory to allocate using bigphysarea_alloc(). (Do cat /proc/bigphysarea to see KB free of bigphys memory).  Note: This parameter replaces audio_memory, and it tells this module to attempt to allocate the audio memory from the bigphysarea pool (requires a specially patched kernel and a bootime parameter, see Documentation/bigphysarea.txt for more info).  Specify a size in KB of the bigphysarea.  A positive nonzero value means to use the bigphysarea, otherwise the audio_memory parameter is used instead.  Defaults to 0 (don't use bigphysarea).");
-#endif
 
 #define NUM_CHANS_REQUIRED (first_trig_chan+(num_trig_chans-1))
 
@@ -190,7 +169,7 @@ static struct proc_dir_entry *proc_ent = 0;
 static volatile int rt_task_stop = 0; /* Internal variable to stop the RT 
                                          thread. */
 static volatile int rt_task_running = 0;
-static pthread_t rt_task = 0;
+static pthread_t rttask = 0;
 
 static struct RamperThread
 {
@@ -248,14 +227,14 @@ static inline long Micro2Sec(long long micro, unsigned long *remainder);
   More internal 'global' variables and data structures.
 -----------------------------------------------------------------------------*/
 struct AudioBuf {
-  char *buf;
-  unsigned long len;
+  unsigned char *data; /**< pointer to audio data -- usually an rt-shm */
+  char name[SNDNAME_SZ]; /**< used for attaching/detaching the shm */
+  unsigned long len; /**< The length of the buffer, in bytes */
   unsigned rate;
   unsigned short bits;
   unsigned short nchans;
   unsigned short stop_ramp_tau_ms;
   unsigned short is_looped_flag;
-  unsigned long final_size;
   unsigned trig_play_ct;
   unsigned trig_stop_ct;
 };
@@ -303,7 +282,7 @@ static DECLARE_MUTEX(trigger_mutex);
  Some helper functions
 -----------------------------------------------------------------------------*/
 static int detectEvent(CardID_t); /**< returns 0 on no input detected, positive for play id or negative for stop id */
-static pthread_mutex_t dispatch_Mut = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t dispatch_Mut;
 static void dispatchEvent(CardID_t, int trig); /**< Do triggers (if any).. */
 static int virtualTriggerFunction(CardID_t, int); /* Do virtual 'soft' triggers (if any) */      
 static int createRamperThreads(void);
@@ -312,19 +291,29 @@ static void doPossiblyRampedStop(unsigned card, unsigned chan);
 static void *cosine2RamperThread(void *);
 static void cancelAnyRunningRampedStops(unsigned card, unsigned chan);
 
+static int fifoHandler0(unsigned f);
+static int fifoHandler1(unsigned f);
+static int fifoHandler2(unsigned f);
+static int fifoHandler3(unsigned f);
+static int fifoHandler4(unsigned f);
+static int fifoHandler5(unsigned f);
+static int (*handlerFuncMap[])(unsigned) = { fifoHandler0, fifoHandler1, fifoHandler2, fifoHandler3, fifoHandler4, fifoHandler5 };
 static int handleFifos_MapCardID(unsigned int fifo_no); /* gets called as rtf handler, maps rtf id to card id and calls handleFifos(cardId */
 static int handleFifos(CardID_t card);
 static void grabAllDIO(void);
 static inline void updateTS(CardID_t c) { rs[c].current_ts = gethrtime() - rs[c].init_ts; }
+static void freeAudioBuffer(struct AudioBuf *);
 static void freeAudioBuffers(CardID_t c);
+#ifdef RTLINUX
 /* just like clock_gethrtime but instead it used timespecs */
 static inline void clock_gettime(clockid_t clk, struct timespec *ts);
 static inline void nano2timespec(hrtime_t time, struct timespec *t);
+#endif
 /* 64-bit division is not natively supported on 32-bit processors, so it must 
    be emulated by the compiler or in the kernel, by this function... */
-static inline unsigned long long ulldiv(unsigned long long dividend, unsigned long divisor, unsigned long *remainder);
+static inline unsigned long long ulldiv_(unsigned long long dividend, unsigned long divisor, unsigned long *remainder);
 /* Just like above, but does modulus */
-static inline unsigned long ullmod(unsigned long long dividend, unsigned long divisor);
+static inline unsigned long ullmod_(unsigned long long dividend, unsigned long divisor);
 /* this function is non-reentrant! */
 static const char *uint64_to_cstr(uint64 in);
 
@@ -334,7 +323,6 @@ static void destroyChanMapper(void);
 static void stopAllChans(CardID_t c);
 static int initL22Devs(void);
 static void cleanupL22Devs(void);
-static void freeAudioMemory(void);
 
 /*-----------------------------------------------------------------------------*/
 
@@ -342,9 +330,12 @@ int init (void)
 {
   int retval = 0;
   
+  pthread_mutex_init(&dispatch_Mut, 0); /* do this regardles.. */
+#ifdef RTAI
+  DEBUG("linux prio: %x\n", rt_get_prio(rt_whoami()));
+#endif
   if (    (retval = initL22Devs())
        || (retval = initChanMapper())
-       || (retval = initAudioMem()) 
        || (retval = initShm())
        || (retval = initFifos())
        || (retval = initRunStates())
@@ -354,7 +345,13 @@ int init (void)
       cleanup();  
       return retval;
     }
- 
+#ifdef RTAI
+  rt_set_oneshot_mode();
+  start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
+  /* Must mark linux as using FPU because of embedded C code startup */
+  rt_linux_use_fpu(1);
+#endif
+  
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,29)
  
   proc_ent = create_proc_entry(MODULE_NAME, S_IFREG|S_IRUGO, 0);
@@ -367,7 +364,7 @@ int init (void)
 #endif
 
   if ( SOFTWARE_TRIGGERS() ) {
-    LOG_MSG("started successfully, using passive 'virtual' triggers at SHM \"%s\", for a total of 2^31 possible triggered sounds!\n", LYNX_TRIG_VIRT_SHM_NAME);
+    LOG_MSG("started successfully, using passive 'virtual' triggers at SHM \"%s\", for a total of 2^31 possible triggered sounds!\n", FSM_EXT_TRIG_SHM_NAME);
   } else {
     LOG_MSG("started successfully at %d Hz, using COMEDI DIO for triggering, first trig: %d, num trigs: %d.\n", sampling_rate, first_trig_chan, num_trig_chans);
   }
@@ -381,7 +378,7 @@ int init (void)
 void cleanup (void)
 {
   unsigned c;
-
+  
   LOCK_TRIGGERS();
 
   for (c = 0; c < n_l22dev; ++c) stopAllChans(c);
@@ -394,7 +391,7 @@ void cleanup (void)
     virtShm->function = 0; /* Clear the function pointer just in case other
 			      rt tasks are looking at it. */
     virtShm->magic = 0;
-    mbuff_free(LYNX_TRIG_VIRT_SHM_NAME, (void *)virtShm);
+    mbuff_free(FSM_EXT_TRIG_SHM_NAME, (void *)virtShm);
     virtShm = 0;
   }
 
@@ -403,8 +400,8 @@ void cleanup (void)
   
   if (rt_task_running) {
     rt_task_stop = 1;
-    pthread_cancel(rt_task);
-    pthread_join(rt_task, 0);
+    pthread_cancel(rttask);
+    pthread_join(rttask, 0);
   }
   
   destroyRamperThreads();
@@ -419,16 +416,12 @@ void cleanup (void)
       if (shm->fifo_in[c] >= 0) rtf_destroy(shm->fifo_in[c]);
       if (shm->fifo_out[c] >= 0) rtf_destroy(shm->fifo_out[c]);
     }
-    mbuff_free(SHM_NAME, (void *)shm); 
+    memset((void *)shm, 0, sizeof(*shm));
+    mbuff_free(SND_SHM_NAME, (void *)shm); 
     shm = 0; 
   }
 
   destroyChanMapper();
-
-  if (audio_memory_pool) {
-    destroy_memory_pool(audio_memory_pool);
-    freeAudioMemory(); /* either uses bigphyadrea_free or vfree */
-  }
 
   if (COMEDI_TRIGGERS())
     LOG_MSG("unloaded successfully after %s cycles.\n",
@@ -444,6 +437,12 @@ void cleanup (void)
   pthread_mutex_destroy(&dispatch_Mut);
 
   cleanupL22Devs();
+  
+  /* detach all shared mems for each card */
+  for (c = 0; c < n_l22dev; ++c) 
+    freeAudioBuffers(c); 
+  
+  pthread_mutex_destroy(&dispatch_Mut);
 }
 
 static int initL22Devs(void)
@@ -482,118 +481,29 @@ static void cleanupL22Devs(void)
   l22dev = 0;
 }
 
-static int initAudioMem(void)
-{
-  int retval;
-  unsigned long tstchunk = 0, memsize = 0;
-  char *tmp = 0;
-  int first_alloc_try = 1;
-
-#if defined(CONFIG_BIGPHYS_AREA) && CONFIG_BIGPHYS_AREA
-  if (bigphys > 0) {
-    bigphys *= 1024;
-    audio_memory_pool = (void *)bigphysarea_alloc(bigphys);
-    if (!audio_memory_pool) {
-      ERROR("Could not allocate %d bytes from bigphysarea pool, defaulting to regular vmalloc() value via audio_memory parameter.\n", bigphys);
-      bigphys = 0;
-    } else {
-      memsize = bigphys;
-      LOG_MSG("Allocated %d bytes for audio memory pool using bigphysarea_alloc().\n", memsize);
-
-    }
-  }
-#endif
-  /* above failed or is compiled out, try and use vmalloc() */
-  if (!audio_memory_pool) { 
-      if (audio_memory <= 0) {
-        struct sysinfo si;
-        si_meminfo(&si);
-        audio_memory = si.totalram*si.mem_unit / 3;
-      } else
-        audio_memory *= 1024*1024;  
-      
-      if (audio_memory <= 0) {
-        LOG_MSG("Invalid audio memory value: %d!\n", audio_memory);
-        return -EINVAL;
-      }
-      
-      /* Try and allocate requested size for audio memory pool.. if that fails,
-         keep trying with 1MB smaller amounts until we either succeed or 
-         if that fails.. give up. */
-      do {    
-        audio_memory_pool = (void *)vmalloc(audio_memory);
-        if (!audio_memory_pool) {
-          if (first_alloc_try)
-            WARNING("Cannot allocate %d bytes for the audio memory pool!  Trying smaller amounts..\n", 
-                    audio_memory);
-          audio_memory -= 1024*1024; /* Try 1MB less.. */
-          first_alloc_try = 0;
-        } else {
-          LOG_MSG("Allocated %d bytes for audio memory pool using vmalloc().\n", audio_memory);
-        }
-      } while(!audio_memory_pool && audio_memory > 1024*1024);
-      /* Ergh!  We failed to even get 1MB of audio memory! WTF? */
-      if (!audio_memory_pool) {
-        ERROR("Could not even get a measely %d bytes for the audio memory pool!  Out of memory?\n", audio_memory); 
-        return -ENOMEM;
-      }
-
-      memsize = audio_memory;
-  }
-  tstchunk = (memsize/2);
-
-  /* Ok, now give the audio memory pool to the TLSF dynamic memory
-     allocator so we can allocate memory in realtime.. */
-  if ( (retval = init_memory_pool(memsize, audio_memory_pool)) <= 0 || !(tmp = (char *)TLSF_malloc(tstchunk)) )
-  {
-      if (retval == TLSF_FLI_TOOSMALL) 
-        ERROR("TLSF init_memory_pool complained that memory size is too big!  Increase compile-time MAX_FLI in tlsf.h to at least log2(%d)!\n", memsize);
-      else
-        ERROR("TLSF init_memory_pool returned %d, aborting..\n", retval);
-      freeAudioMemory();
-      return -EINVAL;
-  }
-
-  /* Test memory pool.. */
-  memset(tmp, 0, tstchunk);
-  TLSF_free(tmp);
-
-  return 0;
-}
-
-static void freeAudioMemory(void)
-{
-#if defined(CONFIG_BIGPHYS_AREA) && CONFIG_BIGPHYS_AREA
-  if (bigphys && audio_memory_pool) {
-    bigphysarea_free((caddr_t)audio_memory_pool, bigphys);
-  } else 
-#endif
-    vfree(audio_memory_pool);
-  audio_memory_pool = 0;
-}
 
 static int initShm(void)
 {
   unsigned i;
 
-  shm = (volatile struct Shm *) mbuff_alloc(SHM_NAME, SHM_SIZE);
+  shm = (volatile struct Shm *) mbuff_alloc(SND_SHM_NAME, SND_SHM_SIZE);
   if (! shm)  {
     ERROR("Could not mbuff_alloc the shared memory structure.  Aborting!\n");
     return -ENOMEM;
   }
   
   memset((void *)shm, 0, sizeof(*shm));
-  shm->magic = SHM_MAGIC;
+  shm->magic = SND_SHM_MAGIC;
 
   for (i = 0; i < MAX_CARDS; ++i)
     shm->fifo_out[i] = shm->fifo_in[i] = -1;
 
   if ( SOFTWARE_TRIGGERS() ) 
   {
-      virtShm = (struct LynxTrigVirtShm *) 
-        mbuff_alloc(LYNX_TRIG_VIRT_SHM_NAME, LYNX_TRIG_VIRT_SHM_SIZE);
+      virtShm = (struct FSMExtTrigShm *) 
+        mbuff_alloc(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
       if (!virtShm) return -ENOMEM;
-      virtShm->magic = LYNX_TRIG_VIRT_SHM_MAGIC;
+      virtShm->magic = FSM_EXT_TRIG_SHM_MAGIC;
       virtShm->function = virtualTriggerFunction;
   }
 
@@ -603,32 +513,16 @@ static int initShm(void)
   return 0;
 }
 
-static int find_free_rtf(unsigned *minor, unsigned size)
-{
-  unsigned i;
-  for (i = 0; i < RTF_NO; ++i) {
-    int ret = rtf_create(i, size);
-    if ( ret  == 0 ) {
-      *minor = i;
-      return 0;
-    } else if ( ret != -EBUSY ) 
-      /* Uh oh.. some deeper error occurred rather than just the fifo was
-	 already allocated.. */
-      return ret;
-  }
-  return -EBUSY;
-}
-
 static int initFifos(void)
 {
   int32 err, minor, i;
 
   for (i = 0; i < n_l22dev; ++i) {
     /* Open up fifos here.. */
-    err = find_free_rtf(&minor, sizeof(FIFO_SZ));
+    err = rtf_find_free(&minor, sizeof(FIFO_SZ));
     if (err < 0) return 1;
     shm->fifo_out[i] = minor;
-    err = find_free_rtf(&minor, sizeof(FIFO_SZ));
+    err = rtf_find_free(&minor, sizeof(FIFO_SZ));
     if (err < 0) return 1;
     shm->fifo_in[i] = minor;
 
@@ -636,7 +530,7 @@ static int initFifos(void)
       {
         /* In soft trigger mode, install an RT handler since there is no 
            rt-thread polling the fifos.. */
-        if ( rtf_create_handler(shm->fifo_in[i], handleFifos_MapCardID) ) {
+        if ( rtf_create_handler(shm->fifo_in[i], handlerFuncMap[i]) ) {
           LOG_MSG("rtf_create_handler returned error!\n");
           return 1;
         }
@@ -730,7 +624,7 @@ static int initRT(void)
 {
   pthread_attr_t attr;
   struct sched_param sched_param;
-  int error;
+  int error = 0;
   unsigned long rem;
 
   error = createRamperThreads();
@@ -745,16 +639,18 @@ static int initRT(void)
     LOG_MSG("Sampling rate of %d seems crazy, going to default of %d\n", sampling_rate, DEFAULT_SAMPLING_RATE);
     sampling_rate = DEFAULT_SAMPLING_RATE;
   }
-  task_period_ns = ulldiv(BILLION, sampling_rate, &rem);
+  task_period_ns = ulldiv_(BILLION, sampling_rate, &rem);
 
   /* Setup pthread data, etc.. */
   pthread_attr_init(&attr);
   pthread_attr_setfp_np(&attr, 1);
   sched_param.sched_priority = 1;
   error = pthread_attr_setschedparam(&attr, &sched_param);  
-  if (error) return -error;
-  error = pthread_create(&rt_task, &attr, doRT, 0);
-  if (error) return -error;
+  if (error) { error = -error; goto end_out; }
+  error = pthread_create(&rttask, &attr, doRT, 0);  
+  if (error) { error = -error; goto end_out; }
+end_out:
+  pthread_attr_destroy(&attr);
   return 0;
 }
 
@@ -766,18 +662,10 @@ static int myseq_open(struct inode *i, struct file *f)
 
 static int myseq_show (struct seq_file *m, void *dummy)
 {  
-  (void) dummy;
   unsigned c;
+  (void) dummy;
 
   seq_printf(m, "%s Module\n\n", MODULE_NAME);
-
-  seq_printf(m, "Audio memory pool at %p ", audio_memory_pool);
-#if defined(CONFIG_BIGPHYS_AREA) && CONFIG_BIGPHYS_AREA
-  if (bigphys && audio_memory_pool) {
-    seq_printf(m, "size %d bytes (used bigphysarea).\n", bigphys);
-  } else 
-#endif
-    seq_printf(m, "size %d bytes (used vmalloc).\n", audio_memory);
   
   seq_printf(m, "shm addr: %p\tshm magic: %08x\n", (void *)shm, shm->magic);
 
@@ -790,8 +678,8 @@ static int myseq_show (struct seq_file *m, void *dummy)
       seq_printf(m, "\n"); /* extra newline */
       for (i = 0; i < MAX_SND_ID; ++i) {
         struct AudioBuf *buf = &rs[c].audio_buffers[i];
-        if (buf->buf)
-          seq_printf(m, "\tSound buffer %d: buf_ptr: %p, rate - %u,  len - %lu,  bits - %hu,  nchans - %hu,  ramp_ms - %hu,  plays - %u,  stops - %u\n", i, buf->buf, buf->rate, buf->len, buf->bits, buf->nchans, buf->stop_ramp_tau_ms, buf->trig_play_ct, buf->trig_stop_ct);
+        if (buf->data)
+          seq_printf(m, "\tSound buffer %d: name: %s, buf_ptr: %p, rate - %u,  len - %lu,  bits - %hu,  nchans - %hu,  ramp_ms - %hu,  plays - %u,  stops - %u\n", i, buf->name, buf->data, buf->rate, buf->len, buf->bits, buf->nchans, buf->stop_ramp_tau_ms, buf->trig_play_ct, buf->trig_stop_ct);
       }      
     }
   }
@@ -817,11 +705,6 @@ static void *doRT (void *arg)
   while (! rt_task_stop) {
 
     /*#define TIME_IT*/
-#if defined(TIME_IT)
-    /* DEBUG */
-    static int i = 0;
-    long long ts = gethrtime(), tend;
-#endif
 
     timespec_add_ns(&next_task_wakeup, (long)task_period_ns);
 
@@ -853,17 +736,6 @@ static void *doRT (void *arg)
       
     }
     
-    
-#if defined(TIME_IT)
-    tend = gethrtime();
-
-    /* DEBUG */
-    if (i++ % sampling_rate == 0 || (tend-ts) > (long long)(120000) ) {
-      char buf[64];
-      int64_to_cstr((long long) tend - ts, buf);
-      LOG_MSG("%s nanos for this scan\n", buf);
-    }
-#endif
     
     /* Sleep until next period */
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &next_task_wakeup, 0); 
@@ -910,7 +782,7 @@ static void dispatchEvent(CardID_t c, int event_id)
 
   chan = CM_GrabChannel(channels[c], snd_id);
 
-  if (!buf->buf || !buf->len) {
+  if (!buf->data || !buf->len) {
     DEBUG("Triggered event %d skipped due to missing audio buffer.\n",
           snd_id);
     pthread_mutex_unlock(&dispatch_Mut); 
@@ -918,7 +790,7 @@ static void dispatchEvent(CardID_t c, int event_id)
   }
 
   /* Schedule a play to happen ASAP */
-  L22SetAudioBuffer(l22dev[c], buf->buf, buf->len, (buf->bits/8-1)|((buf->nchans-1)*4), chan, buf->is_looped_flag);
+  L22SetAudioBuffer(l22dev[c], buf->data, buf->len, (buf->bits/8-1)|((buf->nchans-1)*4), chan, buf->is_looped_flag);
   
   ++buf->trig_play_ct; /* increment trig play count */
   
@@ -960,27 +832,39 @@ static int virtualTriggerFunction(CardID_t card, int trig)
   return ret;
 }
 
-static void freeAudioBuffers(CardID_t c)
+static void freeAudioBuffer(struct AudioBuf *buf)
 {
-  int i;
-  for (i = 0; i < MAX_SND_ID; ++i) {
-    struct AudioBuf *buf = &rs[c].audio_buffers[i];
-    if (buf->buf) {
-      TLSF_free(buf->buf);
-      memset(buf, 0, sizeof(*buf));
+    if (buf->data && buf->len && buf->name[0]) {        
+        DEBUG("Freeing buffer named %s size %lu\n", buf->name, buf->len);
+        mbuff_free(buf->name, buf->data);
     }
-  }
+    memset((void *)buf, 0, sizeof(*buf));
 }
 
+static void freeAudioBuffers(CardID_t c)
+{
+  unsigned i;
+  for (i = 0; i < MAX_SND_ID; ++i) 
+    freeAudioBuffer(&rs[c].audio_buffers[i]);  
+}
+
+static int fifoHandler0(unsigned f) { (void)f; if (shm) return handleFifos_MapCardID(shm->fifo_in[0]); return -1; }
+static int fifoHandler1(unsigned f) { (void)f; if (shm) return handleFifos_MapCardID(shm->fifo_in[1]); return -1; }
+static int fifoHandler2(unsigned f) { (void)f; if (shm) return handleFifos_MapCardID(shm->fifo_in[2]); return -1; }
+static int fifoHandler3(unsigned f) { (void)f; if (shm) return handleFifos_MapCardID(shm->fifo_in[3]); return -1; }
+static int fifoHandler4(unsigned f) { (void)f; if (shm) return handleFifos_MapCardID(shm->fifo_in[4]); return -1; }
+static int fifoHandler5(unsigned f) { (void)f; if (shm) return handleFifos_MapCardID(shm->fifo_in[5]); return -1; }
 static int handleFifos_MapCardID(unsigned int fifo_no) /* gets called as rtf handler, maps rtf id to card id and calls handleFifos(cardId) */
 {
+  DEBUG("handleFifos_MapCardID(%p)\n", (void *)(unsigned long)fifo_no);
   if (shm) {
     unsigned card;
     for (card = 0; card < n_l22dev; ++card) 
       if (fifo_no == shm->fifo_in[card])
         return handleFifos(card);
   }
-  return 0;
+  ERROR("handleFifos_MapCardID could not map %u to any card!! Wtf?!\n", fifo_no);
+  return -EINVAL;
 }
 
 /* Note: in comedi_triggers mode this is run in realtime context, otherwise
@@ -990,6 +874,10 @@ static int handleFifos(CardID_t c)
   FifoNotify_t dummy = 1;
   int errcode;
 
+  DEBUG("handleFifos(%u)\n", (unsigned)c);
+#ifdef RTAI
+  DEBUG("prio: %x\n", rt_get_prio(rt_whoami()));
+#endif
   /** locking only does something for software trigger mode (in which case
       this function is in non-realtime context), since that is the
       only case where there is asynchronous access to trigger data.. */
@@ -1008,8 +896,8 @@ static int handleFifos(CardID_t c)
       
       switch (msg->id) {
         
-      case RESET:
-        doCmdInRTThread(RESET, (void *)c); /* may spawn a new thread and wait 
+      case INITIALIZE:
+        doCmdInRTThread(INITIALIZE, (void *)c); /* may spawn a new thread and wait 
                                               for it if we are not in 
                                               rt-context.. */
         do_reply = 1;
@@ -1033,28 +921,50 @@ static int handleFifos(CardID_t c)
         
       case SOUND:
         rs[c].invalid = 1; /* lock? */
+        mb();
+        DEBUG("handleFifos: SOUND cmd received\n", (unsigned)c);
+        
         {
           unsigned id = msg->u.sound.id;
           msg->u.sound.transfer_ok = 0; /* Assume not until otherwise proven to be ok.. */
           if (id < MAX_SND_ID) {
             struct AudioBuf *buf = &rs[c].audio_buffers[id];
-            char *newbuf = 0;
-            unsigned long pos = 0;
-            unsigned long old_final_size = buf->final_size;
             unsigned devRate = 0;
+            /* TODO HACK BUG HELP! XXX NOTE -- We really REALLY need to handle the case where we are 
+               freeing a sound that is currently playing here.  What do we do?! NEEDS TESTING. */
+            { /* ok, we'll try and stop the sound here.  BUT it may not be obvious if it's still playing
+                 it *definitely isn't* playing if: 
+                   - CM_LookupSound() fails
+                    *or*
+                   - CM_LookupSound() succeeds, but rs[c].last_played_buf[chan] != buf
+                
+                Otherwise... the sound might be playing or may have recently played and it stopped and no other sound is playing on that channel.
+                
+                Note the above checks ensure that we don't stop a different sound that might be playing.. */
+                int chan = CM_LookupSound(channels[c], id);
+                 
+                if (chan > -1 && chan < L22_NUM_CHANS && rs[c].last_played_buf[chan] == buf) {
+                    DevChan dc;
+                    dc.dev = c;
+                    dc.chan = chan;
+                    DEBUG("Stopping sound on dev %hu chan %hu before loading a new sound...\n", dc.dev, dc.chan);
+                    doCmdInRTThread(STOP_CMD, dc.devchan_voidp);
+                } else
+                    DEBUG("Sound was not playing, does not need stoppage.\n");
+                
+                 
+            }
             /*L22Stop(); / * Just in case it was playing a sound.. */
-            if (buf->buf && msg->u.sound.append) pos = buf->len;
-            if (msg->u.sound.size > MSG_SND_SZ) msg->u.sound.size = MSG_SND_SZ;
-            buf->len = msg->u.sound.size+pos;
+            
+            /* free and clear previous buffer.. a noop if it wasn't allocated */
+            freeAudioBuffer(buf);
+            
+            buf->len = msg->u.sound.size;
             buf->stop_ramp_tau_ms = msg->u.sound.stop_ramp_tau_ms;
-            old_final_size = buf->final_size;
-            buf->final_size = msg->u.sound.total_size;
-            if ( (old_final_size && old_final_size == buf->final_size 
-                  && (newbuf = buf->buf))
-                 || (newbuf = (char *)TLSF_realloc(buf->buf, buf->final_size)) ) {
-
-              buf->buf = newbuf;
-              memcpy(buf->buf + pos, msg->u.sound.snd, msg->u.sound.size);
+            strncpy(buf->name, msg->u.sound.name, sizeof(buf->name));
+            buf->name[sizeof(buf->name)-1] = 0;/* force NUL termination */
+            DEBUG("Attempting to attach to buffer %s of length %lu\n", buf->name, (unsigned long)buf->len);
+            if ( (buf->data = (unsigned char *)mbuff_attach(buf->name, buf->len)) ) {
               buf->nchans = msg->u.sound.chans;
               buf->rate = msg->u.sound.rate;
               buf->bits = msg->u.sound.bits_per_sample;
@@ -1070,10 +980,10 @@ static int handleFifos(CardID_t c)
               }
 
               /* not supported anymore.. L22SetSampleRate(l22dev, buf->rate); */
+
             } else {
-              if (buf->buf) TLSF_free(buf->buf); /* ergh.. out of memory.. free old buffer if it existed :( */
-              ERROR("Sound buffer %u could not be allocated with size %u!  Out of memory in memory pool?\n", id, buf->len);
-              memset(buf, 0, sizeof(*buf));
+              ERROR("Sound buffer %u named %s of size %lu could not be attached!  RT-Shm mechanism out of resources?\n", id, buf->name, buf->len);
+              memset((void *)buf, 0, sizeof(*buf));
             }
             msg->u.sound.size = 0; /* Clear it, just in case? */
           } else {
@@ -1082,6 +992,7 @@ static int handleFifos(CardID_t c)
           }
         }
         rs[c].invalid = 0; /* Unlock.. */
+        mb();
         
         do_reply = 1;
         break;
@@ -1151,7 +1062,7 @@ static void grabAllDIO(void)
       comedi_dio_bitfield(dev, subdev, 0, (unsigned int *)&dio_bits);
       dio_bits &= ((1 << (num_trig_chans+first_trig_chan)) - 1) & ~((1 << first_trig_chan) - 1) ; /* Mask out unwanted channels */
 
-      if (debug && dio_bits && ullmod(cycle, sampling_rate) == 0)
+      if (debug && dio_bits && ullmod_(cycle, sampling_rate) == 0)
         DEBUG("READS 0x%x\n", dio_bits);
   }
 
@@ -1231,7 +1142,7 @@ static int createRamperThreads(void)
           struct sched_param sched_param;      
           struct RamperThread *thr = &ramperThreads[dev][chan];
           
-          memset(thr, 0, sizeof(*thr)); /* clear/init the data structure.. */
+          memset((void *)thr, 0, sizeof(*thr)); /* clear/init the data structure.. */
           
           thr->chan = chan;
           thr->dev = dev;
@@ -1250,6 +1161,7 @@ static int createRamperThreads(void)
                                        cosine2RamperThread, (void *)thr);
               }
             }
+            pthread_attr_destroy(&attr);
             
           }
           
@@ -1273,13 +1185,14 @@ static void destroyRamperThreads(void)
         atomic_set(&thr->stop, 1);
         sem_post(&thr->sem);
         pthread_join(thr->thread, &count);
-        DEBUG("ramper thread %u:%d deleted after %u successful rampings!\n", dev, chan, (unsigned)count);
+        DEBUG("ramper thread %u:%d deleted after %lu successful rampings!\n", dev, chan, (unsigned long)count);
         thr->thread = 0;
       }
       sem_destroy(&thr->sem);
     }
 }
 
+#ifdef RTLINUX
 /* just like clock_gethrtime but instead it used timespecs */
 static inline void clock_gettime(clockid_t clk, struct timespec *ts)
 {
@@ -1290,32 +1203,34 @@ static inline void clock_gettime(clockid_t clk, struct timespec *ts)
 static inline void nano2timespec(hrtime_t time, struct timespec *t)
 {
   unsigned long rem = 0;
-  t->tv_sec = ulldiv(time, 1000000000, &rem);
+  t->tv_sec = ulldiv_(time, 1000000000, &rem);
   t->tv_nsec = rem;
 }
-static inline unsigned long long ulldiv(unsigned long long ull, unsigned long uld, unsigned long *r)
+#endif
+
+static inline unsigned long long ulldiv_(unsigned long long ull, unsigned long uld, unsigned long *r)
 {
     if (r) *r = do_div(ull, uld);
     else do_div(ull, uld);
     return ull;
 }
-static inline unsigned long ullmod(unsigned long long ull, unsigned long uld)
+static inline unsigned long ullmod_(unsigned long long ull, unsigned long uld)
 {         
         unsigned long ret;
-        ulldiv(ull, uld, &ret);
+        ulldiv_(ull, uld, &ret);
         return ret;
 }
 
 static inline unsigned long Nano2Sec(unsigned long long nano)
 {
   unsigned long rem = 0;
-  return ulldiv(nano, BILLION, &rem);
+  return ulldiv_(nano, BILLION, &rem);
 }
 
 static inline unsigned long Nano2USec(unsigned long long nano)
 {
   unsigned long rem = 0;
-  return ulldiv(nano, 1000, &rem);
+  return ulldiv_(nano, 1000, &rem);
 }
 
 
@@ -1351,8 +1266,9 @@ static inline long Micro2Sec(long long micro, unsigned long *remainder)
 {
   int neg = micro < 0;
   unsigned long rem;
+  long ans;
   if (neg) micro = -micro;
-  long ans = ulldiv(micro, 1000000, &rem);
+  ans = ulldiv_(micro, 1000000, &rem);
   if (neg) ans = -ans;
   if (remainder) *remainder = rem;
   return ans;
@@ -1364,10 +1280,10 @@ static inline double cos2(double r) { double c = cos(r); return c*c; }
 
 static void *cosine2RamperThread(void *arg)
 {
-  static const unsigned long task_period_nanos = BILLION/2500; /* .4 ms task period */
-  static const double HALF_PI = 3.14159/2.0;
+  static const unsigned long task_period_nanos = 400000; /* .4 ms task period */
+#define HALF_PI 1.570796326794896619 /* PI/2*/
   struct RamperThread *me = (struct RamperThread *)arg;
-  unsigned num_handled = 0;
+  unsigned long num_handled = 0;
   unsigned short tau_ms;
   sem_t *mySemaphore = &me->sem;
   atomic_t *myStopFlg = &me->stop, *myParam = &me->tauParam;
@@ -1410,7 +1326,9 @@ static void *cosine2RamperThread(void *arg)
       ++num_handled;
     }
   }
+  DEBUG("cosine2Ramper about to return %lu\n", num_handled);
   return (void *)num_handled;
+#undef HALF_PI
 }
 
 static void cancelAnyRunningRampedStops(unsigned c, unsigned chan)
@@ -1437,9 +1355,9 @@ static void stopAllChans(CardID_t c)
 static int initChanMapper(void) 
 { 
   unsigned i;
-  memset(channels, 0, sizeof(channels));
+  memset((void *)channels, 0, sizeof(channels));
   for (i = 0; i < n_l22dev; ++i) {
-    channels[i] = CM_Init(l22dev[i], debug ? rtl_printf : 0);
+    channels[i] = CM_Init(l22dev[i], debug ? (void *)rt_printk : 0);
     if (!channels[i]) return -ENOMEM; 
   }
   return 0;
@@ -1450,7 +1368,7 @@ static void destroyChanMapper(void)
   unsigned i;
   for (i = 0; i < n_l22dev; ++i) 
     if (channels[i]) CM_Destroy(channels[i]);
-  memset(channels, 0, sizeof(channels));
+  memset((void *)channels, 0, sizeof(channels));
 }
 
 /* Some thread functions used to implement some fifo commands.  These are
@@ -1459,6 +1377,9 @@ static void destroyChanMapper(void)
 static void *doPlayCmd(void *arg) 
 { 
   DevChan dc;
+#ifdef RTAI
+  DEBUG("doPlayCmd(%p) prio: %x\n", arg, rt_get_prio(rt_whoami()));
+#endif  
   dc.devchan_voidp = arg;
   L22Play(l22dev[dc.dev], dc.chan);
   return (void *)1; 
@@ -1485,6 +1406,9 @@ static void *doResetCmd(void *arg)
 static void *doEventCmd(void *arg) 
 {
   DevEvt de;  
+#ifdef RTAI
+  DEBUG("doEventCmd(%p) prio: %x\n", arg, rt_get_prio(rt_whoami()));
+#endif  
   de.devevt_voidp = arg;
   dispatchEvent(de.dev, de.evt);
   return (void *)1;
@@ -1493,9 +1417,10 @@ static void *doEventCmd(void *arg)
 static void *doCmdInRTThread(int cmd, void *arg)
 {
   void *(*func)(void *) = 0;
+  DEBUG("doCmdInRTThread(%d, %p)\n", cmd, arg);
   switch (cmd) {
   case FORCEEVENT: func = doEventCmd; break;
-  case RESET: func = doResetCmd; break;
+  case INITIALIZE: func = doResetCmd; break;
   case STOP_CMD: func = doStopCmd; break;
   case PLAY_CMD: func = doPlayCmd; break;
   default:
@@ -1503,20 +1428,77 @@ static void *doCmdInRTThread(int cmd, void *arg)
     return 0;
   }
   if (func) {
-    if ( pthread_self() == pthread_linux() ) {
+    if ( CURRENT_IS_LINUX() ) {
       /* we are not in an rt thread, so spawn a new thread and wait for it */
-      pthread_t thr;
+      pthread_t thr = 0;
       void * ret;
       int err = pthread_create(&thr, 0, func, arg);
+      DEBUG("doCmdInRTThread - CURRENT IS LINUX, creating RT thread\n");
       if (err) {
         ERROR("*** Internal Error *** Could not create RT thread in doCmdInRTThread: %d!\n", cmd);
         return 0;
       }
       pthread_join(thr, &ret);
       return ret;
-    } else  /* already in an rt-thread, just call the func */
-    return func(arg);  
+    } else {  /* already in an rt-thread, just call the func */
+        DEBUG("doCmdInRTThread - CURRENT IS NOT LINUX, no RT thread needed\n");
+        return func(arg);  
+    }
   }
   /* not _normally_ reached.. */
   return 0;
 }
+
+
+#ifdef FAKE_L22
+
+/* Dummy funcs for debugging */
+int L22SetVolume(L22Dev_t dev, unsigned chan, unsigned long volume)
+{
+    DEBUG("L22SetVolume(%d, %u, %lu)\n", dev, chan, volume);
+    return 1;
+}
+void L22Close(L22Dev_t dev) 
+{
+    DEBUG("L22Close(%d)\n", dev);
+}
+unsigned long L22GetVolume(L22Dev_t dev, unsigned chan)
+{
+    DEBUG("L22GetVolume(%d,%u)\n", dev, chan);
+    return 0xffff;
+}
+unsigned L22GetSampleRate(L22Dev_t dev)
+{
+    DEBUG("L22GetSampleRate(%d)\n", dev);
+    return 200000;
+}
+int L22Play(L22Dev_t dev, unsigned chan)
+{
+    DEBUG("L22Play(%d, %x)\n", dev, chan);
+    return 1;
+}
+L22Dev_t L22Open(int devno)
+{
+    DEBUG("L22Open(%d)\n", devno);
+    return devno;
+}
+void L22Stop(L22Dev_t dev, unsigned chan)
+{
+    DEBUG("L22Stop(%d, %x)\n", dev, chan);
+}
+int L22IsPlaying(L22Dev_t dev, unsigned chan)
+{
+    DEBUG("L22IsPlaying(%d, %x)\n", dev, chan);
+    return 1;
+}
+int L22GetNumDevices(void)
+{
+    DEBUG("L22GetNumDevices(void)\n");
+    return 4;
+}
+int L22SetAudioBuffer(L22Dev_t dev, void *buffer, unsigned long num_bytes, int format_code, unsigned chan_id, int looped)
+{
+    DEBUG("L22SetAudioBuffer(%d, %p, %lu, %d, %u, %d)\n", dev, buffer, num_bytes, format_code, chan_id, looped);
+    return 1;
+}
+#endif

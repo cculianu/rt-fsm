@@ -30,6 +30,7 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <new>
 #include <pthread.h>
 #include <semaphore.h>
 
@@ -47,7 +48,6 @@ SoundMachine *sm = 0;
 typedef std::list<ConnectedThread> ChildThreads;
 ChildThreads *childThreads = 0;
 pthread_mutex_t childThreadsMut = PTHREAD_MUTEX_INITIALIZER;
-
 
 class SoundMachine
 {
@@ -78,6 +78,9 @@ protected:
     Mode pm;
     void *shm_notype;
     SoundMachine(Mode m, void *shm) : pm(m), shm_notype(shm) {}
+    virtual void allocSBMem(SoundBuffer &sb) = 0;
+    virtual void freeSBMem(SoundBuffer &sb) const = 0;
+    friend class SoundBuffer;
 };
 
 SoundMachine::~SoundMachine() 
@@ -100,6 +103,9 @@ class KernelSM : public SoundMachine
 protected:    
     KernelSM(void *shm_);
     
+    void allocSBMem(SoundBuffer &sb);
+    void freeSBMem(SoundBuffer &sb) const;
+
 public:    
     virtual ~KernelSM();
     void reset(unsigned card);
@@ -123,7 +129,7 @@ class UserSM : public SoundMachine
     Timer timer;
     volatile bool threadRunning, chldThreadRunning, chldPleaseStop;
     volatile bool cardRunning;
-    volatile int lastEvent;
+    volatile int lastEvent, ctr;
     sem_t child_sem;
     static UserSM * volatile instance;
     
@@ -152,6 +158,9 @@ class UserSM : public SoundMachine
 protected:
     UserSM(void *s);
     
+    void allocSBMem(SoundBuffer &sb);
+    void freeSBMem(SoundBuffer &sb) const;
+
 public:    
     virtual ~UserSM();
     
@@ -180,6 +189,12 @@ class Warning : public Log
 {
 public:  
     Warning() : Log() { (*this) << "[" << TimeText() << " **WARNING**] "; }
+};
+
+class Error : public Log
+{
+public:  
+    Error() : Log() { (*this) << "[" << TimeText() << " ******ERROR******] "; }
 };
 
 class ConnectedThread
@@ -234,20 +249,28 @@ void ConnectedThread::stop()
 
 void *ConnectedThread::thrFunc(void *arg)
 {
+  long ret = 0;
   ConnectedThread *self = reinterpret_cast<ConnectedThread *>(arg);
-  pthread_detach(pthread_self());
-  static Mutex mut;
-  static volatile int thread_id_ctr = 0;
-  mut.lock();
-  self->myid = thread_id_ctr++;
-  mut.unlock();
-  self->running = true;
-  self->pleaseStop = false;
-  int ret = self->doConnection();
+  try {
+    pthread_detach(pthread_self());
+    static Mutex mut;
+    static volatile int thread_id_ctr = 0;
+    mut.lock();
+    self->myid = thread_id_ctr++;
+    mut.unlock();
+    self->running = true;
+    self->pleaseStop = false;
+    ret = self->doConnection();
+  } catch (const FatalException & e) {
+    Error() << "ConnectedThread " << self->myid << " caught FATAL exception: " << e.why() << " --  Exiting program...\n";      
+    std::abort();
+  } catch (const Exception & e) {
+    Error() << "ConnectedThread " << self->myid << " caught exception: " << e.why() << " -- Exiting thread...\n";
+  }
   if (childThreads) {
-    MutexLocker ml(childThreadsMut);
-    for (ChildThreads::iterator it = childThreads->begin(); it != childThreads->end(); ++it)
-    if (&(*it) == self)  { childThreads->erase(it); break; }
+      MutexLocker ml(childThreadsMut);
+      for (ChildThreads::iterator it = childThreads->begin(); it != childThreads->end(); ++it)
+      if (&(*it) == self)  { childThreads->erase(it); break; }
   }
   return (void *)ret;
 }
@@ -284,16 +307,16 @@ SoundMachine * SoundMachine::attach()
       return new UserSM(shm_notype);
   }
 
-  shm_notype = RTOS::shmAttach(SHM_NAME, SHM_SIZE, &shmStatus);
+  shm_notype = RTOS::shmAttach(SND_SHM_NAME, SND_SHM_SIZE, &shmStatus);
 
   if (!shm_notype)
-      throw Exception(std::string("Cannot attach to shm ") + SHM_NAME
+      throw Exception(std::string("Cannot attach to shm ") + SND_SHM_NAME
                         + ", error was: " + RTOS::statusString(shmStatus));
     
   Shm *shm = static_cast<Shm *>(shm_notype);
-  if (shm->magic != SHM_MAGIC) {
+  if (shm->magic != SND_SHM_MAGIC) {
       std::stringstream s;
-                  s << "Attached to shared memory buffer at " << shm_notype << " but the magic number is invaid! (" << reinterpret_cast<void *>(shm->magic) << " != " << reinterpret_cast<void *>(SHM_MAGIC) << ")\n";
+                  s << "Attached to shared memory buffer at " << shm_notype << " but the magic number is invaid! (" << reinterpret_cast<void *>(shm->magic) << " != " << reinterpret_cast<void *>(SND_SHM_MAGIC) << ")\n";
       s << "Shm Dump:\n";
       char *ptr = reinterpret_cast<char *>(shm_notype);
       for (unsigned i = 0; i < 16; ++i) {
@@ -375,15 +398,93 @@ private:
   int m, n;
 };
 
-struct SoundBuffer : public std::vector<char>
+struct SoundBuffer
 {
   SoundBuffer(unsigned long size,
-              int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms = 0, int loop_flg = 0) 
-    : std::vector<char>(size),
-      id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg)
-  { resize(size); }
+              int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms = 0, int loop_flg = 0);
+  ~SoundBuffer();
+  
+  unsigned long size() const { return len_bytes; }
+  
   int id, chans, sample_size, rate, stop_ramp_tau_ms, loop_flg;
+  const char *name() const { return nam.c_str(); }
+  
+  unsigned char & operator[](int i) { return mem[i]; }
+  const unsigned char & operator[](int i) const { return mem[i]; }
+  
+ private:
+  unsigned long len_bytes;
+  unsigned char *mem;
+  std::string nam;
+  
+  friend class KernelSM;
+  friend class UserSM;
 };
+
+void KernelSM::allocSBMem(SoundBuffer & sb)
+{
+      
+    mut.lock();
+    unsigned n = ++shm->ctr;
+    mut.unlock();
+    std::ostringstream s;
+    s << "sb" << n;
+    sb.nam = s.str();
+    RTOS::ShmStatus status;
+    sb.mem = static_cast<unsigned char *>(RTOS::shmAttach(sb.name(), sb.len_bytes, &status, true));
+    if (!sb.mem) {
+        s.str() = "";
+        s << "Could not create a new rt-shm of length " << sb.len_bytes << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
+        throw Exception(s.str());
+    }
+}
+
+void UserSM::allocSBMem(SoundBuffer & sb)
+{
+    std::ostringstream s;
+    s << "sb";
+    mut.lock();
+    s << ++ctr;
+    mut.unlock();
+    sb.nam = s.str(); 
+    try {
+        sb.mem = new unsigned char[sb.len_bytes];
+    } catch (const std::bad_alloc & e) {
+        throw Exception(std::string("Could not allocate memory for sound buffer: ") + e.what());
+    }
+}
+
+SoundBuffer::SoundBuffer(unsigned long size,
+                         int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms, 
+                         int loop_flg) 
+    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), len_bytes(size), mem(0)
+{
+    if (!sm) throw Exception("Global variable 'sm' needs to be set and point to a SoundMachine object!");
+    sm->allocSBMem(*this);
+}
+
+void UserSM::freeSBMem(SoundBuffer & sb) const
+{
+    delete [] sb.mem;
+    sb.mem = 0;
+}
+
+void KernelSM::freeSBMem(SoundBuffer & sb) const
+{
+    RTOS::ShmStatus status;
+    RTOS::shmDetach(sb.mem, &status);
+    if (status != RTOS::Ok) {
+        Error() << "Detach of shm: " << sb.name() << " reported error: " << RTOS::statusString(status) << "\n";
+    }
+    sb.mem = 0;
+}
+
+SoundBuffer::~SoundBuffer()
+{
+    if (!mem) return;
+    if (!sm) throw Exception("Global variable 'sm' needs to be set and point to a SoundMachine object!");
+    sm->freeSBMem(*this);
+}
 
 void doServer(void)
 {
@@ -507,14 +608,19 @@ int ConnectedThread::doConnection(void)
               Log() << "Warning soundfile of " << bytes << " truncated to 128MB!" << std::endl; 
 
             SoundBuffer sound(bytes, id, chans, samplesize, rate, stop_ramp_tau_ms, loop);
-
+            
             Log() << "Getting ready to receive sound  " << sound.id << " length " << sound.size() << std::endl; 
             Timer xferTimer;
             count = sockReceiveData(&sound[0], sound.size());	    
             double xt = xferTimer.elapsed();
             if (count == (int)sound.size()) {
               Log() << "Received " << count << " bytes in " << xt << " seconds (" << ((count*8)/1e6)/xt << " mbit/s)" << std::endl; 
-              cmd_error = !sm->setSound(mycard, sound);
+              try {
+                cmd_error = !sm->setSound(mycard, sound);
+              } catch (const Exception & e) {
+                Log() << "Caught exception from sm->setSound(): " << e.why() << "\n";
+                cmd_error = true;
+              }
             } else if (count <= 0) {
               break;
             }
@@ -688,32 +794,21 @@ bool KernelSM::setSound(unsigned card, const SoundBuffer & s)
   msg->id = SOUND;
 
   Timer timer;
-  
-  unsigned long sent = 0;
-  while(sent < s.size()) {
 
-    // setup matrix here..
-    msg->u.sound.bits_per_sample = s.sample_size;
-    msg->u.sound.id = s.id;
-    msg->u.sound.chans = s.chans;
-    msg->u.sound.rate = s.rate;
-    msg->u.sound.total_size = s.size();
-    msg->u.sound.stop_ramp_tau_ms = s.stop_ramp_tau_ms;
-    msg->u.sound.is_looped = s.loop_flg;
+  strncpy(msg->u.sound.name, s.name(), SNDNAME_SZ);
+  msg->u.sound.name[SNDNAME_SZ-1] = 0;
+  msg->u.sound.size = s.size();
+  msg->u.sound.bits_per_sample = s.sample_size;
+  msg->u.sound.id = s.id;
+  msg->u.sound.chans = s.chans;
+  msg->u.sound.rate = s.rate;
+  msg->u.sound.stop_ramp_tau_ms = s.stop_ramp_tau_ms;
+  msg->u.sound.is_looped = s.loop_flg;
 
-    unsigned bytes = s.size() - sent;
-    msg->u.sound.append = sent ? 1 : 0;
-    if (bytes > MSG_SND_SZ) bytes = MSG_SND_SZ;
-    msg->u.sound.size = bytes;
-    memcpy(msg->u.sound.snd, &s[0] + sent, bytes);
+  sendToRT(card, *msg);
 
-    sendToRT(card, *msg);
-
-    // todo: check msg->u.transfer_ok and report errors..
-    if (!msg->u.sound.transfer_ok) return false;
-
-    sent += bytes;
-  }
+  // todo: check msg->u.transfer_ok and report errors..
+  if (!msg->u.sound.transfer_ok) return false;
 
   Log() << "Sent sound to kernel in " << unsigned(timer.elapsed()*1000) << " millisecs." << std::endl; 
 
@@ -727,7 +822,7 @@ KernelSM::KernelSM(void *s)
      fifo_in[i] = RTOS::openFifo(shm->fifo_out[i]);
      if (!fifo_in[i]) throw Exception ("Could not open RTF fifo_in for reading");
      fifo_out[i] = RTOS::openFifo(shm->fifo_in[i], RTOS::Write);
-     if (!fifo_out[i]) throw Exception ("Could not open RTF fifo_in for writing");
+     if (!fifo_out[i]) throw Exception ("Could not open RTF fifo_out for writing");
    }
 }
 
@@ -746,7 +841,10 @@ void KernelSM::sendToRT(unsigned card, FifoMsg & msg) const
 {
   // lock SHM here??
   MutexLocker ml(mut);
-
+  
+  if (shm->magic != SND_SHM_MAGIC)
+      throw FatalException("ARGH! The rt-shm was cleared from underneath us!  Did we lose the kernel module?");
+  
   std::memcpy(const_cast<FifoMsg *>(&shm->msg[card]), &msg, sizeof(FifoMsg));
 
   FifoNotify_t dummy = 1;    
@@ -773,7 +871,7 @@ void KernelSM::sendToRT(unsigned card, FifoMsgID cmd) const
   std::auto_ptr<FifoMsg> msg(new FifoMsg);
 
   switch (cmd) {
-  case RESET:
+  case INITIALIZE:
   case PAUSEUNPAUSE:
   case INVALIDATE:
     msg->id = cmd;
@@ -787,7 +885,7 @@ void KernelSM::sendToRT(unsigned card, FifoMsgID cmd) const
 
 void KernelSM::reset(unsigned card)
 {
-    sendToRT(card, RESET);
+    sendToRT(card, INITIALIZE);
 }
 
 void KernelSM::halt(unsigned card)
@@ -839,7 +937,7 @@ UserSM * volatile UserSM::instance = 0;
 
 UserSM::UserSM(void *s)
     : SoundMachine(Userspace, s), shm(static_cast<UTShm *>(s)),
-      threadRunning(false), chldThreadRunning(false), chldPleaseStop(false), cardRunning(true), lastEvent(0)
+      threadRunning(false), chldThreadRunning(false), chldPleaseStop(false), cardRunning(true), lastEvent(0), ctr(0)
 {
     if (instance) 
         throw Exception("Multiple instances of class UserSM have been constructed.  Only 1 instance allowed globally! Argh!");

@@ -339,7 +339,15 @@ extern "C"
   { 
     pthread_detach(pthread_self());
     ConnectionThread *me = static_cast<ConnectionThread *>(arg);
-    void * ret = me->threadFunc();  
+    void * ret;
+    try {
+        ret = me->threadFunc();  
+    } catch (const FatalException & e) {
+        Log() << "Caught FATAL exception: " << e.why() << " --  Exiting program...\n";      
+        std::abort();
+    } catch (const Exception & e) {
+        Log() << "Caught exception: " << e.why() << " -- Exiting thread...\n";
+    }
     // now, try and reap myself..
     MutexLocker ml(connectedThreadsLock);
     ConnectedThreadsList::iterator it;
@@ -1070,6 +1078,9 @@ void *ConnectionThread::threadFunc(void)
 void ConnectionThread::sendToRT(ShmMsg & msg) // note param name masks class member
 {
   MutexLocker locker(fsms[fsm_id].msgFifoLock);
+  
+  if (shm->magic != FSM_SHM_MAGIC)
+    throw FatalException("ARGH! The rt-shm was cleared from underneath us!  Did we lose the kernel module?");
 
   std::memcpy(const_cast<ShmMsg *>(&shm->msg[fsm_id]), &msg, sizeof(msg));
 

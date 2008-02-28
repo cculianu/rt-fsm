@@ -4,10 +4,11 @@
 #include "IntTypes.h"
 
 #ifdef __cplusplus
+#include <string.h>
 extern "C" {
 #endif
 
-#define MSG_SND_SZ (1024*1024) /* 1MB per chunk of sound transferred to kernel.. */
+#define SNDNAME_SZ (8) 
 #define MAX_SND_ID 0x80
 
 #define MAX_CARDS 6 /* Keep this the same as L22_MAX_DEVS in LynxTWO-RT.h! */
@@ -16,7 +17,7 @@ enum FifoMsgID {
     GETPAUSE,  /**< Query to find out if it is paused. */
     PAUSEUNPAUSE, /**< Halt the trigger detect (temporarily).  No variables
                      are cleared but events cannot generate new snd play. */
-    RESET, /**< Reset/Initialize. */
+    INITIALIZE, /**< Reset/Initialize. */
     GETVALID,  /**< Query to find out if it has any valid sound.*/
     INVALIDATE, /**< Invalidate (clear) the state machine specification, 
                    but preserve other system variables. */
@@ -37,27 +38,20 @@ struct FifoMsg {
       /** For id == SOUND */
       struct {
         /* Sound Specification */   
-        unsigned char snd[MSG_SND_SZ];
+        char name[SNDNAME_SZ]; /**< The name of the shm to attach to */
+        unsigned long size; /**< The size of the shm to attach to */
+        
         unsigned bits_per_sample; /**< 8, 16, 24, or 32 are allowed */
         unsigned chans; /**< 1 or 2 */
         unsigned rate; /**< 8kHz - 200 kHz */
         unsigned id; /**< The trigger id.  This corresponds to the digital lines 
                           used to trigger the sound.. */
-        unsigned size;
         unsigned stop_ramp_tau_ms; /**< The number of ms to do the cosine-squared
                                       amplitude ramp-down when stopping a sound
                                       prematurely. 0 to disable this. */
-        unsigned long total_size; /**< For multiple transfers, the final size..*/
         int is_looped; /**< if true, this sound should play in a loop whenever
                           it is triggered.  Otherwise the sound will stop
                           normally after 1 playing. */
-        int append; /**< If true, append this sound buffer
-                       to the previous one of the same id..
-                       If false, no append, just overwrite and be done with it.
-                       Note to overwite the current sound:
-                       1. write a soundfile with no append.
-                       2. Then keep writing the soundfile with append=1 until 
-                          done.*/
         int transfer_ok; /**< True is written by kernel to indicate transter was 
                             ok, otherwise writes 0 to indicate error..  */
       } sound;
@@ -78,6 +72,9 @@ struct FifoMsg {
       int last_event; /**< The current/last event, or 0 if none */
 
     } u;
+#ifdef __cplusplus
+    FifoMsg() { memset(this, 0, sizeof(*this)); }
+#endif
   };
   
   /**
@@ -95,6 +92,7 @@ struct FifoMsg {
                            wasteful double-copying.  It's faster to use
                            the shm directly, and only use the FIFO for 
                            synchronization and notification.                 */
+    volatile unsigned long ctr; /**< Used to generate unique sound buffer shm names */
     const unsigned num_cards;
   };
 
@@ -107,9 +105,9 @@ struct FifoMsg {
   typedef struct Shm Shm;
 #endif
 
-#define SHM_NAME "STrigShm"
-#define SHM_MAGIC ((int)(0xf00d0607)) /*< Magic no. for shm... 'food0607'  */
-#define SHM_SIZE (sizeof(struct Shm))
+#define SND_SHM_NAME "STrigShm"
+#define SND_SHM_MAGIC ((int)(0xf00d0609)) /*< Magic no. for shm... 'food0609'  */
+#define SND_SHM_SIZE (sizeof(struct Shm))
 
 #ifdef __cplusplus
 }

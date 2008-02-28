@@ -565,6 +565,7 @@ void cleanup (void)
       if (shm->fifo_nrt_output[f] >= 0) rtf_destroy(shm->fifo_nrt_output[f]);
     }
     if (shm->fifo_debug >= 0) rtf_destroy(shm->fifo_debug);
+    memset((void *)shm, 0, sizeof(*shm));
     mbuff_free(FSM_SHM_NAME, (void *)shm); 
     shm = 0; 
   }
@@ -589,7 +590,7 @@ void cleanup (void)
   }
 
 #ifdef RTAI  
-  stop_rt_timer();
+  /*stop_rt_timer(); NB: leave timer running just in case we have other threads.. */
 #endif
   printStats();
 }
@@ -657,19 +658,19 @@ static int initFifos(void)
   /* Open up fifos here.. */
   
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
-    err = find_free_rtf(&minor, FIFO_SZ);
+    err = rtf_find_free(&minor, FIFO_SZ);
     if (err < 0) return 1;
     shm->fifo_out[f] = minor;
-    err = find_free_rtf(&minor, FIFO_SZ);
+    err = rtf_find_free(&minor, FIFO_SZ);
     if (err < 0) return 1;
     shm->fifo_in[f] = minor;
-    err = find_free_rtf(&minor, FIFO_TRANS_SZ);
+    err = rtf_find_free(&minor, FIFO_TRANS_SZ);
     if (err < 0) return 1;
     shm->fifo_trans[f] = minor;
-    err = find_free_rtf(&minor, FIFO_DAQ_SZ);
+    err = rtf_find_free(&minor, FIFO_DAQ_SZ);
     if (err < 0) return 1;
     shm->fifo_daq[f] = minor;
-    err = find_free_rtf(&minor, FIFO_NRT_OUTPUT_SZ);
+    err = rtf_find_free(&minor, FIFO_NRT_OUTPUT_SZ);
     if (err < 0) return 1;
     shm->fifo_nrt_output[f] = minor;
     
@@ -677,7 +678,7 @@ static int initFifos(void)
   }
 
   if (debug) {
-    err = find_free_rtf(&minor, 3072); /* 3kb fifo enough? */  
+    err = rtf_find_free(&minor, 3072); /* 3kb fifo enough? */  
     if (err < 0) return 1;
     shm->fifo_debug = minor;
     DEBUG("FIFOS: Debug %d\n", shm->fifo_debug);
@@ -1167,7 +1168,7 @@ static int comediCallback(unsigned int mask, void *ignored)
     { 
       unsigned long flags;
       
-      rtl_critical(flags); /* Lock machine, disable interrupts.. to avoid
+      rt_critical(flags); /* Lock machine, disable interrupts.. to avoid
                               race conditions with RT since we write to 
                               ai_samples. */
 
@@ -1181,7 +1182,7 @@ static int comediCallback(unsigned int mask, void *ignored)
 
       /* consume all full scans up to present... */
       comedi_mark_buffer_read(dev_ai, subdev_ai, numScans * oneScanBytes);
-      rtl_end_critical(flags); /* Unlock machine, reenable interrupts... */
+      rt_end_critical(flags); /* Unlock machine, reenable interrupts... */
 
       /* puts chan0 to the debug fifo iff in debug mode */
       putDebugFifo(ai_samples[0]); 
@@ -2723,19 +2724,29 @@ static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num)
 static const char *uint64_to_cstr(uint64 num)
 {
   static char buf[10][21];
-  static volatile unsigned i = 0;
-  i %= 10;
+  static atomic_t index = ATOMIC_INIT(0);
+  long flags;
+  unsigned i;
+  rt_critical(flags);
+  i = ((unsigned)atomic_read(&index)) % 10;
+  atomic_inc(&index);
+  rt_end_critical(flags);
   uint64_to_cstr_r(buf[i], 21, num);
-  return buf[i++];
+  return buf[i];
 }
 
 static const char *int64_to_cstr(int64 num)
 {
   static char buf[10][22];
-  static volatile unsigned i = 0;
-  i %= 10;
+  static atomic_t index = ATOMIC_INIT(0);
+  long flags;
+  unsigned i;
+  rt_critical(flags);
+  i = ((unsigned)atomic_read(&index)) % 10;
+  atomic_inc(&index);
+  rt_end_critical(flags);
   int64_to_cstr_r(buf[i], 22, num);
-  return buf[i++];
+  return buf[i];
 }
 
 static inline long Micro2Sec(long long micro, unsigned long *remainder)
@@ -3218,18 +3229,18 @@ static void swapFSMs(FSMID_t f)
   unsigned long flags;
   stopActiveWaves(f); /* since we are starting a new trial, force any
                          active timer waves to abort! */ 
-  rtl_critical(flags);
+  rt_critical(flags);
   CALL_EMBC(f, cleanup);
-  rtl_end_critical(flags);
+  rt_end_critical(flags);
   rs[f].states = OTHER_FSM_PTR(f); /* swap in the new fsm.. */
   /*LOG_MSG("Cycle: %lu  Got new FSM\n", (unsigned long)cycle);*/
   updateHasSchedWaves(f); /* just updates rs.states->has_sched_waves flag*/
   reconfigureIO(); /* to have new routing take effect.. */
   rs[f].valid = 1; /* Unlock FSM.. */
   rs[f].pending_fsm_swap = 0; 
-  rtl_critical(flags);
+  rt_critical(flags);
   CALL_EMBC(f, init);
-  rtl_end_critical(flags);
+  rt_end_critical(flags);
   if (NUM_ROWS(f) && NUM_ROWS(f) >= rs[f].current_state)
     gotoState(f, 0, -1); /* force a state 0 if the new fsm doesn't contain current_state!! */
 }
@@ -3240,9 +3251,9 @@ static void unloadDetachFSM(struct FSMSpec *fsm)
     if (*embc) {
       if ((*embc)->cleanup) {
         unsigned long flags;
-        rtl_critical(flags);
+        rt_critical(flags);
         (*embc)->cleanup();
-        rtl_end_critical(flags);
+        rt_end_critical(flags);
       }
       (*embc)->unlock(); /* decrease use count .. was incremented by fsmLinkProgram */
       mbuff_detach(fsm->shm_name, *embc);
