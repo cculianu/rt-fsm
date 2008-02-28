@@ -1,5 +1,5 @@
-SRC = SoundServer.cpp rtos_utility.cpp WavFile.cpp
-PRG_OBJS = SoundServer.o rtos_utility.o WavFile.o
+SRC = SoundServer.cpp rtos_utility.cpp WavFile.cpp Util.cpp
+PRG_OBJS = SoundServer.o rtos_utility.o WavFile.o Util.o
 PRG = SoundServer
 CXX=g++
 CXXFLAGS=-W -Wall -g -I../../include -I ../UserspaceExtTrig -I ../../user
@@ -10,6 +10,9 @@ CXXFLAGS=-W -Wall -g -I../../include -I ../UserspaceExtTrig -I ../../user
 all: .deps $(PRG) 
 
 rtos_utility.o: ../../user/rtos_utility.cpp
+	$(CC) $(CXXFLAGS) -c -o $@ $<
+
+Util.o: ../../user/Util.cpp
 	$(CC) $(CXXFLAGS) -c -o $@ $<
 
 $(PRG): $(PRG_OBJS)

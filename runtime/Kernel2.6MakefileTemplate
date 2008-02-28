@@ -18,15 +18,13 @@ install:
 
 clean:
 	-rm -f *.o *.ko .*.cmd .*.flags *.mod.c *~
+	make -C $(KDIR) M=$(PWD) clean
 
 else	
 
 obj-m      := $(TARGET).o
 
 $(TARGET)-objs := $(OBJS)
-
-$(TARGET).o: $(OBJS)
-	$(LD) $(LD_RFLAG) -r -o $@ $(OBJS)
 
 -include $(KDIR)/Rules.make
 
