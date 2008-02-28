@@ -4,6 +4,7 @@
 #include "Mutex.h"
 #include "UserspaceExtTrig.h"
 #include "WavFile.h"
+#include "Util.h"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -31,10 +32,6 @@
 #include <memory>
 #include <pthread.h>
 #include <semaphore.h>
-
-#ifndef ABS
-#define ABS(a) ( (a) < 0 ? -(a) : (a) )
-#endif
 
 class ConnectedThread;
 struct Matrix;
@@ -117,16 +114,6 @@ public:
     bool setSound(unsigned card, const SoundBuffer &);
 };
 
-class Timer
-{
-public:
-  Timer() { reset(); }
-  void reset();
-  double elapsed() const; // returns number of seconds since ctor or reset() was called 
-private:
-  struct timeval ts;
-};
-
 class UserSM : public SoundMachine
 {
     UTShm *shm;
@@ -182,19 +169,18 @@ public:
         
 
 
-static std::ostream & log(int ignored = 0)
+class Debug : public Log
 {
-  (void)ignored;
-  return std::cerr;
-}
+public:  
+    Debug(bool print = (::debugLvl > 0)) : Log() { suppress = !print; (*this) << "DEBUG: "; }
+    
+};
 
-static std::ostream & debug(int ignored = 0)
+class Warning : public Log
 {
-    static std::ofstream dummy;
-    (void)ignored;
-    if (debugLvl > 0) return log() << "DEBUG: ";
-    return dummy; // is an error to write to this.. so data is discarded
-}
+public:  
+    Warning() : Log() { (*this) << "[" << TimeText() << " **WARNING**] "; }
+};
 
 class ConnectedThread
 {
@@ -213,10 +199,9 @@ private:
   static pthread_mutex_t mut;
   static void *thrFunc(void *arg);
 
-  std::ostream &log(int i = -1) 
+  ::Log Log() 
   { 
-    if (i == 0) return ::log(i); // unlock, so don't output anything extra...
-    return ::log(i) << "[Thread " << myid << " (" << remoteHost << ")] "; 
+    return ::Log() << "[" << TimeText() << " Thread " << myid << " (" << remoteHost << ")] "; 
   }
 
   int doConnection();
@@ -235,8 +220,7 @@ ConnectedThread::~ConnectedThread()
 { 
   if (running) {
   	stop();	
-  	log(1) <<  "deleted." << std::endl;
-  	log(0);
+  	Log() <<  "deleted." << std::endl;
     running = false;
     pleaseStop = true;
   }
@@ -280,17 +264,6 @@ int ConnectedThread::start(int sock_fd, const std::string & rhost)
 
 /* NOTE that all functions in this program have the potential to throw
  * Exception on failure (which is why they seem not to haev error status return values) */
-class Exception
-{
-public:
-  Exception(const std::string & reason = "") : reason(reason) {}
-  virtual ~Exception() {}
-
-  const std::string & why() const { return reason; }
-
-private:
-  std::string reason;
-};
 
 SoundMachine * SoundMachine::attach()
 {
@@ -378,7 +351,7 @@ extern "C" void sighandler(int sig)
     break; // ignore SIGPIPE..
 
   default:
-    log() << "Caught signal " << sig << " cleaning up..." << std::endl;     
+    std::cerr << "Caught signal " << sig << " cleaning up..." << std::endl;     
     pleaseStop = true;
     ::close(listen_fd);
     listen_fd = -1;
@@ -412,19 +385,6 @@ struct SoundBuffer : public std::vector<char>
   int id, chans, sample_size, rate, stop_ramp_tau_ms, loop_flg;
 };
 
-void Timer::reset()
-{
-  ::gettimeofday(&ts, NULL);
-}
-
-double Timer::elapsed() const
-{
-  if (ts.tv_sec == 0) return 0.0;
-  struct timeval tv;
-  ::gettimeofday(&tv, NULL);
-  return tv.tv_sec - ts.tv_sec + (tv.tv_usec - ts.tv_usec)/1000000.0;
-}
-
 void doServer(void)
 {
   //do the server listen, etc..
@@ -440,13 +400,13 @@ void doServer(void)
   inaddr.sin_port = htons(listenPort);
   inet_aton("0.0.0.0", &inaddr.sin_addr);
 
-  log() << "Sound Server version " << VersionSTR << std::endl;
-  log() << "Sound play mode: " << (sm->mode() == SoundMachine::Kernelspace ? "Kernel (Hard RT)" : "Userspace (non-RT)") << std::endl;
-  log() << "Listening for connections on port: " << listenPort << std::endl; 
+  Log() << "Sound Server version " << VersionSTR << std::endl;
+  Log() << "Sound play mode: " << (sm->mode() == SoundMachine::Kernelspace ? "Kernel (Hard RT)" : "Userspace (non-RT)") << std::endl;
+  Log() << "Listening for connections on port: " << listenPort << std::endl; 
 
   int parm = 1;
   if (::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &parm, sizeof(parm)) )
-    log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
+    Log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
   
   if ( ::bind(listen_fd, (struct sockaddr *)&inaddr, addr_sz) != 0 ) 
     throw Exception(std::string("bind: ") + strerror(errno));
@@ -465,15 +425,15 @@ void doServer(void)
     }
 
     if (::setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &parm, sizeof(parm)) )
-      log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
+      Log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
     
     childThreads->push_back(ConnectedThread());
     ConnectedThread & conn = childThreads->back();
     if ( conn.start(sock, inet_ntoa(inaddr.sin_addr)) == 0 ) {
-      log(1) << "Started new thread, now have " << childThreads->size() << " total." 
-             << std::endl; log(0);
+      Log() << "Started new thread, now have " << childThreads->size() << " total." 
+             << std::endl; 
     } else {
-      log(1) << "Error starting connection thread!\n"; log(0);
+      Log() << "Error starting connection thread!\n";
       childThreads->pop_back();
     }
   }
@@ -501,7 +461,7 @@ int main(int argc, const char *argv[])
 
   } catch (const Exception & e) {
 
-    log(1) << e.why() << std::endl; log(0);
+    Log() << e.why() << std::endl; 
     ret = 1;
 
   }
@@ -515,7 +475,7 @@ int ConnectedThread::doConnection(void)
 {
     Timer connectionTimer;
 
-    log(1) << "Connection received from host " << remoteHost << std::endl; log(0);
+    Log() << "Connection received from host " << remoteHost << std::endl;
    
     std::string line;
     int count;
@@ -540,20 +500,20 @@ int ConnectedThread::doConnection(void)
           rate = static_cast<int>(rate_dbl);
           if (id && bytes && chans && samplesize && rate) {
             if ( (count = sockSend("READY\n")) <= 0 ) {
-              log(1) << "Send error..." << std::endl; log(0);
+              Log() << "Send error..." << std::endl;
               break;
             }
             if (bytes > (128*1024*1024) && (bytes = (128*1024*1024)) )
-              log(1) << "Warning soundfile of " << bytes << " truncated to 128MB!" << std::endl; log(0);
+              Log() << "Warning soundfile of " << bytes << " truncated to 128MB!" << std::endl; 
 
             SoundBuffer sound(bytes, id, chans, samplesize, rate, stop_ramp_tau_ms, loop);
 
-            log(1) << "Getting ready to receive sound  " << sound.id << " length " << sound.size() << std::endl; log(0);
+            Log() << "Getting ready to receive sound  " << sound.id << " length " << sound.size() << std::endl; 
             Timer xferTimer;
             count = sockReceiveData(&sound[0], sound.size());	    
             double xt = xferTimer.elapsed();
             if (count == (int)sound.size()) {
-              log(1) << "Received " << count << " bytes in " << xt << " seconds (" << ((count*8)/1e6)/xt << " mbit/s)" << std::endl; log(0);
+              Log() << "Received " << count << " bytes in " << xt << " seconds (" << ((count*8)/1e6)/xt << " mbit/s)" << std::endl; 
               cmd_error = !sm->setSound(mycard, sound);
             } else if (count <= 0) {
               break;
@@ -615,7 +575,7 @@ int ConnectedThread::doConnection(void)
           }
         }
       } else if ( line.find("EXIT") == 0 || line.find("BYE") == 0 || line.find("QUIT") == 0) {
-        log(1) << "Graceful exit requested." << std::endl; log(0);
+        Log() << "Graceful exit requested." << std::endl; 
         break;
       } else if (line.find("NOOP") == 0) {
         // noop is just used to test the connection, keep it alive, etc
@@ -633,9 +593,9 @@ int ConnectedThread::doConnection(void)
 
     }
     
-    log(1) << "Connection to host " << remoteHost << " ended after " << connectionTimer.elapsed() << " seconds." << std::endl; log(0);
+    Log() << "Connection to host " << remoteHost << " ended after " << connectionTimer.elapsed() << " seconds." << std::endl;
     
-    log(1) << " thread exit." << std::endl; log(0);
+    Log() << " thread exit." << std::endl;
     return 0;
 }
 
@@ -651,15 +611,15 @@ int ConnectedThread::sockSend(const void *buf, size_t len, bool is_binary, int f
     std::stringstream ss;
     ss << "Sending: " << charbuf; 
     if (charbuf[len-1] != '\n') ss << std::endl;
-    log(1) << ss.str() << std::flush;
+    Log() << ss.str() << std::flush;
   } else
-    log(1) << "Sending binary data of length " << len << std::endl; log(0);  
+    Log() << "Sending binary data of length " << len << std::endl; 
 
   int ret = ::send(sock, buf, len, flags);
   if (ret < 0) {
-    log(1) << "ERROR returned from send: " << strerror(errno) << std::endl; log(0);
+    Log() << "ERROR returned from send: " << strerror(errno) << std::endl; 
   } else if (ret != (int)len) {
-    log(1) << "::send() returned the wrong size; expected " << len << " got " << ret << std::endl; log(0);
+    Log() << "::send() returned the wrong size; expected " << len << " got " << ret << std::endl; 
   }
   return ret;
 }
@@ -684,7 +644,7 @@ std::string ConnectedThread::sockReceiveLine()
   // now, trim trailing spaces
   while(slen && ::isspace(buf[slen-1])) { buf[--slen] = 0; }
   rets = buf;
-  log(1) << "Got: " << rets << std::endl; log(0);
+  Log() << "Got: " << rets << std::endl;
   return rets;
 }
 
@@ -697,10 +657,10 @@ int ConnectedThread::sockReceiveData(void *buf, int size, bool is_binary)
     int ret = ::recv(sock, (char *)(buf) + nread, size - nread, 0);
     
     if (ret < 0) {
-      log(1) << "ERROR returned from recv: " << strerror(errno) << std::endl; log(0);
+      Log() << "ERROR returned from recv: " << strerror(errno) << std::endl; 
       return ret;
     } else if (ret == 0) {
-      log(1) << "ERROR in recv, connection probably closed." << std::endl; log(0);
+      Log() << "ERROR in recv, connection probably closed." << std::endl; 
       return ret;
     } 
     nread += ret;
@@ -710,11 +670,11 @@ int ConnectedThread::sockReceiveData(void *buf, int size, bool is_binary)
   if (!is_binary) {
     char *charbuf = static_cast<char *>(buf);
     charbuf[size-1] = 0;
-    log(1) << "Got: " << charbuf << std::endl; log(0);
+    Log() << "Got: " << charbuf << std::endl;
   } else {
-    log(1) << "Got: " << nread << " bytes." << std::endl; log(0);
+    Log() << "Got: " << nread << " bytes." << std::endl; 
     if (nread != size) {
-      log(1) << "INFO ::recv() returned the wrong size; expected " << size << " got " << nread << std::endl; log(0);
+      Log() << "INFO ::recv() returned the wrong size; expected " << size << " got " << nread << std::endl; 
     }
   }
   return nread;
@@ -722,7 +682,7 @@ int ConnectedThread::sockReceiveData(void *buf, int size, bool is_binary)
 
 bool KernelSM::setSound(unsigned card, const SoundBuffer & s)
 {
-  log(1) << "Soundfile is: bytes: " << s.size() << " chans: " << s.chans << "  sample_size: " << s.sample_size << "  rate: " << s.rate << std::endl; log(0);
+  Log() << "Soundfile is: bytes: " << s.size() << " chans: " << s.chans << "  sample_size: " << s.sample_size << "  rate: " << s.rate << std::endl; 
 
   std::auto_ptr<FifoMsg> msg(new FifoMsg);
   msg->id = SOUND;
@@ -755,7 +715,7 @@ bool KernelSM::setSound(unsigned card, const SoundBuffer & s)
     sent += bytes;
   }
 
-  log(1) << "Sent sound to kernel in " << unsigned(timer.elapsed()*1000) << " millisecs." << std::endl; log(0);
+  Log() << "Sent sound to kernel in " << unsigned(timer.elapsed()*1000) << " millisecs." << std::endl; 
 
   return true;
 }
@@ -946,7 +906,7 @@ void UserSM::fifoReadThr()
             if (ret > 0) { n-=ret; tot += ret; }
             else break; // hmm.. weird error from fifo read..
         }
-        //log() << "(Discaded " << tot << " bytes of stale data from fifo)" << std::endl;
+        //Log() << "(Discaded " << tot << " bytes of stale data from fifo)" << std::endl;
     }
     
     // now, just loop indefinitely reading the fifo with a blocking read
@@ -954,7 +914,7 @@ void UserSM::fifoReadThr()
         pthread_testcancel(); 
         if (ret > 0) trigger(msg.target, msg.data); // ret == 0 when we catch a signal...?
     }
-    debug() << "exiting fifoReadThr with ret " << ret << " errno: " << strerror(errno) << "\n";
+    Debug() << "exiting fifoReadThr with ret " << ret << " errno: " << strerror(errno) << "\n";
 }
 
 bool UserSM::soundExists(unsigned id) const
@@ -970,39 +930,39 @@ void UserSM::trigger(unsigned card, int trig)
 
 void UserSM::trigger_nolock(unsigned card, int trig)
 {
-    debug() << "in trigger_nolock with card " << card << " trig " << trig << "\n";
+    Debug() << "in trigger_nolock with card " << card << " trig " << trig << "\n";
 
     if (card < getNCards() && soundExists(ABS(trig))) {
         lastEvent = trig;
         SoundFileMap::iterator it = soundFileMap.find(ABS(trig));
         if (it->second.pid) { // untrig always!
-            debug() << "untriggering (killin proc)  " << it->second.pid << "\n";
+            Debug() << "untriggering (killin proc)  " << it->second.pid << "\n";
             ::kill(it->second.pid, SIGTERM);
             it->second.pid = 0;
         } 
         if (trig > 0) { // (re)trigger
-            debug() << "forking..\n";
+            Debug() << "forking..\n";
             int pid = fork();
             if (pid > 0) { // parent
                 it->second.pid = pid;
             } else if (pid == 0) { // child
                 int ret = execl("/usr/bin/play", "/usr/bin/play", it->second.filename.c_str(), (char *)NULL);
                 if (ret)
-                    log() << "Error executing command: /usr/bin/play " << it->second.filename << ": " << strerror(errno) << std::endl;
+                    Log() << "Error executing command: /usr/bin/play " << it->second.filename << ": " << strerror(errno) << std::endl;
                 std::exit(-1);
             } else {
-                log() << "Could not trigger sound #" << trig << ", fork error: " << strerror(errno) << std::endl;
+                Log() << "Could not trigger sound #" << trig << ", fork error: " << strerror(errno) << std::endl;
             }
         }
     } else {
-        log() << "WARNING: Kernel told us to play sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";
+        Warning() << "Kernel told us to play sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";
     }
 }
 
 void UserSM::childSH(int sig)
 {
     if (!instance) return;
-    debug() << "in UserSM::childSH, posting to sem\n";
+    Debug() << "in UserSM::childSH, posting to sem\n";
     if (sig == SIGCHLD) sem_post(&instance->child_sem);
 }
 
@@ -1012,16 +972,16 @@ void UserSM::childReaper()
     chldThreadRunning = true;
     // reap dead children... until we receive a cancellation request which I *think* should cause us to return with EINTR out of wait()?
     while ( !chldPleaseStop && sem_wait(&child_sem) == 0 ) {
-        debug() << "in UserSM::childReaper woke up from sem\n";
+        Debug() << "in UserSM::childReaper woke up from sem\n";
         while ( !chldPleaseStop && (pid = wait(&status)) > 0 ) {
             if ( chldPleaseStop ) break;
-            debug() << "in UserSM::childReaper got pid: " << pid << " status " << status << "\n";
+            Debug() << "in UserSM::childReaper got pid: " << pid << " status " << status << "\n";
             MutexLocker ml(mut);
             SoundFileMap::iterator it;
             for (it = soundFileMap.begin(); it != soundFileMap.end(); ++it)
                 // found it! mark it as done!
                 if (pid == it->second.pid) {
-                    debug() << "in UserSM::childReaper found running sound, clearing its status\n";
+                    Debug() << "in UserSM::childReaper found running sound, clearing its status\n";
                     it->second.pid = 0;
                     if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
                         ++it->second.playct;
@@ -1031,11 +991,11 @@ void UserSM::childReaper()
                     break;
                 }
         }
-        debug() << "wait() returned " << pid << " errno is: " << strerror(errno) << "\n";
-        debug() << "in UserSM::childReaeper gunna wait on sem again\n";        
+        Debug() << "wait() returned " << pid << " errno is: " << strerror(errno) << "\n";
+        Debug() << "in UserSM::childReaeper gunna wait on sem again\n";        
     }
     if (chldPleaseStop)
-        debug() << "childReaper got chldPleaseStop request, ending thread..\n";
+        Debug() << "childReaper got chldPleaseStop request, ending thread..\n";
 }
 
 
@@ -1101,7 +1061,7 @@ bool UserSM::setSound(unsigned card, const SoundBuffer & buf)
     std::ostringstream s;
     s << "/tmp/" << "SoundServerSound_" << getpid() << "_" << card << "_" << buf.id << ".wav";
     if (!wav.create(s.str().c_str())) {
-        log() << "Error creating wav file: " << s.str() << std::endl;
+        Log() << "Error creating wav file: " << s.str() << std::endl;
         return false;
     }
     if (!wav.write(&buf[0], buf.size()/(buf.sample_size/8), buf.sample_size, buf.rate))

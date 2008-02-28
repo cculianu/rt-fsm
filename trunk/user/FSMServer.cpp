@@ -10,6 +10,7 @@
 #include "scanproc.h"
 #include "Version.h"
 #include "Mutex.h"
+#include "Util.h"
 
 #include <unistd.h>
 #include <sys/socket.h>
@@ -55,12 +56,6 @@ namespace {
 }
 #endif
 
-#ifndef MIN
-#  define MIN(a,b) ( (a) < (b) ? (a) : (b) )
-#endif
-#ifndef MAX
-#  define MAX(a,b) ( (a) > (b) ? (a) : (b) )
-#endif
 #ifndef SOL_TCP 
 #  ifndef IPPROTO_TCP
 #    define IPPROTO_TCP 6
@@ -75,35 +70,6 @@ class StringMatrix;
 class SchedWaveSpec;
 typedef std::map<int, std::string> IntStringMap;
 class ConnectionThread;
-
-template <class T> std::string ToString(const T & t)
-{
-  std::ostringstream o;
-  o << t;
-  return o.str();
-}
-
-template <class T> T FromString(const std::string & s, bool *ok = 0)
-{
-  std::istringstream is(s);
-  T t;
-  is >> t;
-  if (ok) *ok = !is.fail();
-  return t;
-}
-
-std::string TimeText () 
-{
-  char buf[1024];
-  time_t t = time(0);
-  struct tm tms;
-  localtime_r(&t, &tms);
-  
-
-  size_t sz = strftime(buf, sizeof(buf)-1, "%b %d %H:%M:%S", &tms);
-  buf[sz] = 0;
-  return buf;
-}
 
 struct Matrix
 {
@@ -270,94 +236,6 @@ static void *nrtThrWrapper(void *);
   
 static FSMSpecific fsms[NUM_STATE_MACHINES];
 
-static std::vector<double> splitNumericString(const std::string & str,
-                                              const std::string &delims = ",",
-                                              bool allowEmpties = true);
-static std::vector<std::string> splitString(const std::string &str,
-                                            const std::string &delim = ",",
-                                            bool trim_whitespace = true,
-                                            bool skip_empties = true);
-
-template <typename T> class shallow_copy
-{
-  struct Impl
-  {
-    T *t;
-    volatile int nrefs;
-    Impl() : t(0), nrefs(0) {}
-    ~Impl() {}
-  };
-  mutable Impl *p;
-
-  void ref_incr() const { ++p->nrefs; }
-  void ref_decr() const { 
-    if (!--p->nrefs) { 
-      delete p->t; p->t = 0; delete p; 
-    } 
-  }
-
-public:
-
-  shallow_copy(T * t = new T) {  p = new Impl; p->t = t; ref_incr(); }
-  ~shallow_copy() { ref_decr(); p = 0; }
-  shallow_copy(const shallow_copy &r) { p = r.p; ref_incr();  }
-  shallow_copy & operator=(const shallow_copy & r) { ref_decr(); p = r.p; ref_incr();  }
-  // makes a private copy
-  void duplicate() { Impl * i = new Impl(*p);  i->nrefs = 1; i->t = new T(*p->t); ref_decr(); p = i; }
-
-  T & get() { return *p->t; }
-  const T & get() const { return *p->t; }
-
-  unsigned nrefs() const { return p->nrefs; }
-};
-
-/// A thread-safe logger class.  On destruction
-/// the singleton logstream is written-to, in a thread-safe manner.
-/// Note it uses shallow copy of data so it's possible to pass this by
-/// value in and out of functions.  
-class Log : protected shallow_copy<std::string>
-{
-  static pthread_mutex_t mut; // this is what makes it thread safe
-  static std::ostream * volatile logstream;
-public:
-  static void setLogStream(std::ostream &);
-
-  Log();
-  ~Log() { if (nrefs() == 1) { MutexLocker m(mut); (*logstream) << get(); get() = ""; } }
-  
-  template <typename T> Log & operator<<(const T & t) 
-  {
-    MutexLocker m(mut);
-    std::ostringstream os;
-    os << get() << t;  
-    get() = os.str();
-    return *this;
-  }
-
-  Log & operator << (std::ostream & (*pf)(std::ostream &)) {
-    MutexLocker m(mut);
-    std::ostringstream os;
-    os << get() << pf;  
-    get() = os.str();
-    return *this;
-  }
-}; 
-
-pthread_mutex_t Log::mut = PTHREAD_MUTEX_INITIALIZER;
-std::ostream * volatile Log::logstream = 0; // in case we want to log other than std::cerr..
-
-Log::Log() 
-{ 
-  MutexLocker m(mut);
-  if (!logstream) logstream = &std::cerr; 
-}
-
-void Log::setLogStream(std::ostream &os) 
-{
-  MutexLocker ml(mut);
-  logstream  = &os;
-}
-
 extern "C" { static void * threadfunc_wrapper(void *arg); }
 
 class ConnectionThread
@@ -482,19 +360,8 @@ bool ConnectionThread::start(int sock_fd, const std::string & rhost)
   return 0 == pthread_create(&handle, NULL, threadfunc_wrapper, static_cast<void *>(this));
 }
 
-/* NOTE that all functions in this program have the potential to throw
+/* NOTE that lots of functions in this program have the potential to throw
  * Exception on failure (which is why they seem not to haev error status return values) */
-class Exception
-{
-public:
-  Exception(const std::string & reason = "") : reason(reason) {}
-  virtual ~Exception() {}
-
-  const std::string & why() const { return reason; }
-
-private:
-  std::string reason;
-};
 
 static void attachShm()
 {
@@ -681,30 +548,6 @@ struct SchedWaveSpec : public SchedWave
   int out_evt_col;
   int dio_line;
 };
-
-class Timer
-{
-public:
-  Timer() { reset(); }
-  void reset();
-  double elapsed() const; // returns number of seconds since ctor or reset() was called 
-  static double now() { struct timeval ts; ::gettimeofday(&ts, 0); return double(ts.tv_sec) + ts.tv_usec/1e6; }
-private:
-  struct timeval ts;
-};
-
-void Timer::reset()
-{
-  ::gettimeofday(&ts, NULL);
-}
-
-double Timer::elapsed() const
-{
-  if (ts.tv_sec == 0) return 0.0;
-  struct timeval tv;
-  ::gettimeofday(&tv, NULL);
-  return tv.tv_sec - ts.tv_sec + (tv.tv_usec - ts.tv_usec)/1000000.0;
-}
 
 static void doServer(void)
 {
@@ -2131,31 +1974,6 @@ void *FSMSpecific::nrtThrFun()
   return 0;
 }
 
-static
-std::vector<double> splitNumericString(const std::string &str,
-                                       const std::string &delims,
-                                       bool allowEmpties)
-{
-  std::vector<double> ret;
-  if (!str.length() || !delims.length()) return ret;
-  std::string::size_type pos;
-  for ( pos = 0; pos < str.length() && pos != std::string::npos; pos = str.find_first_of(delims, pos) ) {
-      if (pos) ++pos;
-      bool ok;
-      double d = FromString<double>(str.substr(pos), &ok);
-      if (!ok)
-          // test for zero-length token
-          /* break if parse error -- but conditionally allow empty tokens.. */
-          if (allowEmpties && ( delims.find(str[pos]) != std::string::npos || pos >= str.length() ) ) {
-              if (!pos) ++pos;
-          }      
-          else
-              break; 
-      else
-          ret.push_back(d);
-  }
-  return ret;
-}
 
 Matrix FSMSpecific::getDAQScans()
 {
@@ -2510,14 +2328,6 @@ std::string ConnectionThread::genStringTable(const Matrix &m)
         return o.str();
 }
 
-static std::string trimWS(const std::string & s)
-{
-  std::string::const_iterator pos1, pos2;
-  pos1 = std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun(::isspace)));
-  pos2 = std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun(::isspace))).base();
-  return std::string(pos1, pos2);
-}
-
 bool ConnectionThread::doSetStateProgram()
 {
       /* FSM *program* upload 
@@ -2650,28 +2460,6 @@ bool ConnectionThread::doSetStateProgram()
   parseStringTable(block.c_str(), m);
   return matrixToRT(m, globals, initfunc, cleanupfunc, transitionfunc, tickfunc, entryfuncs, exitfuncs, entrycodes, exitcodes, inChanType, inSpec, outSpec, swSpec, readyForTrialJumpState, state0FSMSwapFlg);  
 }
-
-static std::vector<std::string> splitString(const std::string &str,
-                                            const std::string &delim,
-                                            bool trimws,
-                                            bool skip_empties)
-{
-  std::vector<std::string> ret;
-  if (!str.length() || !delim.length()) return ret;
-  std::string::size_type pos, pos2;
-  for ( pos = 0, pos2 = 0; pos < str.length() && pos != std::string::npos; pos = pos2 ) {
-    if (pos) pos = pos + delim.length();
-    if (pos > str.length()) break;
-    pos2 = str.find(delim, pos);
-    if (pos2 == std::string::npos) pos2 = str.length();
-    std::string s = str.substr(pos, pos2-pos);
-    if (trimws) s = trimWS(s);
-    if (skip_empties && !s.length()) continue;
-    ret.push_back(s);
-  }
-  return ret;  
-}
-
 
 std::string ConnectionThread::newShmName()
 { 

@@ -1,5 +1,5 @@
-SRC = FSMServer.cpp rtos_utility.cpp
-PRG_OBJS = FSMServer.o rtos_utility.o scanproc.o deflate_helper.o
+SRC = FSMServer.cpp rtos_utility.cpp Util.cpp
+PRG_OBJS = FSMServer.o rtos_utility.o scanproc.o deflate_helper.o Util.o
 PRG = FSMServer
 CXX=g++
 CXXFLAGS=-W -Wall -g -I../include
