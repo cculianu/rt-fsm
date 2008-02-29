@@ -590,7 +590,7 @@ void cleanup (void)
   }
 
 #ifdef RTAI  
-  /*stop_rt_timer(); NB: leave timer running just in case we have other threads.. */
+  /*stop_rt_timer(); NB: leave timer running just in case we have other threads in other modules.. */
 #endif
   printStats();
 }
@@ -1296,8 +1296,10 @@ static int initRT(void)
   int error;
 
 #ifdef RTAI /* gah.. tell RTAI to start the timer in oneshot mode.. */
-  rt_set_oneshot_mode();
-  start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
+  if (!rt_is_hard_timer_running()) {
+    rt_set_oneshot_mode();
+    start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
+  }
   /* Must mark linux as using FPU because of embedded C code startup */
   rt_linux_use_fpu(1);
 #endif
