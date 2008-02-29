@@ -402,12 +402,12 @@ private:
 struct SoundBuffer
 {
   SoundBuffer(unsigned long size,
-              int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms = 0, int loop_flg = 0);
+              int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms, int loop_flg, int card);
   ~SoundBuffer();
   
   unsigned long size() const { return len_bytes; }
   
-  int id, chans, sample_size, rate, stop_ramp_tau_ms, loop_flg;
+  int id, chans, sample_size, rate, stop_ramp_tau_ms, loop_flg, card;
   const char *name() const { return nam.c_str(); }
   
   unsigned char & operator[](int i) { return mem[i]; }
@@ -431,11 +431,23 @@ void KernelSM::allocSBMem(SoundBuffer & sb)
     std::ostringstream s;
     s << std::setw(4) << std::setfill('0') << std::right << n << "au";
     sb.nam = s.str();
+    s.str("");
+    { // workaround for 64-bit breakage of userspace shm alloc.  We need to request the shm in the kernel
+      std::auto_ptr<FifoMsg> msg(new FifoMsg);
+      msg->id = ALLOCSOUND;
+      strncpy(msg->u.sound.name, sb.name(), SNDNAME_SZ);
+      msg->u.sound.name[SNDNAME_SZ-1] = 0;
+      msg->u.sound.size = sb.size();
+      sendToRT(sb.card, *msg);
+      if (!msg->u.sound.transfer_ok) {
+        s << "Kernel failed to create a new rt-shm of length " << sb.len_bytes << " named " << sb.name() << " for sound " << sb.id << ".  Out of memory?";
+        throw Exception(s.str());
+      }
+    }
     RTOS::ShmStatus status;
-    sb.mem = static_cast<unsigned char *>(RTOS::shmAttach(sb.name(), sb.len_bytes, &status, true));
+    sb.mem = static_cast<unsigned char *>(RTOS::shmAttach(sb.name(), sb.len_bytes, &status, false));
     if (!sb.mem) {
-        s.str("");
-        s << "Could not create a new rt-shm of length " << sb.len_bytes << " named " << sb.nam << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
+        s << "Could not attach to rt-shm of length " << sb.len_bytes << " named " << sb.name() << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
         throw Exception(s.str());
     }
 }
@@ -457,8 +469,8 @@ void UserSM::allocSBMem(SoundBuffer & sb)
 
 SoundBuffer::SoundBuffer(unsigned long size,
                          int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms, 
-                         int loop_flg) 
-    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), len_bytes(size), mem(0)
+                         int loop_flg, int card) 
+    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), card(card), len_bytes(size), mem(0)
 {
     if (!sm) throw Exception("Global variable 'sm' needs to be set and point to a SoundMachine object!");
     sm->allocSBMem(*this);
@@ -608,7 +620,7 @@ int ConnectedThread::doConnection(void)
             if (bytes > (128*1024*1024) && (bytes = (128*1024*1024)) )
               Log() << "Warning soundfile of " << bytes << " truncated to 128MB!" << std::endl; 
 
-            SoundBuffer sound(bytes, id, chans, samplesize, rate, stop_ramp_tau_ms, loop);
+            SoundBuffer sound(bytes, id, chans, samplesize, rate, stop_ramp_tau_ms, loop, mycard);
             
             Log() << "Getting ready to receive sound  " << sound.id << " length " << sound.size() << std::endl; 
             Timer xferTimer;

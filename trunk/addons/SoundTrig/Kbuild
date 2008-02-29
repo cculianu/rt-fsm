@@ -1,16 +1,15 @@
 CURRENT = $(shell uname -r)
 KDIR = /lib/modules/$(CURRENT)/build
 TARGET = LynxTrig_RT
-OBJS = LynxTrig.o ChanMapper.o
+OBJS = LynxTrig.o ChanMapper.o ../../kernel/softtask.o
 MDIR = rtai
 RTAIDIR = /usr/realtime
 COMEDIDIR = /usr/src/comedi
 PWD = $(shell pwd)
 DEST = /lib/modules/$(CURRENT)/kernel/$(MDIR)
-EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)/../../include -I$(COMEDIDIR)/include -I$(src)/LynxTWO-RT -DRTAI -DFAKE_L22
+EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)/../../include -I$(src)/../../kernel -I$(COMEDIDIR)/include -I$(src)/LynxTWO-RT -DRTAI -DFAKE_L22
 
 obj-m      := $(TARGET).o
-
-$(TARGET)-objs := $(OBJS)
+$(TARGET)-y  := $(OBJS)
 
 -include $(KDIR)/Rules.make
