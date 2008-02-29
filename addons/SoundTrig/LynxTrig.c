@@ -54,6 +54,7 @@
 #include "FSMExternalTrig.h"
 #include "LynxTWO-RT.h"
 #include "ChanMapper.h"
+#include "softtask.h"
 
 #ifdef RTAI
 /* this is a noop on rtai -- all rt tasks use fpu.  */
@@ -117,9 +118,16 @@ static struct file_operations myproc_fops =
    Pass a command of the type seen in enum FifoMsgID */
 enum {
   PLAY_CMD = SOUNDTRIG_MSG_ID_MAX+1,
-  STOP_CMD
+  STOP_CMD,
+  ALLOC_KMEM_CMD,
+  FREE_KMEM_CMD,
+  ALLOC_MBUFF_CMD,
+  FREE_MBUFF_CMD,
+  DETACH_MBUFF_CMD,
+  ATTACH_MBUFF_CMD
 };
 static void *doCmdInRTThread(int cmd, void *arg);
+static void *doCmdInSoftThread(int cmd, void *arg);
 
 
 module_init(init);
@@ -166,7 +174,7 @@ MODULE_PARM_DESC(trig_on_event_chan, "If non-negative, the DIO channel (not rela
 #define NUM_CHANS_REQUIRED (first_trig_chan+(num_trig_chans-1))
 
 static struct proc_dir_entry *proc_ent = 0;
-static volatile int rt_task_stop = 0; /* Internal variable to stop the RT 
+static atomic_t rt_task_stop = ATOMIC_INIT(0); /* Internal variable to stop the RT 
                                          thread. */
 static volatile int rt_task_running = 0;
 static pthread_t rttask = 0;
@@ -323,18 +331,73 @@ static void destroyChanMapper(void);
 static void stopAllChans(CardID_t c);
 static int initL22Devs(void);
 static void cleanupL22Devs(void);
+static int initSems(void);
+static void cleanupSems(void);
+static sem_t *get_unused_sem(void);
+static struct SoftTask *get_unused_st(void);
+static int initSTs(void);
+static void cleanupSTs(void);
 
+static sem_t misc_sems[10];
+static atomic_t misc_sem_idx = ATOMIC_INIT(0);
+static pthread_mutex_t misc_sem_mut;
+static int setup_sems = 0;
+
+static struct SoftTask *soft_tasks[10] = {0};
+static atomic_t soft_task_idx = ATOMIC_INIT(0);
+static pthread_mutex_t soft_task_mut;
+static int setup_soft_tasks;
+
+static void mrSoftTask(void *arg); /**< soft task handler for soft_task */
+typedef struct AllocArg {
+    const char *name;
+    union {
+        unsigned long volatile size;
+        void * volatile ptr;
+    };
+} AllocArg;
+static void *doAllocMbuffCmd(void *);
+static void *doAllocKmemCmd(void *);
+static void *doFreeMbuffCmd(void *);
+static void *doFreeKmemCmd(void *);
+static void *doAttachMbuffCmd(void *);
+static void *doDetachMbuffCmd(void *);
+/** Used to keep track of rt-shm's allocated by ALLOCSOUND but not yet 
+ *  used in SOUND cmds.  This is to make sure that if userspace crashes it doesn't
+ *  leave around  shms.. */
+typedef struct ShmList
+{
+    struct list_head list;
+    char name[SNDNAME_SZ];
+    void *mem;
+    unsigned long size;
+} ShmList;
+static struct list_head shmList = LIST_HEAD_INIT(shmList);
+static pthread_mutex_t shmListMut;
+/** Call in any context -- rt or not -- auto-allocates shm in rt-safe manner and returns a pointer to it*/
+static void *ShmListAdd(const char *name, unsigned long size);
+/** Call in any context -- rt or not */
+static void *ShmListFind(const char *name, unsigned long size);
+/** Call in any context-- rt or not */
+static void ShmListDel(void *mem);
+/** Call in any context-- rt or not */
+static void ShmListCleanup(void);
+        
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
 {
-  int retval = 0;
+  int retval = -ENOMEM;
   
   pthread_mutex_init(&dispatch_Mut, 0); /* do this regardles.. */
+  pthread_mutex_init(&shmListMut, 0); /* do this regardles.. */
+    
 #ifdef RTAI
   DEBUG("linux prio: %x\n", rt_get_prio(rt_whoami()));
 #endif
-  if (    (retval = initL22Devs())
+  if (    (retval = initSTs())
+       || (retval = initSems())
+       || (retval = initL22Devs())
        || (retval = initChanMapper())
        || (retval = initShm())
        || (retval = initFifos())
@@ -343,7 +406,7 @@ int init (void)
        || (retval = initRT())  ) 
     {
       cleanup();  
-      return retval;
+      return -ABS(retval);
     }
 #ifdef RTAI
   if (!rt_is_hard_timer_running()) {
@@ -401,9 +464,11 @@ void cleanup (void)
     remove_proc_entry(MODULE_NAME, 0);
   
   if (rt_task_running) {
-    rt_task_stop = 1;
-    pthread_cancel(rttask);
+    DEBUG("about to stop rt-task..\n");
+    atomic_set(&rt_task_stop, 1);
+    /*pthread_cancel(rttask);*/
     pthread_join(rttask, 0);
+    DEBUG("stopped rt-task..\n");
   }
   
   destroyRamperThreads();
@@ -443,8 +508,10 @@ void cleanup (void)
   /* detach all shared mems for each card */
   for (c = 0; c < n_l22dev; ++c) 
     freeAudioBuffers(c); 
-  
-  pthread_mutex_destroy(&dispatch_Mut);
+  ShmListCleanup(); /**< free any lingering 'orphaned' shms.. */
+  cleanupSems();
+  pthread_mutex_destroy(&shmListMut); 
+  cleanupSTs();
 }
 
 static int initL22Devs(void)
@@ -704,7 +771,7 @@ static void *doRT (void *arg)
   clock_gettime(CLOCK_REALTIME, &next_task_wakeup);
   
   
-  while (! rt_task_stop) {
+  while (! atomic_read(&rt_task_stop) ) {
 
     /*#define TIME_IT*/
 
@@ -837,8 +904,11 @@ static int virtualTriggerFunction(CardID_t card, int trig)
 static void freeAudioBuffer(struct AudioBuf *buf)
 {
     if (buf->data && buf->len && buf->name[0]) {        
+        AllocArg arg;
         DEBUG("Freeing buffer named %s size %lu\n", buf->name, buf->len);
-        mbuff_free(buf->name, buf->data);
+        arg.name = buf->name;
+        arg.size = buf->len;
+        ShmListDel(buf->data); /**< implicitly deletes the audio buffer using rt-shm mechanisms */
     }
     memset((void *)buf, 0, sizeof(*buf));
 }
@@ -876,10 +946,6 @@ static int handleFifos(CardID_t c)
   FifoNotify_t dummy = 1;
   int errcode;
 
-  DEBUG("handleFifos(%u)\n", (unsigned)c);
-#ifdef RTAI
-  DEBUG("prio: %x\n", rt_get_prio(rt_whoami()));
-#endif
   /** locking only does something for software trigger mode (in which case
       this function is in non-realtime context), since that is the
       only case where there is asynchronous access to trigger data.. */
@@ -896,6 +962,11 @@ static int handleFifos(CardID_t c)
       struct FifoMsg *msg = (struct FifoMsg *)&shm->msg[c];
       int do_reply = 0;
       
+      DEBUG("handleFifos(%u)\n", (unsigned)c);
+#ifdef RTAI
+      DEBUG("prio: %x\n", rt_get_prio(rt_whoami()));
+#endif
+
       switch (msg->id) {
         
       case INITIALIZE:
@@ -920,7 +991,17 @@ static int handleFifos(CardID_t c)
         msg->u.is_valid = !rs[c].invalid;
         do_reply = 1;
         break;
-        
+      case ALLOCSOUND: {
+           /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
+          void *mem = ShmListAdd(msg->u.sound.name, msg->u.sound.size);
+          if (mem) {
+              DEBUG("ALLOCSOND: allocated shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
+          } else {
+              ERROR("ALLOCSOND: could not allocate shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
+          }
+          msg->u.sound.transfer_ok = mem != 0;
+      }
+          break;
       case SOUND:
         rs[c].invalid = 1; /* lock? */
         mb();
@@ -965,8 +1046,10 @@ static int handleFifos(CardID_t c)
             buf->stop_ramp_tau_ms = msg->u.sound.stop_ramp_tau_ms;
             strncpy(buf->name, msg->u.sound.name, sizeof(buf->name));
             buf->name[sizeof(buf->name)-1] = 0;/* force NUL termination */
-            DEBUG("Attempting to attach to buffer %s of length %lu\n", buf->name, (unsigned long)buf->len);
-            if ( (buf->data = (unsigned char *)mbuff_attach(buf->name, buf->len)) ) {
+            DEBUG("Looking up buffer %s of length %lu in ShmList\n", buf->name, (unsigned long)buf->len);
+            msg->u.sound.transfer_ok = 0;
+            if ( (buf->data = ShmListFind(buf->name, buf->len)) ) {
+              DEBUG("ShmList buffer found!\n");
               buf->nchans = msg->u.sound.chans;
               buf->rate = msg->u.sound.rate;
               buf->bits = msg->u.sound.bits_per_sample;
@@ -984,8 +1067,7 @@ static int handleFifos(CardID_t c)
               /* not supported anymore.. L22SetSampleRate(l22dev, buf->rate); */
 
             } else {
-              ERROR("Sound buffer %u named %s of size %lu could not be attached!  RT-Shm mechanism out of resources?\n", id, buf->name, buf->len);
-              memset((void *)buf, 0, sizeof(*buf));
+              ERROR("Sound buffer %u named %s of size %lu could not be found! Did it fail to allocate via ALLOCSOUND?\n", id, buf->name, buf->len);
             }
             msg->u.sound.size = 0; /* Clear it, just in case? */
           } else {
@@ -1179,6 +1261,7 @@ static void destroyRamperThreads(void)
 {
   int chan;
   unsigned dev;
+  DEBUG("destroyRamperThreads()\n");
   for (dev = 0; dev < n_l22dev; ++dev) 
     for (chan = 0; chan < L22_NUM_CHANS; ++chan) {
       struct RamperThread *thr = &ramperThreads[dev][chan];
@@ -1451,6 +1534,240 @@ static void *doCmdInRTThread(int cmd, void *arg)
   return 0;
 }
 
+struct MrSoftTaskArg
+{
+    void *(*volatile func)(void *);
+    void * volatile arg;
+    void * volatile ret;
+    sem_t *sem;
+};
+static void *doCmdInSoftThread(int cmd, void *arg)
+{
+    void *(*func)(void *) = 0;
+    DEBUG("doCmdInSoftThread(%d, %p)\n", cmd, arg);
+    switch(cmd) {
+    case ALLOC_KMEM_CMD: func = doAllocKmemCmd; break;
+    case ALLOC_MBUFF_CMD: func = doAllocMbuffCmd; break;
+    case ATTACH_MBUFF_CMD: func = doAttachMbuffCmd; break;
+    case FREE_KMEM_CMD: func = doFreeKmemCmd; break;
+    case FREE_MBUFF_CMD: func = doFreeMbuffCmd; break;
+    case DETACH_MBUFF_CMD: func = doDetachMbuffCmd; break;
+    default:
+        ERROR("*** Internal Error *** Invalid command passed to doCmdInSoftThread: %d!\n", cmd);
+        return 0;
+    }
+    if (func) {
+        if ( CURRENT_IS_LINUX() ) {
+            DEBUG("doCmdInSoftThread -- CURRENT IS LINUX, so calling func directly\n");
+            return func(arg);
+        } else {
+            struct MrSoftTaskArg taskarg = { func, arg, 0, get_unused_sem() };
+            int err;
+            DEBUG("doCmdInSoftThread -- CURRENT IS NOT LINUX, pending softtask\n");
+            if (! (err = softTaskPend(get_unused_st(), &taskarg))) {
+                DEBUG("doCmdInSoftThread ... and waiting on sem...\n");
+                sem_wait(taskarg.sem);
+                DEBUG("doCmdInSoftThread got return value %p\n", taskarg.ret);
+            } else {
+                ERROR("got error return %d from softTaskPend!\n", err);
+            }
+            return taskarg.ret;
+        }
+    }
+    return 0; /* not reached */
+}
+
+static void mrSoftTask(void *arg)
+{
+    struct MrSoftTaskArg *taskArg = (struct MrSoftTaskArg *)arg;
+    DEBUG("mrSoftTask(%p)\n", arg);
+    taskArg->ret = taskArg->func(taskArg->arg);
+    DEBUG("mrSoftTask - returning %p\n", taskArg->ret);
+    sem_post(taskArg->sem);
+    DEBUG("mrSoftTask gunna return\n");
+}
+
+static void *doAllocMbuffCmd(void *arg)
+{
+    AllocArg *allocArg = (AllocArg *)arg;
+    DEBUG("doAllocMbuffCmd(%p) -> %s %lu\n", arg, allocArg->name, allocArg->size);
+    return mbuff_alloc(allocArg->name, allocArg->size);
+}
+
+static void *doAttachMbuffCmd(void *arg)
+{
+    AllocArg *allocArg = (AllocArg *)arg;
+    DEBUG("doAttachMbuffCmd(%p) -> %s %lu\n", arg, allocArg->name, allocArg->size);
+    return mbuff_attach(allocArg->name, allocArg->size);
+}
+
+static void *doAllocKmemCmd(void *arg)
+{
+    unsigned long size = (unsigned long)arg;
+    DEBUG("doAllocKmemCmd(%p) -> %lu\n", arg, size);
+    return kmalloc(size, GFP_KERNEL);
+}
+
+
+static void *doFreeKmemCmd(void *arg)
+{
+    DEBUG("doFreeKmemCmd(%p)\n", arg);
+    kfree(arg);
+    return 0;
+}
+
+static void *doFreeMbuffCmd(void *arg)
+{
+    AllocArg *allocArg = (AllocArg *)arg;
+    DEBUG("doFreeMbuffCmd(%p) -> %s %p\n", arg, allocArg->name, allocArg->ptr);
+    mbuff_free(allocArg->name, allocArg->ptr);
+    return 0;
+}
+
+static void *doDetachMbuffCmd(void *arg)
+{
+    AllocArg *allocArg = (AllocArg *)arg;
+    DEBUG("doDetachMbuffCmd(%p) -> %s %p\n", arg, allocArg->name, allocArg->ptr);
+    mbuff_detach(allocArg->name, allocArg->ptr);
+    return 0;
+}
+
+static void *ShmListAdd(const char *name, unsigned long size)
+{
+    struct ShmList *entry = doCmdInSoftThread(ALLOC_KMEM_CMD, (void *)sizeof(*entry));
+    AllocArg arg;
+    if (!entry) {
+        ERROR("ShmListAdd: could not allocate a list entry data structure!\n");
+        return 0;
+    }
+    arg.name = name;
+    arg.size = size;
+    entry->mem = doCmdInSoftThread(ALLOC_MBUFF_CMD, (void *)&arg);
+    if (!entry->mem) {
+        ERROR("ShmListAdd: failed to allocated mbuff %s size %lu\n", arg.name, arg.size);
+        doCmdInSoftThread(FREE_KMEM_CMD, (void *)entry);
+        return 0;
+    }
+    strncpy(entry->name, name, SNDNAME_SZ);
+    entry->name[SNDNAME_SZ-1] = 0;
+    entry->size = size;
+    pthread_mutex_lock(&shmListMut);
+    list_add(&entry->list, &shmList);
+    pthread_mutex_unlock(&shmListMut);
+    return entry->mem;
+}
+static void ShmListDel_nolock(void *mem)
+{
+    struct list_head *pos;
+    list_for_each(pos, &shmList) {
+        struct ShmList *entry = (struct ShmList *)pos;
+        if (entry->mem == mem) {
+            AllocArg arg;
+            arg.name = entry->name;
+            arg.ptr = entry->mem;
+            list_del(pos);
+            doCmdInSoftThread(FREE_MBUFF_CMD, &arg);
+            doCmdInSoftThread(FREE_KMEM_CMD, (void *)entry);
+            break;
+        }
+    }
+}
+static void ShmListDel(void *mem)
+{
+    pthread_mutex_lock(&shmListMut);
+    ShmListDel_nolock(mem);
+    pthread_mutex_unlock(&shmListMut);
+}
+static void ShmListCleanup(void)
+{
+    struct list_head *pos, *next;
+    pthread_mutex_lock(&shmListMut);
+    list_for_each_safe(pos, next, &shmList) {
+        ShmList *entry = (ShmList *)pos;
+        ShmListDel_nolock(entry->mem);
+    }
+    pthread_mutex_unlock(&shmListMut);
+}
+static void *ShmListFind(const char *name, unsigned long size)
+{
+    struct list_head *pos;
+    void *found = 0;
+    pthread_mutex_lock(&shmListMut);
+    list_for_each(pos, &shmList) {
+        ShmList *entry = (ShmList *)pos;
+        if (!strcmp(entry->name, name)) {
+            if (entry->size != size) 
+                WARNING("ShmListFind found entry %s buf entry->size != passed-in size, (%lu != %lu)\n", entry->size, size);
+            found = entry->mem;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&shmListMut);
+    return found;
+}
+
+static int initSems(void)
+{
+    int i, ret;
+    setup_sems = 0;
+    for (i = 0; i < 10; ++i) {
+        if ( (ret = sem_init(&misc_sems[i], 0, 0)) ) return ret;
+        ++setup_sems;
+    }
+    pthread_mutex_init(&misc_sem_mut, 0);
+    ++setup_sems;
+    return 0;
+}
+static void cleanupSems(void)
+{
+    int i = 0;
+    if (setup_sems-- == 11) pthread_mutex_destroy(&misc_sem_mut);
+    while (setup_sems--) 
+            sem_destroy(&misc_sems[i++]);
+}
+static sem_t *get_unused_sem(void)
+{
+    int i;
+    pthread_mutex_lock(&misc_sem_mut);
+    atomic_inc(&misc_sem_idx);
+    i = atomic_read(&misc_sem_idx) % 10;
+    pthread_mutex_unlock(&misc_sem_mut);
+    return &misc_sems[i];
+}
+
+static struct SoftTask *get_unused_st(void)
+{
+    int i;
+    pthread_mutex_lock(&soft_task_mut);
+    atomic_inc(&soft_task_idx);
+    i = atomic_read(&soft_task_idx) % 10;
+    pthread_mutex_unlock(&soft_task_mut);
+    return soft_tasks[i];
+}
+
+static int initSTs(void)
+{
+    int i;
+    setup_soft_tasks = 0;
+    for (i = 0; i < 10; ++i) {
+        char nam[] = { 's', 't', i+'0', 0 };
+        if ( !(soft_tasks[i] = softTaskCreate(mrSoftTask, nam)) ) return -ENOMEM;
+        ++setup_soft_tasks;
+    }
+    pthread_mutex_init(&soft_task_mut, 0);
+    ++setup_soft_tasks;
+    return 0;
+}
+
+static void cleanupSTs(void)
+{
+    int i = 0;
+    if (setup_soft_tasks-- == 11) pthread_mutex_destroy(&soft_task_mut);
+    while (setup_soft_tasks--) {
+            softTaskDestroy(soft_tasks[i]);
+            soft_tasks[i] = 0;
+    }
+}
 
 #ifdef FAKE_L22
 

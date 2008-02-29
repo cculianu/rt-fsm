@@ -26,6 +26,7 @@ enum FifoMsgID {
     FORCEEVENT, /**< Force a particular event to have occurred. */
     GETLASTEVENT, /**< Query the event we are playing/last played, if any.. */
     GETRUNTIME, /**< The time we have been running.. */
+    ALLOCSOUND, /**< Allocate space for a sound buffer in Kernel */
     SOUNDTRIG_MSG_ID_MAX
 };
 
@@ -35,7 +36,7 @@ struct FifoMsg {
     /** Which element of union is used depends on id above. */
     union {
 
-      /** For id == SOUND */
+      /** For id == SOUND || id == ALLOCSOUND */
       struct {
         /* Sound Specification */   
         char name[SNDNAME_SZ]; /**< The name of the shm to attach to */
