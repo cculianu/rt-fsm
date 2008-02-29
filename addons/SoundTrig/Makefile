@@ -27,7 +27,7 @@ $(PRG): $(PRG_OBJS)
 
 .deps: 
 	-cp -f Makefile.bak Makefile || true
-	-makedepend -- $(CXXFLAGS) --  $(SRC)
+	-makedepend -- $(CXXFLAGS) --  $(SRC) 
 	touch .deps
 
 clean:
