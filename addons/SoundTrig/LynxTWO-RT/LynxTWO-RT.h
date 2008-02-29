@@ -1,6 +1,8 @@
 #ifndef LYNX_TWO_RT_H
 #define LYNX_TWO_RT_H
 
+#define L22LINKAGE __attribute__((regparm(0)))
+
 /** defines for format_code below.. */
 #define PCM8 0
 #define PCM16 1
@@ -19,7 +21,7 @@
 typedef int L22Dev_t;
 
 /** returns the number of L22 Devices that exist or 0 if none exist */
-extern int L22GetNumDevices(void); 
+L22LINKAGE extern int L22GetNumDevices(void); 
 
 #define L22DEV_OPEN_ERROR (-1)
 
@@ -27,10 +29,10 @@ extern int L22GetNumDevices(void);
     Returns the handle to an L22 device that can be used with the rest
     of the functions in this API.
     Returns L22DEV_OPEN_ERROR on error.   */
-extern L22Dev_t L22Open(int devno);
+L22LINKAGE extern L22Dev_t L22Open(int devno);
 
 /** Close a previously-opened device */
-extern void L22Close(L22Dev_t);
+L22LINKAGE extern void L22Close(L22Dev_t);
 
 /** Specify an audio buffer for the audio data to play.  
     It is necessary to call this before L22Play() will actually play anything.
@@ -60,7 +62,7 @@ extern void L22Close(L22Dev_t);
 
     @returns true on success, false if there is some error (most likely due
     to sampling rate/format invalid)  */   
-extern int L22SetAudioBuffer(L22Dev_t dev,
+L22LINKAGE extern int L22SetAudioBuffer(L22Dev_t dev,
                              void *buffer, 
                              unsigned long num_bytes, /**< NB: It is imporant that this buffer be sized to be a multiple of a sample block.  A sample block is the number of bytes per sample * the number of channels in the stream.  The number of bytes per sample is a function of the PCMxx format... */
                              int format_code,
@@ -70,29 +72,29 @@ extern int L22SetAudioBuffer(L22Dev_t dev,
     @param chan_id a number from 0-7, or L22_ALL_CHANS to indicate which sound
     channel is to play.  L22_ALL_CHANS plays all buffers simultaneously.
     It is safe to call this function from realtime context.  */
-extern int L22Play(L22Dev_t dev, unsigned chan_id);
+L22LINKAGE extern int L22Play(L22Dev_t dev, unsigned chan_id);
 
 /** Stop playing if we were playing, otherwise noop. 
     @param chan_id the channel to stop, or L22_ALL_CHANS to stop them all.
     It is safe to call this function from realtime context.  */
-extern void L22Stop(L22Dev_t dev, unsigned chan_id);
+L22LINKAGE extern void L22Stop(L22Dev_t dev, unsigned chan_id);
 
 /** Return true if the L22 device is currently playing a sound, 
     false otherwise.
     @param chan_id The channel id to check if it is playing, or L22_ALL_CHANS to query if any channel is playing.
     It is safe to call this function from realtime context.  */
-extern int L22IsPlaying(L22Dev_t dev, unsigned chan_id);
+L22LINKAGE extern int L22IsPlaying(L22Dev_t dev, unsigned chan_id);
 
 /** Return the currently-set sampling rate. Sorry, you cannot Set the sampling
     rate programmatically anymore due to implementation limitations.  Instead,
     it is set at module-load time.  This will change in the future. */
-extern unsigned L22GetSampleRate(L22Dev_t);
+L22LINKAGE extern unsigned L22GetSampleRate(L22Dev_t);
 
 /** Returns the current play volume, a value from 0 - L22_MAX_VOLUME */
-extern unsigned long L22GetVolume(L22Dev_t dev, unsigned chan);
+L22LINKAGE extern unsigned long L22GetVolume(L22Dev_t dev, unsigned chan);
 /** Sets the current play volume, a value from 0 - L22_MAX_VOLUME 
     returns 1 on success or 0 on error.                              */
-extern int L22SetVolume(L22Dev_t dev, unsigned chan, unsigned long volume);
+L22LINKAGE extern int L22SetVolume(L22Dev_t dev, unsigned chan, unsigned long volume);
 
 /** Returns true iff the L22 Hardware mixer has overflowed since the last
     call to this function. Note that calling this function resets 
@@ -100,6 +102,6 @@ extern int L22SetVolume(L22Dev_t dev, unsigned chan, unsigned long volume);
     by the hardware mixer produce samples that are too loud and outside
     the maximum amplitude of the device.  This is a common problem when
     doing summation mixing (such as what the L22 has). */
-extern int L22MixerOverflowed(L22Dev_t dev);
+L22LINKAGE extern int L22MixerOverflowed(L22Dev_t dev);
 
 #endif

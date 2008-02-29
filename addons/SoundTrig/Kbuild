@@ -7,7 +7,7 @@ RTAIDIR = /usr/realtime
 COMEDIDIR = /usr/src/comedi
 PWD = $(shell pwd)
 DEST = /lib/modules/$(CURRENT)/kernel/$(MDIR)
-EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)/../../include -I$(src)/../../kernel -I$(COMEDIDIR)/include -I$(src)/LynxTWO-RT -DRTAI -DFAKE_L22
+EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)/../../include -I$(src)/../../kernel -I$(COMEDIDIR)/include -I$(src)/LynxTWO-RT -DRTAI 
 
 obj-m      := $(TARGET).o
 $(TARGET)-y  := $(OBJS)

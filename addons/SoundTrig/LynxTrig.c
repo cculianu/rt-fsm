@@ -77,11 +77,15 @@ static inline int pthread_attr_setfp_np(pthread_attr_t *a, int b) {(void)(a); (v
 #  define ABS(x) ( (x) < 0 ? -(x) : (x) )
 #endif
 #define LOG_MSG(x...) rt_printk(KERN_INFO MODULE_NAME": "x)
-#define DEBUG(x...)  do { if(debug) { rt_printk(KERN_DEBUG MODULE_NAME":(thr: %p)", (void *)pthread_self()); rt_printk(" DEBUG: "x); } } while(0)
+#ifndef NDEBUG
+#  define DEBUG(x...)  do { if(debug) { rt_printk(KERN_DEBUG MODULE_NAME":(thr: %p)", (void *)pthread_self()); rt_printk(" DEBUG: "x); } } while(0)
+#else /* NDEBUG */
+#  define DEBUG(x...) /* nothing */
+#endif 
 #define WARNING(x...)  rt_printk(KERN_WARNING MODULE_NAME ": WARNING: "x)
 #define ERROR(x...)  rt_printk(KERN_ERR MODULE_NAME ": INTERNAL ERROR: "x)
 
-MODULE_AUTHOR("Calin A. Culianu");
+MODULE_AUTHOR("Calin A. Culianu <calin@ajvar.org>");
 MODULE_DESCRIPTION(MODULE_NAME ": A component for the rtfsm to trigger the Lynx22 board (requires the LynxTWO-RT driver).");
 
 typedef unsigned CardID_t;
@@ -1785,50 +1789,50 @@ static void cleanupSTs(void)
 #ifdef FAKE_L22
 
 /* Dummy funcs for debugging */
-int L22SetVolume(L22Dev_t dev, unsigned chan, unsigned long volume)
+L22LINKAGE int L22SetVolume(L22Dev_t dev, unsigned chan, unsigned long volume)
 {
     DEBUG("L22SetVolume(%d, %u, %lu)\n", dev, chan, volume);
     return 1;
 }
-void L22Close(L22Dev_t dev) 
+L22LINKAGE void L22Close(L22Dev_t dev) 
 {
     DEBUG("L22Close(%d)\n", dev);
 }
-unsigned long L22GetVolume(L22Dev_t dev, unsigned chan)
+L22LINKAGE unsigned long L22GetVolume(L22Dev_t dev, unsigned chan)
 {
     DEBUG("L22GetVolume(%d,%u)\n", dev, chan);
     return 0xffff;
 }
-unsigned L22GetSampleRate(L22Dev_t dev)
+L22LINKAGE unsigned L22GetSampleRate(L22Dev_t dev)
 {
     DEBUG("L22GetSampleRate(%d)\n", dev);
     return 200000;
 }
-int L22Play(L22Dev_t dev, unsigned chan)
+L22LINKAGE int L22Play(L22Dev_t dev, unsigned chan)
 {
     DEBUG("L22Play(%d, %x)\n", dev, chan);
     return 1;
 }
-L22Dev_t L22Open(int devno)
+L22LINKAGE L22Dev_t L22Open(int devno)
 {
     DEBUG("L22Open(%d)\n", devno);
     return devno;
 }
-void L22Stop(L22Dev_t dev, unsigned chan)
+L22LINKAGE void L22Stop(L22Dev_t dev, unsigned chan)
 {
     DEBUG("L22Stop(%d, %x)\n", dev, chan);
 }
-int L22IsPlaying(L22Dev_t dev, unsigned chan)
+L22LINKAGE int L22IsPlaying(L22Dev_t dev, unsigned chan)
 {
     DEBUG("L22IsPlaying(%d, %x)\n", dev, chan);
     return 1;
 }
-int L22GetNumDevices(void)
+L22LINKAGE int L22GetNumDevices(void)
 {
     DEBUG("L22GetNumDevices(void)\n");
     return 4;
 }
-int L22SetAudioBuffer(L22Dev_t dev, void *buffer, unsigned long num_bytes, int format_code, unsigned chan_id, int looped)
+L22LINKAGE int L22SetAudioBuffer(L22Dev_t dev, void *buffer, unsigned long num_bytes, int format_code, unsigned chan_id, int looped)
 {
     DEBUG("L22SetAudioBuffer(%d, %p, %lu, %d, %u, %d)\n", dev, buffer, num_bytes, format_code, chan_id, looped);
     return 1;

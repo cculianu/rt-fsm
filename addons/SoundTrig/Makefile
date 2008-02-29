@@ -11,11 +11,14 @@ PWD = $(shell pwd)
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c $<
 
-all: .deps MOD $(PRG)
+all: .deps MOD $(PRG) DRV
 
 MOD: 
 	make -C $(KDIR) M=$(PWD) modules
-	
+
+DRV:
+	make -C $(PWD)/LynxTWO-RT 
+		
 rtos_utility.o: ../../user/rtos_utility.cpp
 	$(CC) $(CXXFLAGS) -c -o $@ $<
 
@@ -34,6 +37,7 @@ clean:
 	-cp -f Makefile.bak Makefile || true
 	rm -f *~ *.o Makefile.bak .deps $(PRG)
 	make -C $(KDIR) M=$(PWD) clean
+	make -C $(PWD)/LynxTWO-RT clean
 	
 
 

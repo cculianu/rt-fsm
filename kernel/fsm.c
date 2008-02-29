@@ -82,8 +82,8 @@ static __inline__ int __ffs(int x) { return ffs(x)-1; }
 
 #undef RESET /* make *sure* RTAI's stupid RESET define is gone! */
 
-MODULE_AUTHOR("Calin A. Culianu");
-MODULE_DESCRIPTION(MODULE_NAME ": A Real-Time experiment controller for CSHL.");
+MODULE_AUTHOR("Calin A. Culianu <calin@ajvar.org>");
+MODULE_DESCRIPTION(MODULE_NAME ": The core of the rtfsm project -- executes a finite state machine spec. in hard real-time.  Optionally, can execute arbitrary C code embedded in the FSM spec.");
 
 int init(void);  /**< Initialize data structures and register callback */
 void cleanup(void); /**< Cleanup.. */
