@@ -433,7 +433,7 @@ void KernelSM::allocSBMem(SoundBuffer & sb)
     RTOS::ShmStatus status;
     sb.mem = static_cast<unsigned char *>(RTOS::shmAttach(sb.name(), sb.len_bytes, &status, true));
     if (!sb.mem) {
-        s.str() = "";
+        s.str("");
         s << "Could not create a new rt-shm of length " << sb.len_bytes << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
         throw Exception(s.str());
     }
