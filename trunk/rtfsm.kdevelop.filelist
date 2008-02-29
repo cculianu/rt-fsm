@@ -16,6 +16,8 @@ Client/Matlab/NetClient/Socket.h
 Makefile
 addons
 addons/SoundTrig
+addons/SoundTrig/ChanMapper.c
+addons/SoundTrig/ChanMapper.h
 addons/SoundTrig/LynxTWO-RT
 addons/SoundTrig/LynxTWO-RT/LynxTWO-RT.h
 addons/SoundTrig/LynxTrig.c

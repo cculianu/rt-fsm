@@ -897,9 +897,9 @@ static int handleFifos(CardID_t c)
       switch (msg->id) {
         
       case INITIALIZE:
-        doCmdInRTThread(INITIALIZE, (void *)c); /* may spawn a new thread and wait 
-                                              for it if we are not in 
-                                              rt-context.. */
+          /* spawn a new thread and wait for it if we are not in rt-context..
+             otherwise call function immediately.. */
+        doCmdInRTThread(INITIALIZE, (void *)(unsigned long)c); 
         do_reply = 1;
         break;
                 
@@ -1394,7 +1394,7 @@ static void *doStopCmd(void *arg)
 
 static void *doResetCmd(void *arg) 
 {
-  unsigned card = (unsigned)arg;
+  unsigned card = (unsigned long)arg;
   
   /* Just to make sure we start off fresh ... */
   stopAllChans(card);
