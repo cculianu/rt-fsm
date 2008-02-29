@@ -346,7 +346,7 @@ static int setup_sems = 0;
 static struct SoftTask *soft_tasks[NUM_SOFTS_SEMS] = {0};
 static atomic_t soft_task_idx = ATOMIC_INIT(0);
 static pthread_mutex_t soft_task_mut;
-static int setup_soft_tasks;
+static int setup_soft_tasks = 0;
 
 static void mrSoftTask(void *arg); /**< soft task handler for soft_task */
 typedef struct AllocArg {
@@ -499,19 +499,22 @@ void cleanup (void)
 
   UNLOCK_TRIGGERS();
 
-  pthread_mutex_trylock(&dispatch_Mut);
-  pthread_mutex_unlock(&dispatch_Mut);
-  pthread_mutex_destroy(&dispatch_Mut);
-
   cleanupL22Devs();
   
   /* detach all shared mems for each card */
   for (c = 0; c < n_l22dev; ++c) 
     freeAudioBuffers(c); 
+  
   ShmListCleanup(); /**< free any lingering 'orphaned' shms.. */
+  
+  /* these need to happen last or almost last as they are used by the of the functions above.. */
   cleanupSems();
-  pthread_mutex_destroy(&shmListMut); 
   cleanupSTs();
+
+  pthread_mutex_destroy(&shmListMut); 
+  pthread_mutex_trylock(&dispatch_Mut);
+  pthread_mutex_unlock(&dispatch_Mut);
+  pthread_mutex_destroy(&dispatch_Mut);
 }
 
 static int initL22Devs(void)
@@ -572,6 +575,10 @@ static int initShm(void)
       virtShm = (struct FSMExtTrigShm *) 
         mbuff_alloc(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
       if (!virtShm) return -ENOMEM;
+      if (FSM_EXT_TRIG_SHM_IS_VALID(virtShm)) {
+          ERROR("The FSM already has an external trigger handler installed!\n");
+          return -EBUSY;
+      }
       virtShm->magic = FSM_EXT_TRIG_SHM_MAGIC;
       virtShm->function = virtualTriggerFunction;
   }
@@ -1714,16 +1721,19 @@ static int initSems(void)
         if ( (ret = sem_init(&misc_sems[i], 0, 0)) ) return ret;
         ++setup_sems;
     }
-    pthread_mutex_init(&misc_sem_mut, 0);
-    ++setup_sems;
+    if ( !pthread_mutex_init(&misc_sem_mut, 0) )
+        ++setup_sems;
+    else
+        return -EINVAL;
     return 0;
 }
 static void cleanupSems(void)
 {
-    int i = 0;
-    if (setup_sems-- == NUM_SOFTS_SEMS) pthread_mutex_destroy(&misc_sem_mut);
-    while (setup_sems--) 
-            sem_destroy(&misc_sems[i++]);
+    int i;
+    if (setup_sems == NUM_SOFTS_SEMS+1) { pthread_mutex_destroy(&misc_sem_mut); setup_sems--; }
+    for (i = 0; i < setup_sems; ++i) 
+            sem_destroy(&misc_sems[i]);
+    setup_sems = 0;
 }
 static sem_t *get_unused_sem(void)
 {
@@ -1754,19 +1764,22 @@ static int initSTs(void)
         if ( !(soft_tasks[i] = softTaskCreate(mrSoftTask, nam)) ) return -ENOMEM;
         ++setup_soft_tasks;
     }
-    pthread_mutex_init(&soft_task_mut, 0);
-    ++setup_soft_tasks;
+    if ( !pthread_mutex_init(&soft_task_mut, 0) )
+        ++setup_soft_tasks;
+    else
+        return -EINVAL;
     return 0;
 }
 
 static void cleanupSTs(void)
 {
-    int i = 0;
-    if (setup_soft_tasks-- == NUM_SOFTS_SEMS) pthread_mutex_destroy(&soft_task_mut);
-    while (setup_soft_tasks--) {
+    int i;
+    if (setup_soft_tasks == NUM_SOFTS_SEMS+1) { pthread_mutex_destroy(&soft_task_mut); setup_soft_tasks--; }
+    for (i = 0; i < setup_soft_tasks; ++i) {
             softTaskDestroy(soft_tasks[i]);
             soft_tasks[i] = 0;
     }
+    setup_soft_tasks = 0;
 }
 
 #ifdef FAKE_L22

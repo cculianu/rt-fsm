@@ -488,6 +488,10 @@ int init (void)
 {
   int retval = 0;
   
+#ifdef RTAI
+    rt_linux_use_fpu(1);
+#endif
+
   if (    (retval = initTaskPeriod())
        || (retval = initShm())
        || (retval = initFifos())
