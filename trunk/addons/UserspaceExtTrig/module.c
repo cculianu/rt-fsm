@@ -35,6 +35,8 @@
 MODULE_LICENSE("GPL");
 #endif
 
+MODULE_AUTHOR("Calin A. Culianu <calin@ajvar.org>");
+MODULE_DESCRIPTION("A module that simply forwards kernelspace FSM ext-trig requests to userspace via a fifo.");
 int debug = 0;
 module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "If true, print verbuse debug messages to kernel console.  Defaults to 0 (false).");

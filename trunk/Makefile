@@ -16,7 +16,7 @@ __USER_EXT_TRIG_MOD__:
 	$(MAKE) -C addons/UserspaceExtTrig && cp -f addons/UserspaceExtTrig/UserspaceExtTrig.ko .
 	
 __SOUND_SERVER__:
-	$(MAKE) -C addons/SoundTrig && cp -f addons/SoundTrig/SoundServer . && cp -f addons/SoundTrig/LynxTrig_RT.ko .
+	$(MAKE) -C addons/SoundTrig && cp -f addons/SoundTrig/SoundServer . && cp -f addons/SoundTrig/LynxTrig_RT.ko . && cp -f addons/SoundTrig/LynxTWO-RT/LynxTWO_RT.ko .
 	
 clean: 
 	$(MAKE) -C kernel clean
@@ -24,5 +24,5 @@ clean:
 	$(MAKE) -C utils clean
 	$(MAKE) -C addons/UserspaceExtTrig/ clean
 	$(MAKE) -C addons/SoundTrig/ clean
-	rm -f RealtimeFSM.ko UserspaceExtTrig.ko FSMServer SoundServer LynxTrig_RT.ko *~ include/*~ both/*~
+	rm -f RealtimeFSM.ko UserspaceExtTrig.ko FSMServer SoundServer LynxTrig_RT.ko LynxTWO_RT.ko *~ include/*~ both/*~
 	find . -type f -name \*~ -exec rm -f {} \;
