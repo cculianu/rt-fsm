@@ -337,13 +337,13 @@ static sem_t *get_unused_sem(void);
 static struct SoftTask *get_unused_st(void);
 static int initSTs(void);
 static void cleanupSTs(void);
-
-static sem_t misc_sems[10];
+#define NUM_SOFTS_SEMS 10 /* the number of semaphores an softtasks we simultaneously support */
+static sem_t misc_sems[NUM_SOFTS_SEMS];
 static atomic_t misc_sem_idx = ATOMIC_INIT(0);
 static pthread_mutex_t misc_sem_mut;
 static int setup_sems = 0;
 
-static struct SoftTask *soft_tasks[10] = {0};
+static struct SoftTask *soft_tasks[NUM_SOFTS_SEMS] = {0};
 static atomic_t soft_task_idx = ATOMIC_INIT(0);
 static pthread_mutex_t soft_task_mut;
 static int setup_soft_tasks;
@@ -375,12 +375,12 @@ typedef struct ShmList
 static struct list_head shmList = LIST_HEAD_INIT(shmList);
 static pthread_mutex_t shmListMut;
 /** Call in any context -- rt or not -- auto-allocates shm in rt-safe manner and returns a pointer to it*/
-static void *ShmListAdd(const char *name, unsigned long size);
-/** Call in any context -- rt or not */
+static void *ShmListNew(const char *name, unsigned long size);
+/** Call in any context -- rt or not -- see if a particular shm is in our list */
 static void *ShmListFind(const char *name, unsigned long size);
-/** Call in any context-- rt or not */
+/** Call in any context-- rt or not -- deletes a specific mem form the shm list and deallocates the rtshm */
 static void ShmListDel(void *mem);
-/** Call in any context-- rt or not */
+/** Call from module_exit -- cleans up any orphaned shms. */
 static void ShmListCleanup(void);
         
 /*-----------------------------------------------------------------------------*/
@@ -993,7 +993,7 @@ static int handleFifos(CardID_t c)
         break;
       case ALLOCSOUND: {
            /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
-          void *mem = ShmListAdd(msg->u.sound.name, msg->u.sound.size);
+          void *mem = ShmListNew(msg->u.sound.name, msg->u.sound.size);
           if (mem) {
               DEBUG("ALLOCSOND: allocated shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
           } else {
@@ -1632,19 +1632,19 @@ static void *doDetachMbuffCmd(void *arg)
     return 0;
 }
 
-static void *ShmListAdd(const char *name, unsigned long size)
+static void *ShmListNew(const char *name, unsigned long size)
 {
     struct ShmList *entry = doCmdInSoftThread(ALLOC_KMEM_CMD, (void *)sizeof(*entry));
     AllocArg arg;
     if (!entry) {
-        ERROR("ShmListAdd: could not allocate a list entry data structure!\n");
+        ERROR("ShmListNew: could not allocate a list entry data structure!\n");
         return 0;
     }
     arg.name = name;
     arg.size = size;
     entry->mem = doCmdInSoftThread(ALLOC_MBUFF_CMD, (void *)&arg);
     if (!entry->mem) {
-        ERROR("ShmListAdd: failed to allocated mbuff %s size %lu\n", arg.name, arg.size);
+        ERROR("ShmListNew: failed to allocated mbuff %s size %lu\n", arg.name, arg.size);
         doCmdInSoftThread(FREE_KMEM_CMD, (void *)entry);
         return 0;
     }
@@ -1710,7 +1710,7 @@ static int initSems(void)
 {
     int i, ret;
     setup_sems = 0;
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < NUM_SOFTS_SEMS; ++i) {
         if ( (ret = sem_init(&misc_sems[i], 0, 0)) ) return ret;
         ++setup_sems;
     }
@@ -1721,7 +1721,7 @@ static int initSems(void)
 static void cleanupSems(void)
 {
     int i = 0;
-    if (setup_sems-- == 11) pthread_mutex_destroy(&misc_sem_mut);
+    if (setup_sems-- == NUM_SOFTS_SEMS) pthread_mutex_destroy(&misc_sem_mut);
     while (setup_sems--) 
             sem_destroy(&misc_sems[i++]);
 }
@@ -1730,7 +1730,7 @@ static sem_t *get_unused_sem(void)
     int i;
     pthread_mutex_lock(&misc_sem_mut);
     atomic_inc(&misc_sem_idx);
-    i = atomic_read(&misc_sem_idx) % 10;
+    i = atomic_read(&misc_sem_idx) % NUM_SOFTS_SEMS;
     pthread_mutex_unlock(&misc_sem_mut);
     return &misc_sems[i];
 }
@@ -1740,7 +1740,7 @@ static struct SoftTask *get_unused_st(void)
     int i;
     pthread_mutex_lock(&soft_task_mut);
     atomic_inc(&soft_task_idx);
-    i = atomic_read(&soft_task_idx) % 10;
+    i = atomic_read(&soft_task_idx) % NUM_SOFTS_SEMS;
     pthread_mutex_unlock(&soft_task_mut);
     return soft_tasks[i];
 }
@@ -1749,7 +1749,7 @@ static int initSTs(void)
 {
     int i;
     setup_soft_tasks = 0;
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < NUM_SOFTS_SEMS; ++i) {
         char nam[] = { 's', 't', i+'0', 0 };
         if ( !(soft_tasks[i] = softTaskCreate(mrSoftTask, nam)) ) return -ENOMEM;
         ++setup_soft_tasks;
@@ -1762,7 +1762,7 @@ static int initSTs(void)
 static void cleanupSTs(void)
 {
     int i = 0;
-    if (setup_soft_tasks-- == 11) pthread_mutex_destroy(&soft_task_mut);
+    if (setup_soft_tasks-- == NUM_SOFTS_SEMS) pthread_mutex_destroy(&soft_task_mut);
     while (setup_soft_tasks--) {
             softTaskDestroy(soft_tasks[i]);
             soft_tasks[i] = 0;
