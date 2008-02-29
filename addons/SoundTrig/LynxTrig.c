@@ -346,9 +346,11 @@ int init (void)
       return retval;
     }
 #ifdef RTAI
-  rt_set_oneshot_mode();
-  start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
-  /* Must mark linux as using FPU because of embedded C code startup */
+  if (!rt_is_hard_timer_running()) {
+    rt_set_oneshot_mode();
+    start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
+  }
+  /* Must mark linux as using FPU because of C code startup? */
   rt_linux_use_fpu(1);
 #endif
   

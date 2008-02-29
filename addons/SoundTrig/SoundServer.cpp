@@ -31,6 +31,7 @@
 #include <vector>
 #include <memory>
 #include <new>
+#include <iomanip>
 #include <pthread.h>
 #include <semaphore.h>
 
@@ -428,13 +429,13 @@ void KernelSM::allocSBMem(SoundBuffer & sb)
     unsigned n = ++shm->ctr;
     mut.unlock();
     std::ostringstream s;
-    s << "sb" << n;
+    s << std::setw(4) << std::setfill('0') << std::right << n << "au";
     sb.nam = s.str();
     RTOS::ShmStatus status;
     sb.mem = static_cast<unsigned char *>(RTOS::shmAttach(sb.name(), sb.len_bytes, &status, true));
     if (!sb.mem) {
         s.str("");
-        s << "Could not create a new rt-shm of length " << sb.len_bytes << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
+        s << "Could not create a new rt-shm of length " << sb.len_bytes << " named " << sb.nam << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
         throw Exception(s.str());
     }
 }
