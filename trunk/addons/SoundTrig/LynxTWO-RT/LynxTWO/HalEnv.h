@@ -1021,12 +1021,12 @@ extern "C" {
 
 	typedef unsigned long long	ULONGLONG;
     
-#if ARCH == x86
+#ifdef x86
     typedef unsigned int SIZE_T;
-#elif ARCH == x86_64
+#elif defined(x86_64)
     typedef unsigned long SIZE_T;
 #else
-#  error Must define ARCH to be x86 or x86_64!
+#  error Must define either x86 or x86_64!
 #endif
 	
 	//#define MAKELONG(a, b)      ((LONG)(((WORD)(a)) | ((DWORD)((WORD)(b))) << 16))
