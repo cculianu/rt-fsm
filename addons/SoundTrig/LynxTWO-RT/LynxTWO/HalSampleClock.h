@@ -48,7 +48,7 @@ typedef struct
 
 typedef struct
 {
-	long	lSRate;
+	LONG	lSRate;
 	USHORT	usM;
 	USHORT	usN;
 	USHORT	usP;
@@ -60,29 +60,29 @@ public:
 	CHalSampleClock()	{}
 	~CHalSampleClock()	{}
 
-	void	operator= (long lRate)		{ Set( lRate );	}
-			operator long()				{ return( m_lRate );	}
+	void	operator= (LONG lRate)		{ Set( lRate );	}
+			operator LONG()				{ return( m_lRate );	}
 
 	USHORT	Open( PHALADAPTER pHalAdapter );
 	USHORT	Close();
 
-	USHORT	Get( long *plRate, long *plSource, long *plReference );
-	USHORT	Get( long *plRate );
-	USHORT	Set( long lRate, long lSource, long lReference, BOOLEAN bForce = FALSE );
-	USHORT	Set( long lRate, BOOLEAN bForce = FALSE );
+	USHORT	Get( LONG *plRate, LONG *plSource, LONG *plReference );
+	USHORT	Get( LONG *plRate );
+	USHORT	Set( LONG lRate, LONG lSource, LONG lReference, BOOLEAN bForce = FALSE );
+	USHORT	Set( LONG lRate, BOOLEAN bForce = FALSE );
 	
-	USHORT	GetClockRate( long *plRate, long *plSource, long *plReference );
+	USHORT	GetClockRate( LONG *plRate, LONG *plSource, LONG *plReference );
 
-	USHORT	GetMinMax( long *plMin, long *plMax );
+	USHORT	GetMinMax( LONG *plMin, LONG *plMax );
 
 private:
-	USHORT	GetClockInfo( long *plRate, PSRREGS pSRRegs, PPLLCLOCKINFO pClockInfo, int ulNumberOfEntires );
+	USHORT	GetClockInfo( LONG *plRate, PSRREGS pSRRegs, PPLLCLOCKINFO pClockInfo, int ulNumberOfEntires );
 
 	PHALADAPTER		m_pHalAdapter;
 	CHalRegister	m_RegPLLCTL;
-	long	m_lRate;
-	long	m_lSource;
-	long	m_lReference;
+	LONG	m_lRate;
+	LONG	m_lSource;
+	LONG	m_lReference;
 	ULONG	m_ulSpeed;
 	ULONG	m_ulP;
 };

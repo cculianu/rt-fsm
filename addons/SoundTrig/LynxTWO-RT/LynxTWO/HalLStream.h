@@ -247,7 +247,7 @@ public:
 	void	DisableInterrupts();
 	void	ResetFIFOs();
 	
-	USHORT	SampleClockChanged( long lRate, long lSource, long lReference );
+	USHORT	SampleClockChanged( LONG lRate, LONG lSource, LONG lReference );
 
 	ULONG	GetDeviceID( ULONG ulPort );
 	ULONG	GetPCBRev( ULONG ulPort );

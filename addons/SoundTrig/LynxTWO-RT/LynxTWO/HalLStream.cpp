@@ -249,7 +249,7 @@ USHORT	CHalLStream::InitializeDevice( ULONG ulPort )
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT	CHalLStream::SampleClockChanged( long lRate, long lSource, long lReference )
+USHORT	CHalLStream::SampleClockChanged( LONG lRate, LONG lSource, LONG lReference )
 // Called from HalSampleClock.cpp whenever the sample clock or rate changes
 /////////////////////////////////////////////////////////////////////////////
 {
@@ -361,7 +361,7 @@ USHORT	CHalLStream::WriteControl( ULONG ulPort, ULONG ulReg, BYTE ucValue, BYTE 
 		}
 		else
 		{
-			DPF(("CHalLStream::WriteControl Port %lu is Unlocked\n", ulPort ));
+			DPF(("CHalLStream::WriteControl Port %u is Unlocked\n", ulPort ));
 			return( HSTATUS_TIMEOUT );
 		}
 	}

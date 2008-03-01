@@ -155,7 +155,7 @@ USHORT	CHalDMA::Start( BOOLEAN bDoPreload /* = TRUE */ )
 {
 	ULONG	ulStreamControl	= m_pRegStreamControl->Read();	// make sure we start with the current contents of the hardware register
 
-	DPF(("CHalDMA::Start %ld\n", m_ulDeviceNumber ));
+	DPF(("CHalDMA::Start %d\n", m_ulDeviceNumber ));
 	//DS(" DMAStart ",COLOR_BOLD);	DX8( (BYTE)m_ulDeviceNumber, COLOR_BOLD );	//DC(' ');
 	
 	m_ulLastBufferIndex = 0xFFFFFFFF;	// Invalid
@@ -283,7 +283,7 @@ USHORT	CHalDMA::AddEntry( PVOID pBuffer, ULONG ulSize, BOOLEAN bInterrupt )
 	}
 #endif
 
-	m_pBufferBlock->Entry[ m_ulPCBufferIndex ].ulHostPtr = (ULONG)pBuffer;	// this must be a physical address
+	m_pBufferBlock->Entry[ m_ulPCBufferIndex ].ulHostPtr = static_cast<ULONG>(reinterpret_cast<unsigned long>(pBuffer));	// this must be a physical address -- we hope and pray that on 64-bit linux this is ok still because DMA memory is <4 GB?
 	if( bInterrupt )
 	{
 		//DC('i');

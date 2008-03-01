@@ -39,7 +39,7 @@
 BYTE EEReadTDOBit();
 void EESetPort( short p, short val );
 void EEGetNextByte(PBYTE data);
-void EEWaitTime( long lMicroSeconds );
+void EEWaitTime( LONG lMicroSeconds );
 
 #define TCK 0
 #define TMS 1
@@ -78,7 +78,7 @@ typedef struct var_len_byte
 	BYTE val[MAX_LEN+1];  /* bytes of data */
 } LENVALUE, *PLENVALUE;
 
-long	LVValue(PLENVALUE x);
+LONG	LVValue(PLENVALUE x);
 short	LVEqual(PLENVALUE expected, PLENVALUE actual, PLENVALUE mask);
 void	LVReadValue(PLENVALUE x, short numBytes);
 
@@ -102,7 +102,7 @@ typedef struct tagSXsvfInfo
 	/* XSVF status information */
 	BYTE		ucComplete;         /* 0 = running; 1 = complete */
 	BYTE		ucCommand;          /* Current XSVF command BYTE */
-	long		lCommandCount;      /* Number of commands processed */
+	LONG		lCommandCount;      /* Number of commands processed */
 	int			iErrorCode;         /* An error code. 0 = no error. */
 
 	/* TAP state/sequencing information */
@@ -112,10 +112,10 @@ typedef struct tagSXsvfInfo
 
 	/* RUNTEST information */
 	BYTE		ucMaxRepeat;        /* Max repeat loops (for xc9500/xl) */
-	long		lRunTestTime;       /* Pre-specified RUNTEST time (usec) */
+	LONG		lRunTestTime;       /* Pre-specified RUNTEST time (usec) */
 
 	/* Shift Data Info and Buffers */
-	long		lShiftLengthBits;   /* Len. current shift data in bits */
+	LONG		lShiftLengthBits;   /* Len. current shift data in bits */
 	short		sShiftLengthBytes;  /* Len. current shift data in bytes */
 
 	LENVALUE	lvTdi;              /* Current TDI shift data */
@@ -155,13 +155,13 @@ typedef int (*TXsvfDoCmdFuncPtr)( SXsvfInfo* );
 #define XTAPSTATE_MASKREG   0x30    // Mask to extract the register kind 
 
 /////////////////////////////////////////////////////////////////////////////
-long	LVValue( PLENVALUE plvValue )
+LONG	LVValue( PLENVALUE plvValue )
 //	Description:  Extract the long value from the lenval array.
 //	Parameters:   plvValue    - ptr to lenval.
 //	Returns:      long        - the extracted value.
 /////////////////////////////////////////////////////////////////////////////
 {
-	long    lValue;         // result to hold the accumulated result 
+	LONG    lValue;         // result to hold the accumulated result 
 	short   sIndex;
 	
 	lValue  = 0;
@@ -249,7 +249,7 @@ void EEPulseClock()
 // Parameters:   lNumBits    - the number of bits.
 // Returns:      short       - the number of bytes to store the number of bits.
 /////////////////////////////////////////////////////////////////////////////
-short xsvfGetAsNumBytes( long lNumBits )
+short xsvfGetAsNumBytes( LONG lNumBits )
 {
     return( (short)( ( lNumBits + 7L ) / 8L ) );
 }
@@ -411,7 +411,7 @@ int xsvfGotoTapState( PBYTE pucTapState, BYTE ucTargetState )
 *               plvTdoCaptured  - ptr to lenval for storing captured TDO data.
 * Returns:      void.
 *****************************************************************************/
-void xsvfShiftOnly( long lNumBits, PLENVALUE plvTdi, PLENVALUE plvTdoCaptured )
+void xsvfShiftOnly( LONG lNumBits, PLENVALUE plvTdi, PLENVALUE plvTdoCaptured )
 {
     PBYTE  pucTdi;
     PBYTE  pucTdo;
@@ -489,9 +489,9 @@ void xsvfShiftOnly( long lNumBits, PLENVALUE plvTdi, PLENVALUE plvTdoCaptured )
 *               Skip the EEWaitTime() if plvTdoMask->val[0:plvTdoMask->len-1]
 *               is NOT all zeros and sMatch==1.
 *****************************************************************************/
-int xsvfShift( PBYTE pucTapState, BYTE ucStartState, long lNumBits, 
+int xsvfShift( PBYTE pucTapState, BYTE ucStartState, LONG lNumBits, 
 	PLENVALUE plvTdi, PLENVALUE plvTdoCaptured, PLENVALUE plvTdoExpected, PLENVALUE plvTdoMask, 
-	BYTE ucEndState, long lRunTestTime, BYTE ucMaxRepeat )
+	BYTE ucEndState, LONG lRunTestTime, BYTE ucMaxRepeat )
 {
     int             iErrorCode;
     int             iMismatch;
@@ -590,9 +590,9 @@ int xsvfShift( PBYTE pucTapState, BYTE ucStartState, long lNumBits,
 *               ucMaxRepeat         - maximum xc9500/xl retries.
 * Returns:      int                 - 0 = success; otherwise TDO mismatch.
 ****************************************************************************/
-int xsvfBasicXSDRTDO( PBYTE pucTapState, long lShiftLengthBits, short sShiftLengthBytes, PLENVALUE plvTdi, 
+int xsvfBasicXSDRTDO( PBYTE pucTapState, LONG lShiftLengthBits, short sShiftLengthBytes, PLENVALUE plvTdi, 
 	PLENVALUE plvTdoCaptured, PLENVALUE plvTdoExpected, PLENVALUE plvTdoMask, 
-	BYTE ucEndState, long lRunTestTime, BYTE ucMaxRepeat )
+	BYTE ucEndState, LONG lRunTestTime, BYTE ucMaxRepeat )
 {
     LVReadValue( plvTdi, sShiftLengthBytes );
     if ( plvTdoExpected )
@@ -1018,13 +1018,13 @@ BYTE EEReadTDOBit()
 }
 
 /////////////////////////////////////////////////////////////////////////////
-void EEWaitTime( long lMicroSeconds )
+void EEWaitTime( LONG lMicroSeconds )
 //	Wait at least the specified number of microsec.                           
 /////////////////////////////////////////////////////////////////////////////
 {
 	ULONG	ulDummy;	// keep the compiler from complaining
 	// each PCI read takes 330ns best case (fastest).  It takes 3 reads per microsecond
-	long    lCount = lMicroSeconds * 10;
+	LONG    lCount = lMicroSeconds * 10;
 	
 	while( lCount-- )
 	{
@@ -1045,6 +1045,7 @@ void EEGetNextByte( PBYTE pucByte )
 BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 //////////////////////////////////////////////////////////////////////////////
 {
+    DEBUG_MSG("EEPROMGetSerialNumber(%p,%p)\n", pulSerialNumber, pL2Registers);
 	BOOLEAN	bFail = FALSE;
 	SXsvfInfo xsvfInfo;
 	BYTE ucL2IDRead[] = 
@@ -1068,8 +1069,8 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 		
 		gpL2ControlReg	= &((PLYNXTWOREGISTERS)pL2Registers)->PCICTL;
 		gpL2StatusReg	= &((PLYNXTWOREGISTERS)pL2Registers)->MISTAT;
-
-		gulControlReg	= 0;
+		
+        gulControlReg	= 0;
 
 		RtlZeroMemory( &xsvfInfo, sizeof( SXsvfInfo ) );
 		
@@ -1078,7 +1079,7 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 		
 		// Execute the XSVF in the file 
 		xsvfExecute( &xsvfInfo );
-		
+        		
 		// Disable PCI Configuration and put the register back to how it should be...
 		WRITE_REGISTER_ULONG( gpL2ControlReg, 0 );
 
@@ -1092,7 +1093,7 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 		{
 			USHORT usDeviceID = (USHORT)READ_REGISTER_ULONG( &((PLYNXTWOREGISTERS)pL2Registers)->PDBlock.DeviceID );
 			(void) usDeviceID; // avoid compiler warnings about unused..
-			DPF(("EEPROMGetSerialNumber Failed! %x Err [%d] Count [%ld] Len [%d]\n", usDeviceID, xsvfInfo.iErrorCode, xsvfInfo.lCommandCount, xsvfInfo.lvTdoExpected.len ));
+			DPF(("EEPROMGetSerialNumber Failed! %x Err [%d] Count [%d] Len [%d]\n", usDeviceID, xsvfInfo.iErrorCode, xsvfInfo.lCommandCount, xsvfInfo.lvTdoExpected.len ));
 			bFail = TRUE;
 		}
 	}
@@ -1103,6 +1104,8 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 		return( TRUE );
 	}
 #endif
+
+    DEBUG_MSG("EEPROMGetSerialNumber() return = %x\n", *pulSerialNumber);
 
 	return( bFail );
 }

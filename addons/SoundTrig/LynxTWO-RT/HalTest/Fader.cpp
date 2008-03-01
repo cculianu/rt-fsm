@@ -227,7 +227,7 @@ int		FaderGetPosition( HWND hFader )
 }
 
 /////////////////////////////////////////////////////////////////////////////
-long WINAPI FaderWndProc( HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam )
+LONG WINAPI FaderWndProc( HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam )
 /////////////////////////////////////////////////////////////////////////////
 {
 	PAINTSTRUCT	ps;

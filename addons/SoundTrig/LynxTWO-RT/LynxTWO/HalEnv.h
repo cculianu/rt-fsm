@@ -975,11 +975,11 @@ extern "C" {
 #          define TRUE    1
 #       endif
 
-#       ifndef FALSE
-#	   define FALSE   0
+#   ifndef FALSE
+#	      define FALSE   0
 #	endif
 
-#	define FAR                 
+#	define FAR
 #	define NEAR
 	
 #	define VOID                void
@@ -991,31 +991,43 @@ extern "C" {
 	typedef char				CHAR;
 
 	typedef short				SHORT;
-	typedef long				LONG;
+	/*typedef long				LONG;*/
+    typedef int                 LONG; /* make it LP64 safe */
 	typedef unsigned short		USHORT;
-	typedef unsigned long		ULONG;
-
+	/*typedef unsigned long		ULONG;*/
+    typedef unsigned int		ULONG; /* make it LP64 safe */
+    
 	typedef short FAR			*PSHORT;
-	typedef long FAR			*PLONG;
+	/*typedef long FAR			*PLONG;*/
+    typedef LONG FAR            *PLONG;
 	typedef unsigned short FAR	*PUSHORT;
-	typedef unsigned long FAR	*PULONG;
+	/*typedef unsigned long FAR	*PULONG;*/
+    typedef ULONG FAR	*PULONG;
 	
 	typedef unsigned char FAR	*PBYTE;
 	typedef unsigned char FAR	*PUCHAR;
 	typedef unsigned char FAR	*PVOID;
 	typedef unsigned char FAR	*LPUCHAR;
-	typedef unsigned long FAR	*LPULONG;
+	typedef ULONG FAR	*LPULONG;
 	typedef unsigned char FAR	*LPVOID;
 
 	typedef unsigned char       BYTE;
 	typedef unsigned short      WORD;
-	typedef unsigned long       DWORD;
+	typedef unsigned int        DWORD;
 	typedef unsigned int		UINT;
 	
 	typedef long long			__int64;
 	typedef long long			LONGLONG;
 
 	typedef unsigned long long	ULONGLONG;
+    
+#if ARCH == x86
+    typedef unsigned int SIZE_T;
+#elif ARCH == x86_64
+    typedef unsigned long SIZE_T;
+#else
+#  error Must define ARCH to be x86 or x86_64!
+#endif
 	
 	//#define MAKELONG(a, b)      ((LONG)(((WORD)(a)) | ((DWORD)((WORD)(b))) << 16))
 	//#define MAKEWORD(a, b)      ((WORD)(((BYTE)(a)) | ((WORD)((BYTE)(b))) << 8))
@@ -1066,9 +1078,9 @@ extern "C" {
 
 #ifdef __cplusplus
 // operator new and delete implemented in LinuxGlue.cpp
-extern void *operator new(unsigned int size);
+extern void *operator new(SIZE_T size);
 extern void operator delete(void *p);
-extern void *operator new[](unsigned int size);
+extern void *operator new[](SIZE_T size);
 extern void operator delete[](void *p);
 #endif
 

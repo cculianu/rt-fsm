@@ -190,7 +190,7 @@ USHORT	CHalWaveDevice::Start()
 			DPF(("MODE_RUN\n"));
 		}
 
-		DPF(("SynStartReady [%04lx]\n", ulStreamControl & REG_STREAMCTL_FMT_MASK ));
+		DPF(("SynStartReady [%04x]\n", ulStreamControl & REG_STREAMCTL_FMT_MASK ));
 		m_pHalAdapter->SyncStartReady( m_ulDeviceNumber, ulStreamControl );
 		// reset the sync start enabled status for next time.
 		m_bSyncStartEnabled = FALSE;
@@ -328,9 +328,9 @@ USHORT	CHalWaveDevice::ValidateFormat( USHORT wFormatTag, LONG lChannels, LONG l
 		//DPF(("CHalWaveDevice::Validate: Not WAVE_FORMAT_PCM!"));
 		
 		DPF(("Format [%04x] ",	wFormatTag ));
-		DPF(("Ch [%ld] ",		lChannels ));
-		DPF(("SR [%ld] ",		lSampleRate ));
-		DPF(("Bits [%ld]\n",	lBitsPerSample ));
+		DPF(("Ch [%d] ",		lChannels ));
+		DPF(("SR [%d] ",		lSampleRate ));
+		DPF(("Bits [%d]\n",	lBitsPerSample ));
 
 		return( HSTATUS_INVALID_FORMAT );
 	}
@@ -397,7 +397,7 @@ USHORT	CHalWaveDevice::ValidateFormat( USHORT wFormatTag, LONG lChannels, LONG l
 		m_pHalAdapter->GetSampleClock()->Get( &lCurrentRate );
 		if( lCurrentRate != lSampleRate )
 		{
-			DPF(("CHalWaveDevice::Validate: lSampleRate doesn't match rate of running devices!  Requested: %ld  RunningDevs: %ld\n", lSampleRate, lCurrentRate));
+			DPF(("CHalWaveDevice::Validate: lSampleRate doesn't match rate of running devices!  Requested: %d  RunningDevs: %d\n", lSampleRate, lCurrentRate));
 			return( HSTATUS_INVALID_SAMPLERATE );
 		}
 	}
@@ -405,20 +405,20 @@ USHORT	CHalWaveDevice::ValidateFormat( USHORT wFormatTag, LONG lChannels, LONG l
 	// Validate nSamplesPerSec field
 	if( lSampleRate < MIN_SAMPLE_RATE )
 	{
-		DPF(("CHalWaveDevice::Validate: Invalid lSampleRate! %lu\n", lSampleRate ));
+		DPF(("CHalWaveDevice::Validate: Invalid lSampleRate! %u\n", lSampleRate ));
 		return( HSTATUS_INVALID_SAMPLERATE );
 	}
 
 	if( lSampleRate > MAX_SAMPLE_RATE )
 	{
-		DPF(("CHalWaveDevice::Validate: Invalid lSampleRate! %lu\n", lSampleRate ));
+		DPF(("CHalWaveDevice::Validate: Invalid lSampleRate! %u\n", lSampleRate ));
 		return( HSTATUS_INVALID_SAMPLERATE );
 	}
 
 	// Validate lBlockAlign
 	if( lBlockAlign != ((lBitsPerSample * lChannels) / 8) )
 	{
-		DPF(("CHalWaveDevice::Validate: Invalid lBlockAlign %ld!\n", lBlockAlign));
+		DPF(("CHalWaveDevice::Validate: Invalid lBlockAlign %d!\n", lBlockAlign));
 		return( HSTATUS_INVALID_FORMAT );
 	}
 
@@ -862,7 +862,7 @@ USHORT	CHalWaveDevice::Service()
 	{
 		DB('O',COLOR_BOLD);
 		m_ulOverrunCount++;
-		DPF(("\nCHalWaveDevice: Overrun Detected %ld\n", m_ulOverrunCount ));
+		DPF(("\nCHalWaveDevice: Overrun Detected %d\n", m_ulOverrunCount ));
 		ulReason = kReasonWaveEmpty;
 	}
 

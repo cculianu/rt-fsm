@@ -11,8 +11,10 @@
 #define ERROR(x...) linux_error(x)
 #ifndef NDEBUG
 #  define DEBUG_MSG(x...) do { if (debug) linux_debug(x); } while(0)
+#  define DEBUG_CRAZY(x...) do { if (debug > 1) linux_debug(x); } while(0)
 #else
 #  define DEBUG_MSG(x...) do { } while(0)
+#  define DEBUG_CRAZY(x...) do {} while (0)
 #endif
 #ifdef __cplusplus
 extern "C" {

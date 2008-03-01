@@ -63,7 +63,7 @@ USHORT LinuxGlue::AllocateDMA(PVOID pCtx, PVOID *pVAddr, PVOID *pPAddr,
   void *virt;
   unsigned long phys;
 
-  DEBUG_MSG("LinuxGlue::AllocateDMA() ulAddressMask is: %08lx\n", ulAddressMask);
+  DEBUG_MSG("LinuxGlue::AllocateDMA() ulAddressMask is: %08x\n", ulAddressMask);
 
   USHORT ret = linux_allocate_dma_mem(ctx, &virt, &phys, ulLength); 
   if ( 0 == ret ) {
@@ -103,7 +103,7 @@ USHORT LinuxGlue::MapIO( PVOID pContext, PPCI_CONFIGURATION pPCI )
     if (vaddr) {
       // save values in PCI_CONFIGURATION... 
       base.ulPhysicalAddress = phys;
-      base.ulAddress = reinterpret_cast<ULONG>(vaddr);
+      base.ulAddress = static_cast<ULONG>(reinterpret_cast<unsigned long>(vaddr));
       base.ulSize = len;
       base.usType = PCI_BARTYPE_MEM; // erm it's all memory mapped, right?!
       ++ok;
@@ -132,7 +132,7 @@ PHALADAPTER LinuxGlue::GetHalAdapter(PVOID pContext, ULONG ulAdapterNum)
   return 0;
 }
 
-void *operator new(unsigned int size)
+void *operator new(SIZE_T size)
 {
   return linux_allocate(size);
 }
@@ -142,7 +142,7 @@ void operator delete(void *p)
   linux_free(p);
 }
 
-void *operator new[](unsigned int size)
+void *operator new[](SIZE_T size)
 {
   return linux_allocate(size);
 }
@@ -256,7 +256,7 @@ extern "C" {
   
   L22LINKAGE unsigned short LynxSetAudioBuffer(LinuxContext *ctx,
                                     void *buffer, 
-                                    unsigned long nbytes, 
+                                    ULONG nbytes, 
                                     int format_code,
                                     unsigned chan,
                                     int looped)
@@ -431,10 +431,10 @@ extern "C" {
     // 1000 DWORDs later the mixer will come back on after it settles.
     if (ctx && ctx->priv && ctx->priv->adapter) {
       ctx->priv->adapter->GetSampleClock()->Set(SampleRate);
-      long actualRate = 0;
+      LONG actualRate = 0;
       ctx->priv->adapter->GetSampleClock()->Get(&actualRate);
-      if ((long)SampleRate != actualRate)
-        WARNING("Actual sampling rate of %ld differs from requested rate of %u!\n", actualRate, SampleRate);
+      if ((LONG)SampleRate != actualRate)
+        WARNING("Actual sampling rate of %ld differs from requested rate of %u!\n", (long)actualRate, SampleRate);
       SampleRate = actualRate; // comes from global var.. 
     }
   }
@@ -609,7 +609,7 @@ L22LINKAGE void LynxDoDMAPoll(struct LinuxContext *ctx)
     PHALDMA dma = dev->GetDMA();
 #ifdef DEBUG
     ULONG h = dma->GetEntriesInHardware(), e = dma->GetNumberOfEntries();
-    DEBUG_MSG("LynxDoDMAPoll: h: %lu  e: %lu  r0: %lu r1: %lu\n", h, e, dma->GetBytesRemaining(0), dma->GetBytesRemaining(1));
+    DEBUG_MSG("LynxDoDMAPoll: h: %u  e: %u  r0: %u r1: %u\n", h, e, dma->GetBytesRemaining(0), dma->GetBytesRemaining(1));
     if (dma->IsDMAStarved()) {
       DEBUG_MSG("LynxDoDMAPoll: dma is starved for channel %d\n", chan);
     }
