@@ -22,11 +22,11 @@ MOD_OBJS = \
 ifneq ($(MACH),x86_64)
 # regular x86?
 MOD_OBJS +=  _divdi3.o _udivdi3.o
-CXXFLAGS += -DARCH=x86
+CXXFLAGS += -Dx86
 
 else
 # x86_64
-CXXFLAGS += -mcmodel=kernel -DARCH=x86_64
+CXXFLAGS += -mcmodel=kernel -Dx86_64
 
 endif
 
