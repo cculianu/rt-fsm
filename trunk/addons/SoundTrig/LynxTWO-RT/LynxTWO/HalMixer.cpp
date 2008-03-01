@@ -776,7 +776,7 @@ BOOLEAN	CHalMixer::IsControlWriteable( USHORT usControl )
 USHORT CHalMixer::SetControl( USHORT usDstLine, USHORT usSrcLine, USHORT usControl, USHORT usChannel, ULONG ulValue )
 /////////////////////////////////////////////////////////////////////////////
 {
-	long	lRate, lSource, lReference;
+	LONG	lRate, lSource, lReference;
 	USHORT	usCh, usDst, usSrc;
 
 	if( !m_bOpen )
@@ -1252,7 +1252,7 @@ USHORT CHalMixer::SetControl( USHORT usDstLine, USHORT usSrcLine, USHORT usContr
 USHORT	CHalMixer::GetControl( USHORT usDstLine, USHORT usSrcLine, USHORT usControl, USHORT usChannel, PULONG pulValue, ULONG ulSize )
 /////////////////////////////////////////////////////////////////////////////
 {
-	long	lRate, lSource, lReference;
+	LONG	lRate, lSource, lReference;
 	USHORT	usDst, usSrc;
 	USHORT	usCh;
 	//DPF(("CHalMixer::GetControl Dst %d Src %d Ctl %d V[%08lx]\n", usDstLine, usSrcLine, usControl, (ULONG)pulValue ));

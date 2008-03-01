@@ -1,9 +1,10 @@
 
 # comment this out to disable debug
-#DEBUG = -DDEBUG -g
-DEBUG = -DNDEBUG 
+DEBUG = -DDEBUG -g
+#DEBUG = -DNDEBUG 
 #DEBUG = -DDEBUG -g -DTIME_ISR
 #DEBUG = -DNDEBUG -DTIME_ISR
+MACH = $(shell uname -m)
 
 SRC_CXX = \
 	  LinuxGlue.cpp \
@@ -16,10 +17,21 @@ MOD_OBJS = \
           Hal4114.o     HalDevice.o      HalMixer.o      HalSampleClock.o \
           Hal8420.o     HalEEPROM.o      HalPlayMix.o    HalTimecode.o \
           HalAdapter.o  HalLStream.o     HalRecordMix.o  HalWaveDMADevice.o \
-          HalDMA.o      HalMIDIDevice.o  HalRegister.o   HalWaveDevice.o \
-          _divdi3.o _udivdi3.o
+          HalDMA.o      HalMIDIDevice.o  HalRegister.o   HalWaveDevice.o 
+          
+ifneq ($(MACH),x86_64)
+# regular x86?
+MOD_OBJS +=  _divdi3.o _udivdi3.o
+CXXFLAGS += -DARCH=x86
+
+else
+# x86_64
+CXXFLAGS += -mcmodel=kernel -DARCH=x86_64
+
+endif
+
 CXX=g++
-CXXFLAGS += -W -Wall -fno-rtti -nostdinc -fno-exceptions -nostdinc++ -fms-extensions -DLINUX -DRTAI  $(DEBUG) -I../ -I. -I../Include
+CXXFLAGS += -W -Wall -fno-rtti -nostartfiles -nostdinc -fno-exceptions -nostdinc++ -fms-extensions -fno-pic -fno-PIC -DLINUX -DRTAI  $(DEBUG) -I../ -I. -I../Include
 TARGET=LynxTWO.o
 
 .cpp.o:
@@ -42,5 +54,5 @@ clean:
 	rm -f *~ *.o *.oS Makefile.bak \* .deps 
 
 $(TARGET): $(MOD_OBJS) 
-	ld -r -o $(TARGET) $(MOD_OBJS) 
+	$(LD) -r -o $(TARGET) $(MOD_OBJS) 
 

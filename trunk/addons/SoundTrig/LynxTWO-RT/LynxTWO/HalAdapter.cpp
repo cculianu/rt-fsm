@@ -218,7 +218,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 			ulData = READ_REGISTER_ULONG( pAddr + i );
 			if( ulData != ulTestData )
 			{
-				DPF(("Bad Adapter Ram at %08lx [%08lx] Read [%08lx] XOR [%08lx]\n", i, ulTestData, ulData, ulData^ulTestData ));
+				DPF(("Bad Adapter Ram at %08x [%08x] Read [%08x] XOR [%08x]\n", i, ulTestData, ulData, ulData^ulTestData ));
 				m_HalDriverInfo.pUnmap( m_HalDriverInfo.pContext, &m_PCIConfig );
 				return( HSTATUS_BAD_ADAPTER_RAM );
 			}
@@ -239,7 +239,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	usStatus = (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.LY );
 	if( usStatus != 0x4C59 )	// 0x4C='L' 0x59='Y'
 	{
-		DPF(("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08lx\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.LY ) ));
+		DPF(("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08x\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.LY ) ));
 		m_HalDriverInfo.pUnmap( m_HalDriverInfo.pContext, &m_PCIConfig );
 		return( HSTATUS_INCORRECT_FIRMWARE );
 	}
@@ -247,7 +247,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	usStatus = (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.NX );
 	if( usStatus != 0x4E58 )	// 0x4E='N' 0x58='X'
 	{
-		DPF(("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08lx\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.NX ) ));
+		DPF(("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08x\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.NX ) ));
 		m_HalDriverInfo.pUnmap( m_HalDriverInfo.pContext, &m_PCIConfig );
 		return( HSTATUS_INCORRECT_FIRMWARE );
 	}
@@ -298,7 +298,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	/////////////////////////////////////////////////////////////////////////
 	if( m_ulSerialNumber != 0xFFFFFFFF )
 	{
-		DPF(("Serial Number %08lx\n", m_ulSerialNumber ));
+		DPF(("Serial Number %08x\n", m_ulSerialNumber ));
 		// Custom OEM LynxTWO-A Board Requirements
 		if( (L2SN_GET_MODEL( m_ulSerialNumber ) == PCIDEVICE_LYNXTWO_A) && 
 			(

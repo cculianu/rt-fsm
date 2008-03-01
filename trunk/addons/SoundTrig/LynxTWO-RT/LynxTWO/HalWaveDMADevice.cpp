@@ -233,7 +233,7 @@ USHORT	CHalWaveDMADevice::Service( BOOLEAN bDMABufferComplete )
 	{
 		DB('O',COLOR_BOLD_U);
 		m_ulOverrunCount++;
-		DPF(("DMA Overrun Detected %lu on %d\n",m_ulOverrunCount,  (int)GetDeviceNumber()));
+		DPF(("DMA Overrun Detected %u on %d\n",m_ulOverrunCount,  (int)GetDeviceNumber()));
 		ulReason = kReasonDMAEmpty;
 	}
 

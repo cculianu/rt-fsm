@@ -61,7 +61,7 @@ USHORT	CHalSampleClock::Close()
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT CHalSampleClock::Set( long lRate, BOOLEAN bForce )
+USHORT CHalSampleClock::Set( LONG lRate, BOOLEAN bForce )
 /////////////////////////////////////////////////////////////////////////////
 {
 	return( Set( lRate, m_lSource, m_lReference, bForce ) );
@@ -227,7 +227,7 @@ static SRREGS	tblTIPll_27MHzClk[] =
 #define ARRAYSIZE( a )		(sizeof(a)/sizeof(a[0]))
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT CHalSampleClock::Set( long lRate, long lSource, long lReference, BOOLEAN bForce )
+USHORT CHalSampleClock::Set( LONG lRate, LONG lSource, LONG lReference, BOOLEAN bForce )
 /////////////////////////////////////////////////////////////////////////////
 {
 	PLLCLOCKINFO	ClockInfo;
@@ -235,7 +235,7 @@ USHORT CHalSampleClock::Set( long lRate, long lSource, long lReference, BOOLEAN 
 	PHAL4114		pAK4114 = m_pHalAdapter->Get4114();
 	PHALMIXER		pMixer = m_pHalAdapter->GetMixer();
 	USHORT			usDeviceID = m_pHalAdapter->GetDeviceID();
-	long			lOriginalSource = m_lSource;
+	LONG			lOriginalSource = m_lSource;
 	ULONG			bWideWireIn;
 
 	// correct any code that isn't AES16 aware
@@ -354,7 +354,7 @@ USHORT CHalSampleClock::Set( long lRate, long lSource, long lReference, BOOLEAN 
 			GetClockInfo( &lRate, tbl27MHzClk, &ClockInfo, ARRAYSIZE(tbl27MHzClk) );
 			break;
 		default:
-			DPF(("Invalid lReference [%08lx]\n", lReference ));
+			DPF(("Invalid lReference [%08x]\n", lReference ));
 			return( HSTATUS_INVALID_MIXER_VALUE );
 		}
 		break;
@@ -391,7 +391,7 @@ USHORT CHalSampleClock::Set( long lRate, long lSource, long lReference, BOOLEAN 
 		ClockInfo.ulWord	= 1;
 		break;
 	default:
-		DPF(("Invalid lSource [%08lx]\n", lSource ));
+		DPF(("Invalid lSource [%08x]\n", lSource ));
 		return( HSTATUS_INVALID_MIXER_VALUE );
 	}
 
@@ -504,7 +504,7 @@ USHORT CHalSampleClock::Set( long lRate, long lSource, long lReference, BOOLEAN 
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT CHalSampleClock::Get(long *plRate)
+USHORT CHalSampleClock::Get(LONG *plRate)
 /////////////////////////////////////////////////////////////////////////////
 {
 	*plRate = m_lRate;
@@ -513,7 +513,7 @@ USHORT CHalSampleClock::Get(long *plRate)
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT CHalSampleClock::Get(long *plRate, long *plSource, long *plReference)
+USHORT CHalSampleClock::Get(LONG *plRate, LONG *plSource, LONG *plReference)
 /////////////////////////////////////////////////////////////////////////////
 {
 	*plRate			= m_lRate;
@@ -524,7 +524,7 @@ USHORT CHalSampleClock::Get(long *plRate, long *plSource, long *plReference)
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT CHalSampleClock::GetClockRate( long *plRate, long *plSource, long *plReference )
+USHORT CHalSampleClock::GetClockRate( LONG *plRate, LONG *plSource, LONG *plReference )
 /////////////////////////////////////////////////////////////////////////////
 {
 	PHAL8420	pCS8420 = m_pHalAdapter->Get8420();
@@ -698,7 +698,7 @@ USHORT CHalSampleClock::GetClockRate( long *plRate, long *plSource, long *plRefe
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT CHalSampleClock::GetMinMax( long *plMin, long *plMax )
+USHORT CHalSampleClock::GetMinMax( LONG *plMin, LONG *plMax )
 /////////////////////////////////////////////////////////////////////////////
 {
 	if( m_pHalAdapter->HasP16() )
@@ -712,7 +712,7 @@ USHORT CHalSampleClock::GetMinMax( long *plMin, long *plMax )
 }
 
 /////////////////////////////////////////////////////////////////////////////
-USHORT	CHalSampleClock::GetClockInfo( long *plRate, PSRREGS pSRRegs, PPLLCLOCKINFO pClockInfo, int ulNumberOfEntires )
+USHORT	CHalSampleClock::GetClockInfo( LONG *plRate, PSRREGS pSRRegs, PPLLCLOCKINFO pClockInfo, int ulNumberOfEntires )
 // private
 /////////////////////////////////////////////////////////////////////////////
 {

@@ -45,7 +45,7 @@ extern "C" {
 #define PCIDEVICE_LYNX_AES16		0x0024
 #define PCIDEVICE_LYNX_AES16SRC		0x0025
 
-typedef unsigned long	MBX;
+typedef ULONG	MBX;
 
 /////////////////////////////////////////////////////////////////////////////
 // Sample Rate

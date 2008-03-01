@@ -49,7 +49,7 @@ extern "C" {
   /* Use this to tell the driver code the soundfile you want to play */
   L22LINKAGE extern unsigned short LynxSetAudioBuffer(LinuxContext *ctx,
                                            void *buffer, 
-                                           unsigned long num_bytes, 
+                                           ULONG num_bytes, 
                                            int format_code,
                                            unsigned chan /*0 to L22_NUM_CHANS*/,
                                            int looped);
@@ -61,9 +61,9 @@ extern "C" {
 
   /** Returns 0 on success, nonzero on error. Volume should be between 
       0 (mute) and 0xFFFF (maximum volume) */
-  L22LINKAGE extern int LynxSetVolume(LinuxContext *, unsigned chan, unsigned long volume);
+  L22LINKAGE extern int LynxSetVolume(LinuxContext *, unsigned chan, ULONG volume);
   /** Returns the volume as a value between 0 and 0xFFFF. */
-  L22LINKAGE extern unsigned long LynxGetVolume(LinuxContext *, unsigned chan);
+  L22LINKAGE extern ULONG LynxGetVolume(LinuxContext *, unsigned chan);
 
   /** Returns true iff Lynx is playing a sound currently on 
       the specified channel. Note that this will almost always return true. */

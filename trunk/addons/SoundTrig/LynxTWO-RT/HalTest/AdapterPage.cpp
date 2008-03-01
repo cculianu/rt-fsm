@@ -16,8 +16,8 @@ static char THIS_FILE[] = __FILE__;
 /////////////////////////////////////////////////////////////////////////////
 // CAdapterPage property page
 
-long	glSampleRates[] = { 8000, 11025, 16000, 22050, 32000, 44100, 48000, 64000, 88200, 96000, 128000, 176400, 192000 };
-#define NUM_SAMPLE_RATES	(sizeof( glSampleRates ) / sizeof( long ))
+LONG	glSampleRates[] = { 8000, 11025, 16000, 22050, 32000, 44100, 48000, 64000, 88200, 96000, 128000, 176400, 192000 };
+#define NUM_SAMPLE_RATES	(sizeof( glSampleRates ) / sizeof( *glSampleRates ))
 
 char	*gpszClockSource[]		= { "Internal", "Digital", "External", "Header", "Video", "Option Port 1", "Option Port 2" };
 char	*gpszClockReference[]	= { "Auto", "13.5MHz", "27MHz", "Word", "Word256" };
@@ -362,7 +362,7 @@ BOOL CAdapterPage::OnApply()
 void CAdapterPage::UpdateSampleClock()
 /////////////////////////////////////////////////////////////////////////////
 {
-	long	lRate, lSource, lReference;
+	LONG	lRate, lSource, lReference;
 	ULONG	ulValue;
 
 	m_pHalAdapter->GetSampleClock()->Get( &lRate, &lSource, &lReference );

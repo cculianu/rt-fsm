@@ -66,7 +66,7 @@ public:
 private:
 	PHALADAPTER		m_pHalAdapter;
 	ULONG			m_ulPCBufferIndex;
-	volatile long	m_lEntriesInList;
+	volatile LONG	m_lEntriesInList;
 	PDMABUFFERBLOCK	m_pBufferBlock;
 	ULONG			m_ulDeviceNumber;
 	PHALWAVEDMADEVICE	m_pWaveDMADevice;

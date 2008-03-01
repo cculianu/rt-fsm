@@ -47,13 +47,16 @@ int debug = 0;
 
 L22LINKAGE ULONG read_register_ulong(volatile const void *pAddr)
 {
-  ULONG ret = readl(pAddr);
+  ULONG ret;
+  DEBUG_CRAZY("read_register_ulong(%p)\n", pAddr);
+  ret = readl(pAddr);
   wmb();
   return ret;
 }
 
 L22LINKAGE void write_register_ulong(volatile void *pAddr, ULONG value)
 {
+  DEBUG_CRAZY("write_register_ulong(%p,%x)\n", pAddr, value);
   writel(value, pAddr);
   rmb();
 }
@@ -127,6 +130,7 @@ L22LINKAGE void * linux_map_io(LinuxContext *ctx, unsigned bar, unsigned long *p
   ctx->regions[bar].virt = virt;
   ctx->regions[bar].phys = start;
   ctx->regions[bar].len = rlen;
+  DEBUG_MSG("%p = linux_map_io(%p,%x,%lx,%lx) returning..\n", virt, ctx,bar,*phys,*len);
   return virt;
 }
 
