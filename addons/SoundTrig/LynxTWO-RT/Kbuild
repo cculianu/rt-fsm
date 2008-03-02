@@ -12,7 +12,7 @@ MACH=$(shell uname -m)
 ifeq ($MACH,x86)
 EXTRA_CFLAGS += -Dx86
 else
-EXTRA_CFLAGS += -Dx86_64
+EXTRA_CFLAGS += -Dx86_64 -msse -msse2
 endif
 obj-m      := $(TARGET).o
 $(TARGET)-y  := $(OBJS)
