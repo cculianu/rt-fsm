@@ -8,8 +8,15 @@ COMEDIDIR = /usr/src/comedi
 PWD = $(shell pwd)
 DEST = /lib/modules/$(CURRENT)/kernel/$(MDIR)
 EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)/../include -I$(COMEDIDIR)/include -I/usr/include -DRTAI
+MACH = $(shell uname -m)
 
-ifeq ($(KERNELRELEASE),) 
+ifeq ($(MACH), x86_64)
+# workaround for kernel build system sometimes addind -mno-see and -mno-sse2 which messes up our
+# use of floats in the kernel
+EXTRA_CFLAGS += -msse -msse2
+endif
+
+ifeq ($(KERNELRELEASE),)
 
 all: 
 		make -C $(KDIR) M=$(PWD) modules

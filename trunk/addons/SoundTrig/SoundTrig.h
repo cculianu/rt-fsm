@@ -27,6 +27,7 @@ enum FifoMsgID {
     GETLASTEVENT, /**< Query the event we are playing/last played, if any.. */
     GETRUNTIME, /**< The time we have been running.. */
     ALLOCSOUND, /**< Allocate space for a sound buffer in Kernel */
+    FREESOUND, /**< Not normally issued, but free a buffer previously allocated with allocsound */
     SOUNDTRIG_MSG_ID_MAX
 };
 
