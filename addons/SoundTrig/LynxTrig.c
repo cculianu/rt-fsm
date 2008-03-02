@@ -971,7 +971,6 @@ static int handleFifos(CardID_t c)
   if (errcode == sizeof(dummy)) {
       /* Ok, a message is ready, so take it from the SHM */
       struct FifoMsg *msg = (struct FifoMsg *)&shm->msg[c];
-      int do_reply = 0;
       
       DEBUG("handleFifos(%u)\n", (unsigned)c);
 #ifdef RTAI
@@ -984,7 +983,6 @@ static int handleFifos(CardID_t c)
           /* spawn a new thread and wait for it if we are not in rt-context..
              otherwise call function immediately.. */
         doCmdInRTThread(INITIALIZE, (void *)(unsigned long)c); 
-        do_reply = 1;
         break;
                 
       case PAUSEUNPAUSE:
@@ -992,7 +990,6 @@ static int handleFifos(CardID_t c)
         /* Notice fall through to next case.. */
       case GETPAUSE:
         msg->u.is_paused = rs[c].paused;
-        do_reply = 1;
         break;
         
       case INVALIDATE:
@@ -1000,7 +997,6 @@ static int handleFifos(CardID_t c)
         /* Notice fall through.. */
       case GETVALID:
         msg->u.is_valid = !rs[c].invalid;
-        do_reply = 1;
         break;
       case ALLOCSOUND: {
            /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
@@ -1009,6 +1005,18 @@ static int handleFifos(CardID_t c)
               DEBUG("ALLOCSOND: allocated shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
           } else {
               ERROR("ALLOCSOND: could not allocate shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
+          }
+          msg->u.sound.transfer_ok = mem != 0;
+      }
+          break;
+      case FREESOUND: {
+           /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
+          void *mem = ShmListFind(msg->u.sound.name, msg->u.sound.size);
+          if (mem) {
+              ShmListDel(mem);
+              DEBUG("FREESOUND: freed shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
+          } else {
+              ERROR("FREESOUND: could not find shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
           }
           msg->u.sound.transfer_ok = mem != 0;
       }
@@ -1089,7 +1097,6 @@ static int handleFifos(CardID_t c)
         rs[c].invalid = 0; /* Unlock.. */
         mb();
         
-        do_reply = 1;
         break;
         
       case FORCEEVENT:
@@ -1107,24 +1114,20 @@ static int handleFifos(CardID_t c)
             rs[c].forced_event = 0;
           }
 
-        do_reply = 1;
         break;
         
       case GETRUNTIME:
         if ( SOFTWARE_TRIGGERS() ) updateTS(c);
         msg->u.runtime_us = Nano2USec(rs[c].current_ts);
-        do_reply = 1;
         break;
 
         
       case GETLASTEVENT:
         msg->u.last_event = rs[c].last_event;
-        do_reply = 1;
         break;
         
       default:
         WARNING("Got unknown msg id '%d' in handleFifos()!\n", msg->id);
-        do_reply = 0;
         break;
       }
       

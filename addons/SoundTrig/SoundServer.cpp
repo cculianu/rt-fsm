@@ -69,7 +69,7 @@ public:
     virtual int getLastEvent(unsigned card) const = 0;
     virtual unsigned getNCards() const = 0;
         
-    virtual bool setSound(unsigned card, const SoundBuffer & buf) = 0;
+    virtual bool setSound(unsigned card, SoundBuffer & buf) = 0;
     
     static SoundMachine *attach();
     
@@ -118,7 +118,7 @@ public:
     int getLastEvent(unsigned card) const;
     unsigned getNCards() const { return shm->num_cards; }
     
-    bool setSound(unsigned card, const SoundBuffer &);
+    bool setSound(unsigned card, SoundBuffer &);
 };
 
 class UserSM : public SoundMachine
@@ -174,7 +174,7 @@ public:
     int getLastEvent(unsigned card) const;
     unsigned getNCards() const;
     
-    bool setSound(unsigned card, const SoundBuffer &);
+    bool setSound(unsigned card, SoundBuffer &);
 };
         
 
@@ -412,7 +412,6 @@ struct SoundBuffer
   
   unsigned char & operator[](int i) { return mem[i]; }
   const unsigned char & operator[](int i) const { return mem[i]; }
-  
  private:
   unsigned long len_bytes;
   unsigned char *mem;
@@ -420,6 +419,9 @@ struct SoundBuffer
   
   friend class KernelSM;
   friend class UserSM;
+
+  bool sentOk;
+  
 };
 
 void KernelSM::allocSBMem(SoundBuffer & sb)
@@ -470,7 +472,7 @@ void UserSM::allocSBMem(SoundBuffer & sb)
 SoundBuffer::SoundBuffer(unsigned long size,
                          int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms, 
                          int loop_flg, int card) 
-    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), card(card), len_bytes(size), mem(0)
+    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), card(card), len_bytes(size), mem(0), sentOk(false)
 {
     if (!sm) throw Exception("Global variable 'sm' needs to be set and point to a SoundMachine object!");
     sm->allocSBMem(*this);
@@ -484,12 +486,21 @@ void UserSM::freeSBMem(SoundBuffer & sb) const
 
 void KernelSM::freeSBMem(SoundBuffer & sb) const
 {
-    RTOS::ShmStatus status;
-    RTOS::shmDetach(sb.mem, &status);
-    if (status != RTOS::Ok) {
-        Error() << "Detach of shm: " << sb.name() << " reported error: " << RTOS::statusString(status) << "\n";
+    if (sb.mem) {
+        RTOS::ShmStatus status;
+        RTOS::shmDetach(sb.mem, &status);
+        if (status != RTOS::Ok) {
+            Error() << "Detach of shm: " << sb.name() << " reported error: " << RTOS::statusString(status) << "\n";
+        } else if (!sb.sentOk) { // issue a FREESOUND to kernel if the sound was not transferred ok to kernel
+            std::auto_ptr<FifoMsg> msg(new FifoMsg);
+            msg->id = FREESOUND;
+            strncpy(msg->u.sound.name, sb.name(), SNDNAME_SZ);
+            msg->u.sound.name[SNDNAME_SZ-1] = 0;
+            msg->u.sound.size = sb.size();
+            sendToRT(sb.card, *msg);
+        }
+        sb.mem = 0;
     }
-    sb.mem = 0;
 }
 
 SoundBuffer::~SoundBuffer()
@@ -624,7 +635,7 @@ int ConnectedThread::doConnection(void)
             
             Log() << "Getting ready to receive sound  " << sound.id << " length " << sound.size() << std::endl; 
             Timer xferTimer;
-            count = sockReceiveData(&sound[0], sound.size());	    
+            count = sockReceiveData(&sound[0], sound.size());
             double xt = xferTimer.elapsed();
             if (count == (int)sound.size()) {
               Log() << "Received " << count << " bytes in " << xt << " seconds (" << ((count*8)/1e6)/xt << " mbit/s)" << std::endl; 
@@ -799,7 +810,7 @@ int ConnectedThread::sockReceiveData(void *buf, int size, bool is_binary)
   return nread;
 }
 
-bool KernelSM::setSound(unsigned card, const SoundBuffer & s)
+bool KernelSM::setSound(unsigned card, SoundBuffer & s)
 {
   Log() << "Soundfile is: bytes: " << s.size() << " chans: " << s.chans << "  sample_size: " << s.sample_size << "  rate: " << s.rate << std::endl; 
 
@@ -825,6 +836,8 @@ bool KernelSM::setSound(unsigned card, const SoundBuffer & s)
 
   Log() << "Sent sound to kernel in " << unsigned(timer.elapsed()*1000) << " millisecs." << std::endl; 
 
+  s.sentOk = true;
+  
   return true;
 }
 
@@ -1159,7 +1172,7 @@ int UserSM::getLastEvent(unsigned card) const
 
 unsigned UserSM::getNCards()  const { return 1; }
 
-bool UserSM::setSound(unsigned card, const SoundBuffer & buf)
+bool UserSM::setSound(unsigned card, SoundBuffer & buf)
 {
     if (card >= getNCards()) return false;
     MutexLocker ml(mut);
