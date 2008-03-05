@@ -118,6 +118,36 @@
 %                  which by default is 6000!  The type of this
 %                  function is void(*)(void).
 %
+%                'threshfunc' (OPTIONAL)
+%
+%                  The name of the function (declared and defined in
+%                  the 'globals' above) to call for AI threshold 
+%                  detection in the FSM.  This function will be called 
+%                  once for every AI sample acquired for each FSM task 
+%                  cycle, so make sure it is a fast, lightweight function!
+%                  The type of this function is TRISTATE(*)(int,double).
+%                  And the return type is a TRISTATE which can take values:
+%                  POSITIVE for upward threshhold crossing, 
+%                  NEGATIVE for downward threshold crossing,
+%                  or NEUTRAL for no change (historesis band).
+%                  Here is the internal function the state machine uses by 
+%                  default: 
+%
+%                  TRISTATE threshold_detect(int chan, double v) 
+%                  {
+%                    if (v >= 4.0) return POSITIVE; /* if above 4.0 V, 
+%                                                      above threshold */
+%                    if (v <= 3.0) return NEGATIVE;/* if below 3.0,
+%                                                     below threshold */
+%                    return NEUTRAL; /* otherwise unsure, so no change */
+%                  }
+%
+%                  Note how the function implements a historesis band
+%                  between 3.0 and 4.0 volts.  This is recommended in your 
+%                  custom function as well in order to prevent threshold 
+%                  detection from flip-flopping back and forth in cases 
+%                  where the input signal is noisy.
+%
 %                'entryfuncs' (OPTIONAL)
 %
 %                  An associative array of state numbers to function
@@ -147,7 +177,7 @@
 %                  (zero-indexed) and the second column is the name of
 %                  the function to call.
 %
-%                  'entrycode' (OPTIONAL)
+%                'entrycode' (OPTIONAL)
 %
 %                  Associative array of state numbers to actual C code
 %                  to be executed.  Code gets executed upon state
@@ -225,7 +255,7 @@
 %
 %   // returns a uniformly distributed random number in the range [0, 1.0]
 %   extern double rand(void);
-%   // returns a normally distributed random number with zero mean and unit variance
+%   // returns a normally distributed random number with mean 0 and variance 1.0  
 %   extern double randNormalized(void);
 %
 %   // just like math library -- do man (unix man page) on these to see
@@ -275,6 +305,7 @@ function [sm] = SetStateProgram(varargin)
   cleanupfunc = '';
   transitionfunc = '';
   tickfunc = '';
+  threshfunc = '';
   entryfuncs = {};
   exitfuncs = {};
   entrycode = {};
@@ -318,6 +349,11 @@ function [sm] = SetStateProgram(varargin)
         error(['Argument to ' nam ' needs to be a string.']); 
       end;
       tickfunc = val;
+     case 'threshfunc',
+      if (~ischar(val)), 
+        error(['Argument to ' nam ' needs to be a string.']); 
+      end;
+      threshfunc = val;
      case 'entryfuncs',
       if (~iscell(val) | size(val, 2) ~= 2),
         error(['Argument to ' nam ' needs to be an Mx2 array where' ...
@@ -439,6 +475,7 @@ function [sm] = SetStateProgram(varargin)
   cleanupfunc_str = FormatBlock(sm, UrlEncode(sm, cleanupfunc));
   transitionfunc_str = FormatBlock(sm, UrlEncode(sm, transitionfunc));
   tickfunc_str = FormatBlock(sm, UrlEncode(sm, tickfunc));
+  threshfunc_str = FormatBlock(sm, UrlEncode(sm, threshfunc));
   entryfuncs_str = FormatNumStringAssociativeArray(sm, entryfuncs);
   exitfuncs_str = FormatNumStringAssociativeArray(sm, exitfuncs);
   entrycodes_str = FormatNumStringAssociativeArray(sm, entrycode);
@@ -447,7 +484,7 @@ function [sm] = SetStateProgram(varargin)
   in_chan_type_str = FormatBlock(sm, UrlEncode(sm, sm.in_chan_type));
   matrix_str = FormatMatrix(sm, matrix);
 
-  % format for SET STATE PROGRAM command is 
+% format for SET STATE PROGRAM command is 
 %          SET STATE PROGRAM
 %          BEGIN META
 %          GLOBALS
@@ -460,6 +497,8 @@ function [sm] = SetStateProgram(varargin)
 %            urlencoded name of transition func
 %          TICKFUNC
 %            urlencoded name of tick func
+%          THRESHFUNC
+%            urlencoded name of threshold detector func
 %          ENTRYFUNCS
 %            state_number -> urlencoded func name
 %            etc ...
@@ -500,6 +539,8 @@ function [sm] = SetStateProgram(varargin)
       '%s'... % str already has nl
       'TICKFUNC\n' ...
       '%s'... % str already has nl
+      'THRESHFUNC\n' ...
+      '%s'... % str already has nl
       'ENTRYFUNCS\n' ...
       '%s'... % str already has nl      
 ...%            state_number -> urlencoded func name
@@ -538,7 +579,7 @@ function [sm] = SetStateProgram(varargin)
 ...%            UrlEncoeded matrix cells, one per line
       '%s' ], ... % str already has nl
       globals_str, initfunc_str, cleanupfunc_str, transitionfunc_str, ...
-      tickfunc_str, entryfuncs_str, exitfuncs_str, entrycodes_str, ...
+      tickfunc_str, threshfunc_str, entryfuncs_str, exitfuncs_str, entrycodes_str, ...
       exitcodes_str, in_chan_type_str, input_spec_str, output_spec_str, ...
       sched_wave_spec_str, sm.ready_for_trial_jumpstate, ...
       fsm_swap_on_state_0, m, n, matrix_str);

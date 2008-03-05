@@ -159,6 +159,7 @@ namespace
 
   std::string CompilerPath() { return "tcc/tcc"; }
   std::string IncludePath() { char buf[128]; return std::string(getcwd(buf, 128)) + "/include"; }
+  std::string EmbCHPath() { return IncludePath() + "/EmbC.h"; }
   std::string ModWrapperPath() { return IsKernel24() ? "./embc_mod_wrapper.o" : "runtime/embc_mod_wrapper.c"; }
   std::string MakefileTemplatePath() { return IsKernel26() ? "runtime/Kernel2.6MakefileTemplate" : ""; }
   std::string LdPath() { return "ld"; }
@@ -283,6 +284,7 @@ private:
                   const std::string & cleanupfunc,
                   const std::string & transitionfunc,
                   const std::string & tickfunc,
+                  const std::string & threshfunc,
                   const IntStringMap & entryfuncs,
                   const IntStringMap & exitfuncs, 
                   const IntStringMap & entrycodes,
@@ -475,10 +477,10 @@ static void init()
     throw Exception("Need to be root or setuid-root to run this program as it requires the ability to load kernel modules!");
   std::string missing;
   if (IsKernel24()) {
-    if ( !FileExists(missing = CompilerPath()) || !FileExists(missing = ModWrapperPath()) ) 
+    if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = CompilerPath()) || !FileExists(missing = ModWrapperPath()) ) 
       throw Exception(std::string("Required file or program '") + missing + "' is not found!");
   } else if (IsKernel26()) {
-    if ( !FileExists(missing = MakefileTemplatePath()) || !FileExists(missing = ModWrapperPath()) )
+    if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = MakefileTemplatePath()) || !FileExists(missing = ModWrapperPath()) )
       throw Exception(std::string("Required file or program '") + missing + "' is not found!");
   } else 
       throw Exception("Could not determine Linux kernel version!  Is this Linux??");
@@ -1222,6 +1224,7 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
                                   const std::string & cleanupfunc,
                                   const std::string & transitionfunc,
                                   const std::string & tickfunc,
+                                  const std::string & threshfunc,
                                   const IntStringMap & entryfmap,
                                   const IntStringMap & exitfmap, 
                                   const IntStringMap & entrycmap,
@@ -1443,6 +1446,9 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
     else prog << "0;\n";
     prog << "void (*__embc_tick)(void) = ";
     if (tickfunc.length())  prog << tickfunc << ";\n";
+    else prog << "0;\n";
+    prog << "TRISTATE (*__embc_threshold_detect)(int,double) = ";
+    if (threshfunc.length())  prog << threshfunc << ";\n";
     else prog << "0;\n";
 
     fsm_prog = prog.str();
@@ -1725,6 +1731,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   prog << "void (*__embc_tick)(void) = 0;\n";
   prog << "void __embc_fsm_do_state_entry(ushort s) { (void)s; }\n";
   prog << "void __embc_fsm_do_state_exit(ushort s) { (void)s; }\n";
+  prog << "TRISTATE  (*__embc_threshold_detect)(int, double) = 0;\n";
   prog << "\n// BEGIN USER-DEFINED PROGRAM\n";
   // the state matrix as a static array
   prog << "ulong __stateMatrix[" << nRows << "][" << m.cols() << "] = {\n";
@@ -2386,7 +2393,7 @@ bool ConnectionThread::doSetStateProgram()
 
   // NB, at this point "SET STATE PROGRAM" is already consumed.
   std::string line, section = "", block = "";
-  std::string globals, initfunc, cleanupfunc, transitionfunc, tickfunc, inChanType;
+  std::string globals, initfunc, cleanupfunc, transitionfunc, tickfunc, inChanType, threshfunc;
   IntStringMap entryfuncs, exitfuncs, entrycodes, exitcodes;
   std::vector<int> inSpec;
   std::vector<OutputSpec> outSpec;
@@ -2419,6 +2426,9 @@ bool ConnectionThread::doSetStateProgram()
       }
       else if (section == "TICKFUNC") {
         tickfunc = UrlDecode(block);
+      }
+      else if (section == "THRESHFUNC") {
+        threshfunc = UrlDecode(block);
       }
       else if (section == "IN CHAN TYPE") {
         inChanType = block;
@@ -2469,7 +2479,7 @@ bool ConnectionThread::doSetStateProgram()
   for (ct = 0, block = "";  ct < rows*cols; ++ct) block += sockReceiveLine();
   StringMatrix m(rows, cols);
   parseStringTable(block.c_str(), m);
-  return matrixToRT(m, globals, initfunc, cleanupfunc, transitionfunc, tickfunc, entryfuncs, exitfuncs, entrycodes, exitcodes, inChanType, inSpec, outSpec, swSpec, readyForTrialJumpState, state0FSMSwapFlg);  
+  return matrixToRT(m, globals, initfunc, cleanupfunc, transitionfunc, tickfunc, threshfunc, entryfuncs, exitfuncs, entrycodes, exitcodes, inChanType, inSpec, outSpec, swSpec, readyForTrialJumpState, state0FSMSwapFlg);  
 }
 
 std::string ConnectionThread::newShmName()

@@ -207,8 +207,12 @@ enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define OTHER_FSM_PTR(f) ((struct FSMSpec *)(FSM_PTR(f) == &rs[(f)].states1 ? &rs[(f)].states2 : &rs[(f)].states1))
 #define EMBC_PTR(f) ((struct EmbC *)(FSM_PTR(f)->embc))
 #define OTHER_EMBC_PTR(f) ((struct EmbC *)(OTHER_FSM_PTR(f)->embc))
-#define CALL_EMBC(f, func) do { if (EMBC_PTR(f) && EMBC_PTR(f)->func) EMBC_PTR(f)->func(); } while (0)
-#define CALL_EMBC1(f, func, p1) do { if (EMBC_PTR(f) && EMBC_PTR(f)->func) EMBC_PTR(f)->func(p1); } while (0)
+#define EMBC_HAS_FUNC(f, func) ( EMBC_PTR(f) && EMBC_PTR(f)->func )
+#define CALL_EMBC(f, func) do { if (EMBC_HAS_FUNC(f, func)) EMBC_PTR(f)->func(); } while (0)
+#define CALL_EMBC1(f, func, p1) do { if (EMBC_HAS_FUNC(f, func)) EMBC_PTR(f)->func(p1); } while (0)
+#define CALL_EMBC_RET(f, func) ( EMBC_HAS_FUNC(f, func) ? EMBC_PTR(f)->func() : 0 )
+#define CALL_EMBC_RET1(f, func, p1) ( EMBC_HAS_FUNC(f, func) ? EMBC_PTR(f)->func(p1) : 0 )
+#define CALL_EMBC_RET2(f, func, p1, p2) ( EMBC_HAS_FUNC(f, func) ? EMBC_PTR(f)->func(p1, p2) : 0 )
 #define EMBC_MATRIX_GET(f, r, c) ((EMBC_PTR(f) && EMBC_PTR(f)->get_at) ? EMBC_PTR(f)->get_at(r, c) : 0 )
 #define FSM_MATRIX_GET(fsm, r, c) ( (fsm)->embc && (fsm)->embc->get_at ? (fsm)->embc->get_at(r, c) : 0 )
 #define INPUT_ROUTING(f,x) (rs[(f)].states->routing.input_routing[(x)])
@@ -244,8 +248,10 @@ lsampl_t ai_thresh_hi = 0, /* Threshold, above which we consider it
          ai_thresh_low = 0; /* Below this we consider it a digital 0. */
 
 sampl_t ai_samples[MAX_AI_CHANS]; /* comedi_command callback copies samples to here, or our grabAI synch function puts samples here */
+double ai_samples_volts[MAX_AI_CHANS]; /* array of ai_samples above scaled to volts for embc functions, threshold detect, etc */
 void *ai_asynch_buf = 0; /* pointer to driver's DMA circular buffer for AI. */
 comedi_krange ai_krange, ao_krange; 
+double ai_range_min_v, ai_range_max_v; /* scaled to volts */
 unsigned long ai_asynch_buffer_size = 0; /* Size of driver's DMA circ. buf. */
 unsigned ai_range = 0, ai_mode = UNKNOWN_MODE, ao_range = 0;
 lsampl_t ao_0V_sample = 0; /* When we want to write 0V to AO, we write this. */
@@ -482,6 +488,7 @@ static double emblib_rand(void);
 static double emblib_randNormalized(void);
 static void emblib_logValue(unsigned, const char *, double);
 static void emblib_logArray(unsigned, const char *, const double *, unsigned n);
+static double emblib_getAI(unsigned);
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -918,7 +925,8 @@ static int initAISubdev(void)
   /* we got a dev_ai and subdev_ai unconditionally at this point, so lock it */
   comedi_lock(dev_ai, subdev_ai);
 
-  /* set up the ranges we want.. which is the closest range to 0-5V */
+  /* set up the ranges we want.. 
+     this loop tries to find which is the closest range to 0-5V */
   n = comedi_get_n_ranges(dev_ai, subdev_ai, 0);
   for (i = 0; i < n; ++i) {
     comedi_get_krange(dev_ai, subdev_ai, 0, i, &ai_krange);
@@ -2016,17 +2024,19 @@ static inline void clearTriggerLines(FSMID_t f)
 
 static unsigned long detectInputEvents(FSMID_t f)
 {
-  unsigned i, bits, bits_prev;
+  unsigned i, bits, bits_prev, use_embc_thresh = 0;
   unsigned long events = 0;
   
   switch(IN_CHAN_TYPE(f)) { 
   case DIO_TYPE: /* DIO input */
     bits = dio_bits;
     bits_prev = dio_bits_prev;
+    use_embc_thresh = 0;
     break;
   case AI_TYPE: /* AI input */
     bits = ai_bits;
     bits_prev = ai_bits_prev;
+    use_embc_thresh = 1;
     break;
   default:  
     /* Should not be reached, here to suppress warnings. */
@@ -2043,6 +2053,15 @@ static unsigned long detectInputEvents(FSMID_t f)
         event_id_edge_down = INPUT_ROUTING(f, i*2+1); /* Odd numbered ones are 
                                                       edge-down */
 
+    /* If they specified a threshold detection function for this FSM, call it, 
+        and override our default threshold detector. */
+    if (use_embc_thresh && EMBC_HAS_FUNC(f, threshold_detect)) {
+        TRISTATE ret = CALL_EMBC_RET2(f, threshold_detect, i, ai_samples_volts[i]);
+        if (ISPOSITIVE(ret)) bit = 1;
+        else if (ISNEGATIVE(ret)) bit = 0;
+        else bit = last_bit; /* NEUTRAL condition */
+    }
+    
     /* Edge-up transitions */ 
     if (event_id_edge_up > -1 && bit && !last_bit) /* before we were below, now we are above,  therefore yes, it is an blah-IN */
       events |= 0x1 << event_id_edge_up; 
@@ -2545,9 +2564,13 @@ static void grabAI(void)
     }
 
     /* At this point, we don't care anymore about synch/asynch.. we just
-       have a sample. 
+       have a sample.  */
+    
+    /* Now, scale it to a volts value for embC stuff to use */
+    ai_samples_volts[i] = ((double)(sample)/(double)maxdata_ai) * (ai_range_max_v - ai_range_min_v) + ai_range_min_v;
+    
 
-       Next, we translate the sample into either a digital 1 or a digital 0.
+    /* Next, we translate the sample into either a digital 1 or a digital 0.
 
        To do this, we have two threshold values, ai_thesh_hi and ai_thesh_low.
 
@@ -3149,6 +3172,7 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->randNormalized = &emblib_randNormalized;
   embc->logValue = &emblib_logValue;
   embc->logArray = &emblib_logArray;
+  embc->getAI = &emblib_getAI;
   embc->sqrt = &sqrt;
   embc->exp = &exp;
   embc->exp2 = &exp2;
@@ -3183,33 +3207,34 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
 
 static double emblib_rand(void) 
 {
-  unsigned rand_num;
-  // TODO find out if this is really safe to call from RT context
-  get_random_bytes(&rand_num, sizeof(rand_num));
-  return ((double)rand_num) / ((double)(UINT_MAX)) * 1.0;
+  u32 rand_num = random32();
+  return ((double)rand_num) / ((double)(0xffffffffU)) * 1.0;
 }
 
 static double emblib_randNormalized(void)
 {
-  static int iset=0;
-  static float gset;
-  float fac,rsq,v1,v2;
-  if (iset == 0) { //We don't have an extra deviate handy, so
+  static double last;
+  static int use_last = 0;
+  double ret;
+  
+  if (use_last) {
+      ret = last;
+      use_last = 0;
+  } else {
+    double fac, rsq, v1, v2;
+    //Now make the Box-Muller transformation to get two normal deviates. 
     do {
-      v1=2.0*emblib_rand()-1.0; //pick two uniform numbers in the square extending
-      v2=2.0*emblib_rand()-1.0; //from -1 to +1 in each direction,
-      rsq=v1*v1+v2*v2;
-    } while (rsq >= 1.0 || rsq == 0.0); //and if they are not, try again.
-    fac=sqrt(-2.0*log(rsq)/rsq);
-    //Now make the Box-Muller transformation to get two normal deviates. Return one and
-    //save the other for next time.
-    gset=v1*fac;
-    iset=1; //Set flag.
-    return v2*fac;
-  } else { // We have an extra deviate handy,
-    iset=0; //so unset the flag,
-    return gset; //and return it.
+            v1=2.0*emblib_rand()-1.0; 
+            v2=2.0*emblib_rand()-1.0; 
+            rsq=v1*v1+v2*v2;
+    } while (rsq >= 1.0 || rsq == 0.0); 
+    fac = sqrt( (-2.0*log(rsq)) / rsq );
+    ret = v2*fac;
+    // cache a copy of the variable for next call
+    last = v1*fac;
+    use_last = 1;
   }
+  return ret; 
 }
 
 static void emblib_logValue(unsigned f, const char * nam, double v)
@@ -3228,6 +3253,12 @@ static void emblib_logArray(unsigned f, const char *nam, const double *v, unsign
       ++i;
     }
   }
+}
+
+static double emblib_getAI(unsigned chan)
+{
+    if (chan < MAX_AI_CHANS) return ai_samples_volts[chan];
+    return 0.0;
 }
 
 static void swapFSMs(FSMID_t f)
@@ -3291,10 +3322,14 @@ static void  doSetupThatNeededFloatingPoint(void)
   lsampl_t maxdata = comedi_get_maxdata(dev_ao, subdev_ao, 0);
   int nchans = comedi_get_n_channels(dev_ao, subdev_ao), i;
   ao_0V_sample = (lsampl_t)( (0.-minV)/(maxV-minV) * (double)maxdata );
-  
   for (i = 0; i < nchans; ++i) {
     comedi_data_write(dev_ao, subdev_ao, i, ao_range, 0, ao_0V_sample); /* initialize AO to 0V */
   }
+  
+  ai_range_min_v = ai_krange.min * 1e-6;
+  ai_range_max_v = ai_krange.max * 1e-6;
+  for (i = 0; i < MAX_AI_CHANS; ++i)
+      ai_samples_volts[i] = 0.0;
 }
 
 static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup)

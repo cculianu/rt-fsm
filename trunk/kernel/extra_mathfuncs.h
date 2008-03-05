@@ -5,7 +5,7 @@ extern double pow(double, double); /**< provided by rtmath */
 
 extern double exp2(double x);
 extern double exp10(double x);
-extern double round(double); /**< this one is provided by rt_math, but somehow doesn't show up in the header */
+extern double round(double); /**< this one is provided by rt_math, but is broken so we reimplement it */
 extern double expn(int i, double d);
 extern double log2(double d);
 extern double powi(double d, int i);
