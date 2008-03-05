@@ -50,6 +50,7 @@ static __inline__ int __ffs(int x) { return ffs(x)-1; }
 #include "FSMExternalTrig.h" /* for the external triggering -- for now it's the sound stuff.. */
 #include "FSMExternalTime.h" /* for the external time shm stuff */
 #include "softtask.h" /* for asynchronous process context kernel tasks! */
+#include "float_vsnprintf.h"
 
 #ifdef RTLINUX
 #include "rt_math/kmath.h" /* For math library.. hmm */
@@ -494,6 +495,7 @@ static void emblib_logArray(unsigned, const char *, const double *, unsigned n);
 static double emblib_readAI(unsigned);
 static int emblib_writeAO(unsigned,double);
 static int emblib_gotoState(uint fsm, unsigned state, int eventid);
+static int emblib_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -3190,6 +3192,7 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->readAI = &emblib_readAI;
   embc->writeAO = &emblib_writeAO;
   embc->forceJumpToState = &emblib_gotoState;
+  embc->printf = &emblib_printf;
   embc->sqrt = &sqrt;
   embc->exp = &exp;
   embc->exp2 = &exp2;
@@ -3291,6 +3294,20 @@ static int emblib_gotoState(uint fsm, unsigned state, int eventid)
 {
     int ret = gotoState(fsm, state, eventid); /* NB: gotoState() returns 1 on new state, 0 on same state, -1 on error */
     return ret > -1; 
+}
+
+static int emblib_printf(const char *format, ...) 
+{
+    char buf[192], buf2[192]; /* we can't make this too big since it may break stack.. */
+    int ret;
+    va_list ap;
+
+    va_start(ap, format);
+    ret = float_vsnprintf(buf, sizeof(buf), format, ap);/* first, format floats into buf, %d %x etc are copied verbatim from format! */
+    ret += vsnprintf(buf2, sizeof(buf2), buf, ap); /* next, sprintf it back to a string, buf2.. */
+    va_end(ap);
+    rt_printk("%s", buf2); /* finally, really print it using rt-safe printf */
+    return ret;
 }
 
 static void swapFSMs(FSMID_t f)
