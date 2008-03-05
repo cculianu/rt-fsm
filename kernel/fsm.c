@@ -2553,7 +2553,7 @@ static void grabAI(void)
 static int readAI(unsigned chan)
 {
     lsampl_t sample;
-    static uint64 last_cycle_ai_was_read = 0xffffffffffffffff;
+    static uint64 last_cycle_ai_was_read = 0xffffffffffffffffULL;
     
     if (chan >= MAX_AI_CHANS) {
         WARNING("readAI(): passed-in channel id %u is an illegal (out-of-range) value!", chan);
