@@ -40,7 +40,8 @@ TARGET=LynxTWO.o
 all: .deps $(TARGET) 
 
 .deps: 
-	-makedepend -- $(CXXFLAGS) -- $(SRC_CXX)
+	-makedepend -- $(CXXFLAGS) --  $(SRC_CXX) 2> mkdep.out || cat mkdep.out 1>&2
+	-rm -f mkdep.out
 	touch .deps
 
 _divdi3.o:
