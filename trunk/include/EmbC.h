@@ -63,7 +63,7 @@ struct EmbC
   int (*forceJumpToState)(uint fsm, unsigned state, int event_id_for_history);
   
   // prints a message (most likely to the kernel log buffer)
-  //int (*printf)(const char *format, ...);
+  int (*printf)(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 
   // just like math library
   double (*sqrt)(double);
@@ -225,16 +225,7 @@ static inline int    writeAO(unsigned chan, double voltage) { return __embc->wri
 /*------------------------------
   MISC C-Library-like-functions
   -----------------------------*/
-
-#if defined(RTLINUX) && !defined(RTAI)
-extern int rtl_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
-#  define printf rtl_printf
-#elif defined(RTAI) && !defined(RTLINUX)
-extern int rt_printk(const char *format, ...) __attribute__ ((format (printf, 1, 2)));;
-#  define printf rt_printk
-#else
-#  error Exactly one of RTLINUX or RTAI needs to be defined!
-#endif
+#define printf(x...) (__embc->printf(x))
 
 extern void *memset(void *, int c, unsigned long);
 

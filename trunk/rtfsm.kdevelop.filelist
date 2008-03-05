@@ -144,6 +144,8 @@ kernel/Makefile
 kernel/deflate_helper.c
 kernel/extra_mathfuncs.c
 kernel/extra_mathfuncs.h
+kernel/float_vsnprintf.c
+kernel/float_vsnprintf.h
 kernel/fsm.c
 kernel/softtask.c
 kernel/softtask.h
