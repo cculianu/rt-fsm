@@ -11,6 +11,14 @@ typedef unsigned long long uint64;
 typedef long long int64;
 #endif
 
+typedef int TRISTATE; /* A tristate value takes one of 3 states: POSITIVE, NEGATIVE, or NEUTRAL */
+#define POSITIVE (1)
+#define NEGATIVE (-1)
+#define NEUTRAL (0)
+#define ISPOSITIVE(t) (t > 0)
+#define ISNEGATIVE(t) (t < 0)
+#define ISNEUTRAL(t)   t == 0)
+
 struct EmbCTransition 
 {
   double time; // the time in seconds that this transition occurred
@@ -45,6 +53,9 @@ struct EmbC
   // logs an entire array of num_elems size.  Each element of the array creates a separate timestamp, name, value record in the log.
   void (*logArray)(uint fsm, const char *varname, const double *array, uint num_elems);
 
+  /* Read an AI channel.  Note calls to this function are cheap because results get cached.. */
+  double (*getAI)(unsigned channel_id);
+  
   // prints a message (most likely to the kernel log buffer)
   //int (*printf)(const char *format, ...);
 
@@ -86,6 +97,7 @@ struct EmbC
   void (*entry)(unsigned short);
   void (*exit)(unsigned short);
   unsigned long (*get_at)(unsigned short, unsigned short);
+  TRISTATE (*threshold_detect)(int channel_id, double volts);
   /* called by rt-process to increase use count, etc.. */
   void (*lock)(void); /**< NOTE: Only callable in linux process context due to kernel 2.6 limitations */
   void (*unlock)(void); /**< NOTE: Only callable in linux process context due to kernel 2.6 limitations*/
@@ -103,6 +115,7 @@ extern void (*__embc_init)(void);
 extern void (*__embc_cleanup)(void);
 extern void (*__embc_transition)(void);
 extern void (*__embc_tick)(void);
+extern TRISTATE  (*__embc_threshold_detect)(int, double);
 extern struct EmbC *__embc;
 
 extern unsigned long __embc_fsm_get_at(ushort row, ushort col);
@@ -119,7 +132,7 @@ extern void __embc_fsm_do_state_exit(ushort state);
 // returns a random number in the range [0, 1.0]
 static inline double rand(void) {  return __embc->rand(); }
 
-// returns a random number in the range [-1,0, 1.0] normalized over a distribution with mean 0 and unit variance.
+// returns a random number normalized over a distribution with mean 0 and std dev 1.
 static inline double randNormalized(void) {  return __embc->randNormalized(); }
 
 static inline void logValue(const char *vn, double vv) {   __embc->logValue(*__embc->fsm, vn, vv); }
@@ -171,6 +184,8 @@ static inline uint rate(void) { return *__embc->rate; }
 static inline uint fsm(void) { return *__embc->fsm; }
 // see struct EmbCTransition above -- the most recent state transition
 static inline struct EmbCTransition transition(void) { return *__embc->transition; }
+// read an AI channel for the current scan
+static inline double getAI(unsigned chan) { return __embc->getAI(chan); }
 #if defined(RTLINUX) && !defined(RTAI)
 extern int rtl_printf(const char *format, ...);
 #  define printf rtl_printf

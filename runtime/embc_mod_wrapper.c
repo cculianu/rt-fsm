@@ -71,12 +71,13 @@ int init(void)
   __embc->init = __embc_init;
   __embc->cleanup = __embc_cleanup;
   __embc->statetransition = __embc_transition;
-  __embc->tick = __embc_tick;
+  __embc->tick = __embc_tick; /* may be NULL if user code didn't specify a function */
   __embc->entry = &__embc_fsm_do_state_entry;
   __embc->exit = &__embc_fsm_do_state_exit;
   __embc->get_at = &__embc_fsm_get_at;
   __embc->lock = &lock;
   __embc->unlock = &unlock;
+  __embc->threshold_detect = __embc_threshold_detect; /* may be NULL if user code didn't specify a function! */
   return 0;
 }
 

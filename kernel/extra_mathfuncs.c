@@ -547,3 +547,11 @@ double powi(double x, int nn)
         }
     return(y);
 }
+
+double round(double d)
+{
+    double ret = d - (long)d;
+    if (ret >= 0.5) return (long)(d+0.5);
+    if (ret <= -0.5) return (long)(d-0.5);
+    return (long)d;
+}
