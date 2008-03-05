@@ -237,6 +237,38 @@
 %    };
 %    extern struct EmbCTransition transition(); // returns the last state transition that occurred
 %
+%  /** Forces the state machine to immediately jump to a state -- bypassing normal
+%      event detection mechanism. Note that in the new state, pending events are 
+%      not cleared, so that they may be applied to the new state if and only if 
+%      they haven't yet been applied to the *old* state.  (If you don't like this 
+%      behavior let Calin know and he can change it or hack the code yourself.)
+%  
+%      This call is advanced and not recommended as it breaks the simplicity and 
+%      clarity of the finite state machine paradigm, but it might be useful as a 
+%      hack to make some protocols easier to write.
+%      Returns 1 on success or 0 on error. */
+%   extern int forceJumpToState(unsigned state, int event_id_for_history);
+%  
+%   /*------------------------
+%    LOW LEVEL I/O FUNCTONS 
+%    ------------------------*/
+%  
+%  /** Read an AI channel -- note that if the AI channel was not enabled,
+%      that is, it was not part of the InputEvents spec for any running state machine, the read will 
+%      have to actually go to the DAQ hardware and could potentially be slowish because it requires
+%      an immediate hardware conversion. However the good news is subsequent reads on the same channel 
+%      are always cached for that task cycle. Channel id's are 0-indexed (correspond to the 
+%      hardware's real channel-id-space). */
+%  extern double readAI(unsigned chan);
+%  /** Write to a physical analog output channel.  Note that no caching is ever done and a call to this
+%      function physically results in a new conversion and voltage being written to the hardware DAC. 
+%      Returns true on success, false on failure. */
+%  extern int  writeAO(unsigned chan, double voltage);
+%
+%   /*------------------------
+%    LOGGING FUNCTONS 
+%    ------------------------*/
+%  
 %   /* LOGGING -- the below function can be called from your code in order to
 %      log values of variables in real-time.  Each call to a log*() function 
 %      creates a record with fields: timestamp, varname, value. 
@@ -251,7 +283,9 @@
 %   extern int printf(const char *format, ...);
 %
 %
-%   // misc math stuff
+%   /*------------------------
+%    MATH FUNCTIONS
+%    ------------------------*/
 %
 %   // returns a uniformly distributed random number in the range [0, 1.0]
 %   extern double rand(void);

@@ -54,7 +54,13 @@ struct EmbC
   void (*logArray)(uint fsm, const char *varname, const double *array, uint num_elems);
 
   /* Read an AI channel.  Note calls to this function are cheap because results get cached.. */
-  double (*getAI)(unsigned channel_id);
+  double (*readAI)(unsigned channel_id);
+  
+  /* Write to an AO channel. */
+  int (*writeAO)(unsigned chan, double volts);
+  
+  /* Immediately jump to a new state, returns 1 on success, 0 on failure. */
+  int (*forceJumpToState)(uint fsm, unsigned state, int event_id_for_history);
   
   // prints a message (most likely to the kernel log buffer)
   //int (*printf)(const char *format, ...);
@@ -124,22 +130,26 @@ extern void __embc_fsm_do_state_exit(ushort state);
 
 /* ------------------------------------------------------------------------- */
 #ifdef EMBC_GENERATED_CODE /* only defined inside the generated FSM code */
+
 /*--- Wrappers for embedded C ----------------------------------------------
   NOTE: User code should use the calls below and not use the function calls
   above.  struct EmbCTransition from above is ok, though.
 ----------------------------------------------------------------------------*/
 
-// returns a random number in the range [0, 1.0]
+/// returns a random number in the range [0, 1.0]
 static inline double rand(void) {  return __embc->rand(); }
 
-// returns a random number normalized over a distribution with mean 0 and std dev 1.
+/// returns a random number normalized over a distribution with mean 0 and std dev 1.
 static inline double randNormalized(void) {  return __embc->randNormalized(); }
 
 static inline void logValue(const char *vn, double vv) {   __embc->logValue(*__embc->fsm, vn, vv); }
 
 static inline void logArray(const char *vn, const double *vv, uint num) {   __embc->logArray(*__embc->fsm, vn, vv, num); }
 
-// just like math library, do man on these to see their usage
+/*------------------------
+  MATH LIBRARY SUPPORT
+  ------------------------*/
+/* just like math library, do man on these to see their usage */
 static inline double sqrt(double d) { return __embc->sqrt(d); }
 static inline double exp(double d) { return __embc->exp(d); }
 static inline double exp2(double d) { return __embc->exp2(d); }
@@ -168,33 +178,65 @@ static inline double powi(double d, int i) { return __embc->powi(d, i); }
 static inline double sinh (double d) { return __embc->sinh(d); }
 static inline double tanh(double d) { return __embc->tanh(d); }
 
-// returns the current time in seconds
+/// returns the current time in seconds
 static inline double time(void) { return *__embc->time; }
-// current state
+/// current state
 static inline uint state(void) { return *__embc->state; }
-// ready for trial flag
+/// ready for trial flag
 static inline int ready_for_trial(void) { return *__embc->ready_for_trial; }
-// the number of transitions thus far
+/// the number of transitions thus far
 static inline uint transitions(void) { return *__embc->transitions; }
-// the cycle number
+/// the cycle number
 static inline uint64 cycle(void) { return *__embc->cycle; }
-// the state machine task rate
+/// the state machine task rate
 static inline uint rate(void) { return *__embc->rate; }
-// the fsm id
+/// the fsm id
 static inline uint fsm(void) { return *__embc->fsm; }
-// see struct EmbCTransition above -- the most recent state transition
+/// see struct EmbCTransition above -- the most recent state transition
 static inline struct EmbCTransition transition(void) { return *__embc->transition; }
-// read an AI channel for the current scan
-static inline double getAI(unsigned chan) { return __embc->getAI(chan); }
+/** Forces the state machine to immediately jump to a state -- bypassing normal
+    event detection mechanism. Note that in the new state, pending events are 
+    not cleared, so that they may be applied to the new state if and only if 
+    they haven't yet been applied to the *old* state.  (If you don't like this 
+    behavior let Calin know and he can change it or hack the code yourself.)
+
+    This call is advanced and not recommended as it breaks the simplicity and 
+    clarity of the finite state machine paradigm, but it might be useful as a 
+    hack to make some protocols easier to write.
+    Returns 1 on success or 0 on error. */
+static inline int forceJumpToState(unsigned state, int event_id_for_history) { return __embc->forceJumpToState(fsm(), state, event_id_for_history); }
+
+/*------------------------
+  LOW LEVEL I/O FUNCTONS 
+  ------------------------*/
+
+/** Read an AI channel -- note that if the AI channel was not enabled,
+    that is, it was not part of the InputEvents spec for any running state machine, the read will 
+    have to actually go to the DAQ hardware and could potentially be slowish because it requires
+    an immediate hardware conversion. However the good news is subsequent reads on the same channel 
+    are always cached for that task cycle. Channel id's are 0-indexed (correspond to the 
+    hardware's real channel-id-space). */
+static inline double readAI(unsigned chan) { return __embc->readAI(chan); }
+/** Write to a physical analog output channel.  Note that no caching is ever done and a call to this
+    function physically results in a new conversion and voltage being written to the hardware DAC. 
+    Returns true on success, false on failure. */
+static inline int    writeAO(unsigned chan, double voltage) { return __embc->writeAO(chan, voltage); }
+
+/*------------------------------
+  MISC C-Library-like-functions
+  -----------------------------*/
+
 #if defined(RTLINUX) && !defined(RTAI)
-extern int rtl_printf(const char *format, ...);
+extern int rtl_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 #  define printf rtl_printf
 #elif defined(RTAI) && !defined(RTLINUX)
-extern int rt_printk(const char *format, ...);
+extern int rt_printk(const char *format, ...) __attribute__ ((format (printf, 1, 2)));;
 #  define printf rt_printk
 #else
 #  error Exactly one of RTLINUX or RTAI needs to be defined!
 #endif
+
+extern void *memset(void *, int c, unsigned long);
 
 /*--------------------------------------------------------------------------*/
 #endif /* EMBC_GENERATED_CODE */
