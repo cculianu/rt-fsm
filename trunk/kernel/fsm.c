@@ -2577,6 +2577,7 @@ static int readAI(unsigned chan)
         WARNING("readAI(): comedi_data_read returned %d on AI chan %d!\n", err, chan);
         return 0;
       }
+      
       ai_samples[chan] = sample; /* save the sample for doDAQ() function.. */
       
       if (chan == 0 && debug) putDebugFifo(sample); /* write AI 0 to debug fifo*/
@@ -3351,16 +3352,17 @@ static void  doSetupThatNeededFloatingPoint(void)
 {
   int i, nchans = comedi_get_n_channels(dev_ao, subdev_ao);
   
-  ao_range_min_v = ao_krange.min * 1e-6;
-  ao_range_max_v = ao_krange.max * 1e-6;
+  ao_range_min_v = ((double)ao_krange.min) * 1e-6;
+  ao_range_max_v = ((double)ao_krange.max) * 1e-6;
   ao_0V_sample = VOLTS_TO_SAMPLE_AO(0);
   
   for (i = 0; i < nchans; ++i) 
     /* initialize all AO chans to 0V */
     comedi_data_write(dev_ao, subdev_ao, i, ao_range, 0, ao_0V_sample); 
   
-  ai_range_min_v = ai_krange.min * 1e-6;
-  ai_range_max_v = ai_krange.max * 1e-6;
+  ai_range_min_v = ((double)ai_krange.min) * 1e-6;
+  ai_range_max_v = ((double)ai_krange.max) * 1e-6;
+  
   for (i = 0; i < MAX_AI_CHANS; ++i)
       ai_samples_volts[i] = 0.0;
 }
