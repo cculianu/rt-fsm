@@ -199,7 +199,7 @@ MODULE_PARM_DESC(ai, "This can either be \"synch\" or \"asynch\" to determine wh
 #define NUM_TRANSITIONS(f) (rs[(f)].history.num_transitions)
 #define NUM_LOG_ITEMS(f) (rs[(f)].history.num_log_items)
 #define IN_CHAN_TYPE(f) ((const unsigned)rs[(f)].states->routing.in_chan_type)
-#define AI_THRESHOLD_VOLTS_HI ((const unsigned)4)
+#define AI_THRESHOLD_VOLTS_HI ((const unsigned)4) /* Note: embedded-C might do its own thing here.. */
 #define AI_THRESHOLD_VOLTS_LOW ((const unsigned)3)
 enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define AI_MODE ((const unsigned)ai_mode)
@@ -222,7 +222,8 @@ enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define STATE_TIMEOUT_STATE(_fsm, state) (FSM_MATRIX_GET((_fsm), (state), TIMEOUT_STATE_COL(_fsm)))
 #define STATE_OUTPUT(_fsm, state, i) (FSM_MATRIX_GET((_fsm), (state), (i)+FIRST_OUT_COL(_fsm)))
 #define STATE_COL(_fsm, state, col) (FSM_MATRIX_GET((_fsm), (state), (col)))
-
+#define SAMPLE_TO_VOLTS(sample) (((double)(sample)/(double)maxdata_ai) * (ai_range_max_v - ai_range_min_v) + ai_range_min_v)
+#define VOLTS_TO_SAMPLE_AO(v) ((lsampl_t)( (((double)(v))-ao_range_min_v)/(ao_range_max_v-ao_range_min_v) * (double)maxdata_ao ))
 static struct proc_dir_entry *proc_ent = 0;
 static atomic_t rt_task_stop = ATOMIC_INIT(0); /* Internal variable to stop the RT 
                                                   thread. */
@@ -244,18 +245,19 @@ static unsigned long cb_eos_skips = 0, cb_eos_skipped_scans = 0;
    by DIO channel-id. */
 unsigned dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;
 lsampl_t ai_thresh_hi = 0, /* Threshold, above which we consider it 
-                              a digital 1 */
+                              a digital 1.  Note EmbC code might do its own custom thing
+                              in which case this value is ignored.  It's just a default. */
          ai_thresh_low = 0; /* Below this we consider it a digital 0. */
 
 sampl_t ai_samples[MAX_AI_CHANS]; /* comedi_command callback copies samples to here, or our grabAI synch function puts samples here */
 double ai_samples_volts[MAX_AI_CHANS]; /* array of ai_samples above scaled to volts for embc functions, threshold detect, etc */
 void *ai_asynch_buf = 0; /* pointer to driver's DMA circular buffer for AI. */
 comedi_krange ai_krange, ao_krange; 
-double ai_range_min_v, ai_range_max_v; /* scaled to volts */
+double ai_range_min_v, ai_range_max_v, ao_range_min_v, ao_range_max_v; /* scaled to volts */
 unsigned long ai_asynch_buffer_size = 0; /* Size of driver's DMA circ. buf. */
 unsigned ai_range = 0, ai_mode = UNKNOWN_MODE, ao_range = 0;
 lsampl_t ao_0V_sample = 0; /* When we want to write 0V to AO, we write this. */
-unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0; 
+unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0, ai_chans_seen_this_scan_mask = 0; 
 unsigned int lastTriggers; /* Remember the trigger lines -- these 
                               get shut to 0 after 1 cycle                */
 uint64 cycle = 0; /* the current cycle */
@@ -436,9 +438,10 @@ static inline void clearTriggerLines(FSMID_t);
 static void dispatchEvent(FSMID_t, unsigned event_id);
 static void handleFifos(FSMID_t);
 static inline void dataWrite(unsigned chan, unsigned bit);
-static void commitDataWrites(void);
+static void commitDIOWrites(void);
 static void grabAllDIO(void);
 static void grabAI(void); /* AI version of above.. */
+static int readAI(unsigned chan); /**< reads comedi, caches channel if need be, does converstion to volts, etc.  returns true on success or false on error */
 static void doDAQ(void); /* does the data acquisition for remaining channels that grabAI didn't get.  See STARTDAQ fifo cmd. */
 static unsigned long processSchedWaves(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
 static unsigned long processSchedWavesAO(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
@@ -488,7 +491,9 @@ static double emblib_rand(void);
 static double emblib_randNormalized(void);
 static void emblib_logValue(unsigned, const char *, double);
 static void emblib_logArray(unsigned, const char *, const double *, unsigned n);
-static double emblib_getAI(unsigned);
+static double emblib_readAI(unsigned);
+static int emblib_writeAO(unsigned,double);
+static int emblib_gotoState(uint fsm, unsigned state, int eventid);
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -1548,7 +1553,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
               break;              
             }
           }
-        }            
+        }
 
         if (ss->states->has_sched_waves) { /* Print Sched. Wave statistics */
           int i;
@@ -1626,7 +1631,9 @@ static void *doFSM (void *arg)
       /* Grab both DI and AI chans depending on the chans in use mask which
          was setup by reconfigureIO. */
     if (di_chans_in_use_mask) grabAllDIO(); 
-    if (ai_chans_in_use_mask) grabAI(); 
+    /* note we should unconditionally call this since it clears some global vars
+        even if no acquisition is done */
+    grabAI();  
     
     for (f = 0; f < NUM_STATE_MACHINES; ++f) {
       /* Grab time */
@@ -1741,7 +1748,7 @@ static void *doFSM (void *arg)
       }
     } /* end loop through each state machine */
 
-    commitDataWrites();   
+    commitDIOWrites();   
         
     /* do any necessary data acquisition and writing to shm->fifo_daq */
     doDAQ();
@@ -1862,7 +1869,7 @@ static int gotoState(FSMID_t f, unsigned state, int event_id)
   }
 
   if (state == 0) {
-    /* Hack */
+    /* Hack -- Rule is to only swap FSMs at state 0 crossing.*/
     rs[f].ready_for_trial_flg = 0;
     if (rs[f].pending_fsm_swap) swapFSMs(f);
   }
@@ -1923,7 +1930,7 @@ static void doOutput(FSMID_t f)
 {
   static struct NRTOutput nrt_out;
 
-  unsigned i, ip_out_col = 0;
+  unsigned i;
   unsigned trigs = 0, conts = 0, contmask = rs[f].do_chans_cont_mask; 
   unsigned state = rs[f].current_state;
   FSMSpec *fsm = rs[f].states;
@@ -1964,10 +1971,10 @@ static void doOutput(FSMID_t f)
          sent when state machine column has changed since the last time
          a packet was sent.  These two arrays get cleared on a new
          state matrix though (in reconfigureIO) */
-      if (!rs[f].last_ip_outs_is_valid[ip_out_col] 
-          || rs[f].last_ip_outs[ip_out_col] != STATE_OUTPUT(fsm, state, i)) {
-        rs[f].last_ip_outs[ip_out_col] = STATE_OUTPUT(fsm, state, i);
-        rs[f].last_ip_outs_is_valid[ip_out_col] = 1;
+      if (!rs[f].last_ip_outs_is_valid[i] 
+          || rs[f].last_ip_outs[i] != STATE_OUTPUT(fsm, state, i)) {
+        rs[f].last_ip_outs[i] = STATE_OUTPUT(fsm, state, i);
+        rs[f].last_ip_outs_is_valid[i] = 1;
         nrt_out.magic = NRTOUTPUT_MAGIC;
         nrt_out.state = rs[f].current_state;
         nrt_out.trig = STATE_OUTPUT(fsm, state, i);
@@ -1979,7 +1986,6 @@ static void doOutput(FSMID_t f)
         snprintf(nrt_out.ip_packet_fmt, FMT_TEXT_LEN, "%s", spec->fmt_text);
         rtf_put(shm->fifo_nrt_output[f], &nrt_out, sizeof(nrt_out));
       }
-      ip_out_col++;
       break;
     }
   }
@@ -2024,19 +2030,19 @@ static inline void clearTriggerLines(FSMID_t f)
 
 static unsigned long detectInputEvents(FSMID_t f)
 {
-  unsigned i, bits, bits_prev, use_embc_thresh = 0;
+  unsigned i, bits, bits_prev, try_use_embc_thresh = 0;
   unsigned long events = 0;
   
   switch(IN_CHAN_TYPE(f)) { 
   case DIO_TYPE: /* DIO input */
     bits = dio_bits;
     bits_prev = dio_bits_prev;
-    use_embc_thresh = 0;
+    try_use_embc_thresh = 0;
     break;
   case AI_TYPE: /* AI input */
     bits = ai_bits;
     bits_prev = ai_bits_prev;
-    use_embc_thresh = 1;
+    try_use_embc_thresh = 1;
     break;
   default:  
     /* Should not be reached, here to suppress warnings. */
@@ -2055,7 +2061,7 @@ static unsigned long detectInputEvents(FSMID_t f)
 
     /* If they specified a threshold detection function for this FSM, call it, 
         and override our default threshold detector. */
-    if (use_embc_thresh && EMBC_HAS_FUNC(f, threshold_detect)) {
+    if (try_use_embc_thresh && EMBC_HAS_FUNC(f, threshold_detect)) {
         TRISTATE ret = CALL_EMBC_RET2(f, threshold_detect, i, ai_samples_volts[i]);
         if (ISPOSITIVE(ret)) bit = 1;
         else if (ISNEGATIVE(ret)) bit = 0;
@@ -2492,7 +2498,7 @@ static inline void dataWrite(unsigned chan, unsigned bit)
     pending_output_bits &= ~bitpos;
 }
 
-static void commitDataWrites(void)
+static void commitDIOWrites(void)
 {
   hrtime_t dio_ts = 0, dio_te = 0;
   FSMID_t f;
@@ -2533,44 +2539,63 @@ static void grabAllDIO(void)
 
 static void grabAI(void)
 {
-  int i;
   unsigned mask = ai_chans_in_use_mask;
-
+    
+  /* clear bitmask of our cached samples -- this forces readAI() below to actually do a real read */
+  ai_chans_seen_this_scan_mask = 0; 
+  
   /* Remember previous bits */
   ai_bits_prev = ai_bits;
 
   /* Grab all the AI input channels that are masked as 'in-use' by an FSM */
   while (mask) {
-    lsampl_t sample;
+    int chan = __ffs(mask);    
+    mask &= ~(0x1<<chan); /**< clear bit */
+    if (!readAI(chan)) return; /**< error in readAI -- it already printed a message to log for us so just return */
+  } 
+}
 
-    i = __ffs(mask);    
-    mask &= ~(0x1<<i);
+static int readAI(unsigned chan)
+{
+    lsampl_t sample;
     
-    if (AI_MODE == SYNCH_MODE) {
+    if (chan >= MAX_AI_CHANS) {
+        WARNING("readAI(): passed-in channel id %u is an illegal (out-of-range) value!", chan);
+        return 0;
+    }
+    
+    /* If we already have it for this scan, no sense in reading it again.. */
+    if ( (1<<chan) & ai_chans_seen_this_scan_mask ) return 1;
+    
+    /* Otherwise do a conversion and/or copy it from ASYNCH buffer if in ASYNCH mode.. */
+     if (AI_MODE == SYNCH_MODE) {
       /* Synchronous AI, so do the slow comedi_data_read() */
-      int err = comedi_data_read(dev_ai, subdev_ai, i, ai_range, AREF_GROUND, &sample);
+      int err = comedi_data_read(dev_ai, subdev_ai, chan, ai_range, AREF_GROUND, &sample);
       if (err != 1) {
-        WARNING("comedi_data_read returned %d on AI chan %d!\n", err, i);
-        return;
+        WARNING("readAI(): comedi_data_read returned %d on AI chan %d!\n", err, chan);
+        return 0;
       }
-      ai_samples[i] = sample; /* save the sample for doDAQ() function.. */
+      ai_samples[chan] = sample; /* save the sample for doDAQ() function.. */
       
-      if (i == 0 && debug) putDebugFifo(sample); /* write AI 0 to debug fifo*/
+      if (chan == 0 && debug) putDebugFifo(sample); /* write AI 0 to debug fifo*/
       
     } else { /* AI_MODE == ASYNCH_MODE */
       /* Asynch IO, read samples from our ai_aynch_samples which was populated
          by our comediCallback() function. */
-      sample = ai_samples[i];
+      sample = ai_samples[chan];
     }
-
+    /* mark it as seen this scan */
+    ai_chans_seen_this_scan_mask |= 1<<chan; 
+    
     /* At this point, we don't care anymore about synch/asynch.. we just
        have a sample.  */
     
     /* Now, scale it to a volts value for embC stuff to use */
-    ai_samples_volts[i] = ((double)(sample)/(double)maxdata_ai) * (ai_range_max_v - ai_range_min_v) + ai_range_min_v;
+    ai_samples_volts[chan] = SAMPLE_TO_VOLTS(sample);
     
 
     /* Next, we translate the sample into either a digital 1 or a digital 0.
+       That is, we threshold detect on it.
 
        To do this, we have two threshold values, ai_thesh_hi and ai_thesh_low.
 
@@ -2585,22 +2610,22 @@ static void grabAI(void)
     
     if (sample >= ai_thresh_hi) {
       /* It's above the ai_thresh_hi value, we think of it as a digital 1. */ 
-      ai_bits |= 0x1<<i; /* set the bit, it's above our arbitrary thresh. */
+      ai_bits |= 0x1<<chan; /* set the bit, it's above our arbitrary thresh. */
     } else if (sample <= ai_thresh_low) {
       /* We just dropped below ai_thesh_low, so definitely clear the bit. */
-      ai_bits &= ~(0x1<<i); /* clear the bit, it's below ai_thesh_low */
+      ai_bits &= ~(0x1<<chan); /* clear the bit, it's below ai_thesh_low */
     } else {
       /* No change from last scan.
          This happens sometimes when we are between ai_thesh_low 
          and ai_thresh_high. */
     }
-  } /* end while loop */
+
+    return 1;
 }
 
 static void doDAQ(void)
 {
   FSMID_t f;
-  unsigned seen_chans = ai_chans_in_use_mask;
 
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
     static unsigned short samps[MAX_AI_CHANS];
@@ -2608,22 +2633,9 @@ static void doDAQ(void)
     unsigned ct = 0;
     while (mask) {
       unsigned ch = __ffs(mask);
-      /* determine if this chan was already read by grabAI or by asynch task */
-      int have_chan = ((0x1<<ch) & seen_chans) || (AI_MODE == ASYNCH_MODE && IN_CHAN_TYPE(f) == AI_TYPE);
       mask &= ~(0x1<<ch); /* clear bit */
-      if (have_chan) {
-        /* we already have this channel's  sample from the grabAI() function or from asynch daq */
-        samps[ct] = ai_samples[ch];
-      } else {
-        /* we don't have this sample yet, so read it */
-        lsampl_t samp;
-        comedi_data_read(dev_ai, subdev_ai, ch, ai_range, AREF_GROUND, &samp);
-        samps[ct] = samp;
-
-        /* cache the sample so that if other FSMs need it they can read it from ai_samples[] array.. */
-        ai_samples[ch] = samp; 
-        seen_chans |= 0x1<<ch;
-      }
+      readAI(ch); /**< may be a noop if it's cached, otherwise goes to hardware to do a real read */
+      samps[ct] = ai_samples[ch];
       ++ct;
     }
     if (ct) {
@@ -3172,7 +3184,9 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->randNormalized = &emblib_randNormalized;
   embc->logValue = &emblib_logValue;
   embc->logArray = &emblib_logArray;
-  embc->getAI = &emblib_getAI;
+  embc->readAI = &emblib_readAI;
+  embc->writeAO = &emblib_writeAO;
+  embc->forceJumpToState = &emblib_gotoState;
   embc->sqrt = &sqrt;
   embc->exp = &exp;
   embc->exp2 = &exp2;
@@ -3255,10 +3269,25 @@ static void emblib_logArray(unsigned f, const char *nam, const double *v, unsign
   }
 }
 
-static double emblib_getAI(unsigned chan)
+static double emblib_readAI(unsigned chan)
 {
-    if (chan < MAX_AI_CHANS) return ai_samples_volts[chan];
-    return 0.0;
+    if (readAI(chan)) /* note readAI() is caching and may not be slow at all.. */
+        return ai_samples_volts[chan];
+    /* else.. */
+    WARNING("The embedded-C code got an error in emblib_getAI() for channel %u\n", chan);
+    return 0.0; /* what to do on error? */
+}
+
+static int emblib_writeAO(unsigned chan, double volts)
+{
+    int ret = comedi_data_write(dev_ao, subdev_ao, chan, ao_range, 0, VOLTS_TO_SAMPLE_AO(volts)); 
+    return ret == 1;
+}
+
+static int emblib_gotoState(uint fsm, unsigned state, int eventid)
+{
+    int ret = gotoState(fsm, state, eventid); /* NB: gotoState() returns 1 on new state, 0 on same state, -1 on error */
+    return ret > -1; 
 }
 
 static void swapFSMs(FSMID_t f)
@@ -3318,13 +3347,15 @@ static void unloadDetachFSM(struct FSMSpec *fsm)
 
 static void  doSetupThatNeededFloatingPoint(void)
 {
-  double minV = ao_krange.min * 1e-6, maxV = ao_krange.max * 1e-6;
-  lsampl_t maxdata = comedi_get_maxdata(dev_ao, subdev_ao, 0);
-  int nchans = comedi_get_n_channels(dev_ao, subdev_ao), i;
-  ao_0V_sample = (lsampl_t)( (0.-minV)/(maxV-minV) * (double)maxdata );
-  for (i = 0; i < nchans; ++i) {
-    comedi_data_write(dev_ao, subdev_ao, i, ao_range, 0, ao_0V_sample); /* initialize AO to 0V */
-  }
+  int i, nchans = comedi_get_n_channels(dev_ao, subdev_ao);
+  
+  ao_range_min_v = ao_krange.min * 1e-6;
+  ao_range_max_v = ao_krange.max * 1e-6;
+  ao_0V_sample = VOLTS_TO_SAMPLE_AO(0);
+  
+  for (i = 0; i < nchans; ++i) 
+    /* initialize all AO chans to 0V */
+    comedi_data_write(dev_ao, subdev_ao, i, ao_range, 0, ao_0V_sample); 
   
   ai_range_min_v = ai_krange.min * 1e-6;
   ai_range_max_v = ai_krange.max * 1e-6;

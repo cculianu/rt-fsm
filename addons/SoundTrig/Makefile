@@ -14,7 +14,10 @@ PWD = $(shell pwd)
 all: .deps MOD $(PRG) DRV
 
 MOD: 
+	@-if test -e $(KDIR)/Module.symvers; then mv -f $(KDIR)/Module.symvers $(KDIR)/__Module.symvers; fi; if test -e $(KDIR)/vmlinux; then mv -f $(KDIR)/vmlinux $(KDIR)/__vmlinux; fi
 	make -C $(KDIR) M=$(PWD) modules
+	@-if test -e $(KDIR)/__Module.symvers; then mv -f $(KDIR)/__Module.symvers $(KDIR)/Module.symvers; fi; if test -e $(KDIR)/__vmlinux; then mv -f $(KDIR)/__vmlinux $(KDIR)/vmlinux; fi
+	
 
 DRV:
 	make -C $(PWD)/LynxTWO-RT 
