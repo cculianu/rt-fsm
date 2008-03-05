@@ -1631,9 +1631,7 @@ static void *doFSM (void *arg)
       /* Grab both DI and AI chans depending on the chans in use mask which
          was setup by reconfigureIO. */
     if (di_chans_in_use_mask) grabAllDIO(); 
-    /* note we should unconditionally call this since it clears some global vars
-        even if no acquisition is done */
-    grabAI();  
+    if (ai_chans_in_use_mask) grabAI();  
     
     for (f = 0; f < NUM_STATE_MACHINES; ++f) {
       /* Grab time */
@@ -2540,10 +2538,7 @@ static void grabAllDIO(void)
 static void grabAI(void)
 {
   unsigned mask = ai_chans_in_use_mask;
-    
-  /* clear bitmask of our cached samples -- this forces readAI() below to actually do a real read */
-  ai_chans_seen_this_scan_mask = 0; 
-  
+
   /* Remember previous bits */
   ai_bits_prev = ai_bits;
 
@@ -2558,12 +2553,19 @@ static void grabAI(void)
 static int readAI(unsigned chan)
 {
     lsampl_t sample;
+    static uint64 last_cycle_ai_was_read = 0xffffffffffffffff;
     
     if (chan >= MAX_AI_CHANS) {
         WARNING("readAI(): passed-in channel id %u is an illegal (out-of-range) value!", chan);
         return 0;
     }
     
+    if (last_cycle_ai_was_read != cycle) {
+        /* clear bitmask of our cached samples -- this forces readAI() below to actually do a real read */
+        ai_chans_seen_this_scan_mask = 0; 
+        last_cycle_ai_was_read = cycle;
+    }
+
     /* If we already have it for this scan, no sense in reading it again.. */
     if ( (1<<chan) & ai_chans_seen_this_scan_mask ) return 1;
     
