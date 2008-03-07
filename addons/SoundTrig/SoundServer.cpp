@@ -430,6 +430,7 @@ void KernelSM::allocSBMem(SoundBuffer & sb)
     mut.lock();
     unsigned n = ++shm->ctr;
     mut.unlock();
+    n = n % 10000;
     std::ostringstream s;
     s << std::setw(4) << std::setfill('0') << std::right << n << "au";
     sb.nam = s.str();

@@ -664,7 +664,8 @@ function [ret] = FormatBlock(sm, str)
 function [ret] = FormatNumStringAssociativeArray(sm, arr)
   ret = '';
   for i=1:size(arr,1),
-    ret = sprintf('%s  %d -> %s\n', ret, arr(i, 1), UrlEncode(sm, arr(i,2)));
+    str = cell2mat(arr(1,2));
+    ret = sprintf('%s  %d -> %s\n', ret, cell2mat(arr(i, 1)), UrlEncode(sm, str));
   end;
   return;
   
