@@ -2490,7 +2490,7 @@ std::string ConnectionThread::newShmName()
     MutexLocker ml(connectedThreadsLock);
     fsmCtr = ++shm->fsmCtr;
   }
-  o << "fsm" << std::setw(3) << std::setfill('0') << fsmCtr << "f" << fsm_id << "t" << myid << "_c" << shm_num++; 
+  o << "fsm" << std::setw(3) << std::setfill('0') << (fsmCtr%1000) << "f" << fsm_id << "t" << myid << "_c" << shm_num++; 
   return o.str();
 }
 
