@@ -61,6 +61,10 @@ struct EmbC
   
   /* Immediately jump to a new state, returns 1 on success, 0 on failure. */
   int (*forceJumpToState)(uint fsm, unsigned state, int event_id_for_history);
+  /* Read a DIO line, 0/1 on success, negative on failure. */
+  int (*readDIO)(unsigned);
+  /* Write to a DIO line, 1 on success, 0 on failure. */
+  int (*writeDIO)(unsigned, unsigned);
   
   // prints a message (most likely to the kernel log buffer)
   int (*printf)(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
@@ -200,7 +204,7 @@ static inline struct EmbCTransition transition(void) { return *__embc->transitio
     they haven't yet been applied to the *old* state.  (If you don't like this 
     behavior let Calin know and he can change it or hack the code yourself.)
 
-    This call is advanced and not recommended as it breaks the simplicity and 
+    This call is advanced and not recommended as it violates the simplicity and 
     clarity of the finite state machine paradigm, but it might be useful as a 
     hack to make some protocols easier to write.
     Returns 1 on success or 0 on error. */
@@ -211,16 +215,41 @@ static inline int forceJumpToState(unsigned state, int event_id_for_history) { r
   ------------------------*/
 
 /** Read an AI channel -- note that if the AI channel was not enabled,
-    that is, it was not part of the InputEvents spec for any running state machine, the read will 
-    have to actually go to the DAQ hardware and could potentially be slowish because it requires
-    an immediate hardware conversion. However the good news is subsequent reads on the same channel 
-    are always cached for that task cycle. Channel id's are 0-indexed (correspond to the 
-    hardware's real channel-id-space). */
+    that is, it was not part of the InputEvents spec for any running state 
+    machine, the read will have to actually go to the DAQ hardware and could
+    potentially be slowish because it requires an immediate hardware
+    conversion. However the good news is subsequent reads on the same channel
+    are always cached for that task cycle. Channel id's are 0-indexed 
+    (correspond to the hardware's real channel-id-space). */
 static inline double readAI(unsigned chan) { return __embc->readAI(chan); }
-/** Write to a physical analog output channel.  Note that no caching is ever done and a call to this
-    function physically results in a new conversion and voltage being written to the hardware DAC. 
+/** Write to a physical analog output channel.  Note that no caching is ever 
+    done and a call to this function physically results in a new conversion and
+    voltage being written to the hardware DAC.
     Returns true on success, false on failure. */
 static inline int    writeAO(unsigned chan, double voltage) { return __embc->writeAO(chan, voltage); }
+/** Read from a physical digital I/O line.  Channel id's are 0-indexed and 
+    refer to the absolute channel number on the hardware.  The read is not done
+    immediately, but is just the cached value that the state machine read at
+    the beginning of the task cycle.
+    Note that the line should already have been configured for digital input
+    (normally done by telling the state machine to use input events of 
+    type 'dio').
+    Returns 0/1 for the bitvalue or negative on failure.
+    Failure reasons include an invalid channel id or trying to read from a 
+    channel that is currently configured for digital output. */
+static inline int readDIO(unsigned chan) { return __embc->readDIO(chan); }
+/** Write to a physical digital I/O line (this overrides normal state 
+    machine output). Channel id's are 0-indexed and refer to the absolute 
+    channel number on the hardware.  The writes themselves don't take effect
+    immediately, but rather at the end of the current task cycle (this is an
+    optimization to make all DIO lines take effect at once).  Note that the 
+    DIO channel 'chan' should have already been configured for digital output.
+    This happens automatically if you are using input routing of type 'ai' 
+    (thus freeing up all DIO channels to be digital outputs).
+    Returns true on success or 0 on failure. 
+    Failure reasons may include: an invalid channel ID, or trying to write
+    to a channel that is currently configured for digital input. */
+static inline int writeDIO(unsigned chan, unsigned bitval) { return __embc->writeDIO(chan, bitval); }
 
 /*------------------------------
   MISC C-Library-like-functions
@@ -228,6 +257,7 @@ static inline int    writeAO(unsigned chan, double voltage) { return __embc->wri
 #define printf(x...) (__embc->printf(x))
 
 extern void *memset(void *, int c, unsigned long);
+extern void *memcpy(void *, const void *, unsigned long);
 
 /*--------------------------------------------------------------------------*/
 #endif /* EMBC_GENERATED_CODE */

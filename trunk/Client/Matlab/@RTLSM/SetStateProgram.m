@@ -260,10 +260,37 @@
 %      are always cached for that task cycle. Channel id's are 0-indexed (correspond to the 
 %      hardware's real channel-id-space). */
 %  extern double readAI(unsigned chan);
+%
 %  /** Write to a physical analog output channel.  Note that no caching is ever done and a call to this
 %      function physically results in a new conversion and voltage being written to the hardware DAC. 
 %      Returns true on success, false on failure. */
 %  extern int  writeAO(unsigned chan, double voltage);
+%
+%  /** Read from a physical digital I/O line.  Channel id's are 0-indexed and 
+%      refer to the absolute channel number on the hardware.  The read is not done
+%      immediately, but is just the cached value that the state machine read at
+%      the beginning of the task cycle.
+%      Note that the line should already have been configured for digital input
+%      (normally done by telling the state machine to use input events of 
+%      type 'dio').
+%      Returns 0/1 for the bitvalue or negative on failure.
+%      Failure reasons include an invalid channel id or trying to read from a 
+%      channel that is currently configured for digital output. */
+%  extern int readDIO(unsigned chan);
+%
+%  /** Write to a physical digital I/O line (this overrides normal state 
+%      machine output). Channel id's are 0-indexed and refer to the absolute 
+%      channel number on the hardware.  The writes themselves don't take effect
+%      immediately, but rather at the end of the current task cycle (this is an
+%      optimization to make all DIO lines take effect at once).  Note that the 
+%      DIO channel 'chan' should have already been configured for digital output.
+%      This happens automatically if you are using input routing of type 'ai' 
+%      (thus freeing up all DIO channels to be digital outputs).
+%      Returns true on success or 0 on failure. 
+%      Failure reasons may include: an invalid channel ID, or trying to write
+%      to a channel that is currently configured for digital input. */
+%  extern int writeDIO(unsigned chan, unsigned bitval);
+%
 %
 %   /*------------------------
 %    LOGGING FUNCTONS 
