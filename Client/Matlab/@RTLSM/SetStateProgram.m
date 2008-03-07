@@ -291,6 +291,37 @@
 %      to a channel that is currently configured for digital input. */
 %  extern int writeDIO(unsigned chan, unsigned bitval);
 %
+%  /** Similar to the 'tcp' output routing type.  Basically, sometime in the 
+%      future,a userspace non-realtime thread will initiate a connection to 
+%      host:port and send data of length datalen, then it will close the connection. */
+%  extern void sendTCPPacket(const char *host, unsigned short port, const void *data, unsigned datalen);
+%
+%  /** Similar to above -- a shortcut for sending string data: expects a NUL-terminated string */
+%  extern void sendTCPPacketStr(const char *host, unsigned short port, const char *str);
+%
+%  /** Similar to the 'udp' output routing type.  Basically, sometime in the future,
+%      a userspace non-realtime thread will send dataString as a datagram to 
+%      host:port. */
+%  extern void sendUDPPacket(const char *host, unsigned short port, const void *data, unsigned datalen);
+%
+%  /** Similar to above -- a shortcut for sending string data: expects a NUL-terminated string */
+%  extern void sendUDPPacketStr(const char *host, unsigned short port, const char *str);
+%
+%  /** Call the external triggerable addon passing it data 'which' and trigger 'trig'.  
+%      This is typically how you trigger sound! */
+%  extern void triggerExt(unsigned which, int trig);
+%
+%  /** Synonym for triggerExt() but named triggerSound() for convenience */
+%  extern void triggerSound(unsigned card, unsigned snd);
+%
+%  extern untriggerSound(unsigned card, unsigned snd);
+%
+%  /** Trigger a scheduled wave to play.  */
+%  extern void triggerSchedWave(unsigned wave_id);
+%
+%  /** Un-trigger a scheduled wave.  */
+%  extern void untriggerSchedWave(unsigned wave_id);
+%  
 %
 %   /*------------------------
 %    LOGGING FUNCTONS 
@@ -667,7 +698,7 @@ function [ret] = FormatBlock(sm, str)
 function [ret] = FormatNumStringAssociativeArray(sm, arr)
   ret = '';
   for i=1:size(arr,1),
-    str = cell2mat(arr(1,2));
+    str = cell2mat(arr(i,2));
     ret = sprintf('%s  %d -> %s,\n', ret, cell2mat(arr(i, 1)), UrlEncode(sm, str));
   end;
   return;

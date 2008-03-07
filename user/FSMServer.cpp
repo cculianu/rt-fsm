@@ -228,7 +228,7 @@ struct FSMSpecific
   void *transNotifyThrFun();
   void *daqThrFun();
   void *nrtThrFun();
-  void doNRT_IP(const NRTOutput *, bool isUDP) const;
+  void doNRT_IP(const NRTOutput *, bool isUDP, bool isBinData) const;
 };
 
 static void *transNotifyThrWrapper(void *);
@@ -665,7 +665,7 @@ void *ConnectionThread::threadFunc(void)
       std::string::size_type pos = line.find_first_of("0123456789");
 
       if (pos != std::string::npos) {
-        unsigned m = 0, n = 0, num_Events = 0, num_SchedWaves = 0, readyForTrialState = 0, num_ContChans = 0, num_TrigChans = 0, num_Vtrigs = 0, state0_fsm_swap_flg;
+        unsigned m = 0, n = 0, num_Events = 0, num_SchedWaves = 0, readyForTrialState = 0, num_ContChans = 0, num_TrigChans = 0, num_Vtrigs = 0, state0_fsm_swap_flg = 0;
         std::string outputSpecStr = "";
         std::string inChanType = "ERROR";
         std::stringstream s(line.substr(pos));
@@ -1973,12 +1973,13 @@ void *FSMSpecific::nrtThrFun()
   while(nread >= 0 && fifo_nrt_output != RTOS::INVALID_FIFO) {
     nread = RTOS::readFifo(fifo_nrt_output, nrt.get(), sizeof(*nrt));
     if (nread == sizeof(*nrt) && nrt->magic == NRTOUTPUT_MAGIC) {
-      switch (nrt->type) {
+      unsigned char type = nrt->type&(~NRT_BINDATA), isbin = nrt->type&(NRT_BINDATA);
+      switch (type) {
       case NRT_TCP: 
-        doNRT_IP(nrt.get(), false);
+        doNRT_IP(nrt.get(), false, isbin);
         break;
       case NRT_UDP: 
-        doNRT_IP(nrt.get(), true);
+        doNRT_IP(nrt.get(), true, isbin);
         break;
       default:
         Log() << "ERROR In nrtThrFun() got unknown NRT output type " 
@@ -2010,17 +2011,31 @@ Matrix FSMSpecific::getDAQScans()
   return mat;
 }
 
-void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP) const
+void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP, bool isBin) const
 {  
         struct hostent he, *he_result;
         int h_err;
         char hostEntAux[32768];
-        std::string packetText = FormatPacketText(nrt->ip_packet_fmt, nrt);
-        int ret = ::gethostbyname2_r(nrt->ip_host, AF_INET, &he, hostEntAux, sizeof(hostEntAux),&he_result, &h_err);
-
+        unsigned datalen = 0;
+        const void *data = 0;
+        std::string packetText;
+        
+        if (!isBin) {
+            packetText = FormatPacketText(nrt->ip_packet_fmt, nrt);
+            data = packetText.c_str();
+            datalen = packetText.length();
 #ifdef EMULATOR
-          Log() << "Sending to " << nrt->ip_host << ":" << nrt->ip_port << " data: '" << packetText << "'\n";
+            Log() << "Sending to " << nrt->ip_host << ":" << nrt->ip_port << " data: '" << packetText << "'\n";
 #endif
+            
+        } else {
+            data = nrt->data;
+            datalen = nrt->datalen;
+#ifdef EMULATOR
+            Log() << "Sending to " << nrt->ip_host << ":" << nrt->ip_port << " binary data of length " << datalen "\n";
+#endif
+        }
+        int ret = ::gethostbyname2_r(nrt->ip_host, AF_INET, &he, hostEntAux, sizeof(hostEntAux),&he_result, &h_err);
 
         if (ret) {
           Log() << "ERROR In doNRT_IP() got error (ret=" << ret << ") in hostname lookup for " << nrt->ip_host << ": h_errno=" << h_err << "\n"; 
@@ -2050,13 +2065,12 @@ void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP) const
           ::close(theSock);
           return;
         }
-        int datalen = packetText.length();
         if (isUDP)
           // UDP
-          ret = sendto(theSock, packetText.c_str(), datalen, 0, (const struct sockaddr *)&addr, sizeof(addr));
+          ret = sendto(theSock, data, datalen, 0, (const struct sockaddr *)&addr, sizeof(addr));
         else
           // TCP
-          ret = send(theSock, packetText.c_str(), datalen, MSG_NOSIGNAL);
+          ret = send(theSock, data, datalen, MSG_NOSIGNAL);
         if (ret != datalen) {
           Log() << "ERROR In doNRT_IP() sending " << datalen << " bytes to " << nrt->ip_host << ":" << nrt->ip_port << " got error (errno=" << strerror(errno) << ") in send() call\n"; 
         }
