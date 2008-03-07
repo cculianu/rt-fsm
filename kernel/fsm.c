@@ -494,6 +494,8 @@ static void emblib_logValue(unsigned, const char *, double);
 static void emblib_logArray(unsigned, const char *, const double *, unsigned n);
 static double emblib_readAI(unsigned);
 static int emblib_writeAO(unsigned,double);
+static int emblib_readDIO(unsigned);
+static int emblib_writeDIO(unsigned,unsigned);
 static int emblib_gotoState(uint fsm, unsigned state, int eventid);
 static int emblib_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 /*-----------------------------------------------------------------------------*/
@@ -1650,8 +1652,6 @@ static void *doFSM (void *arg)
         FSMSpec *fsm = rs[f].states; 
         unsigned state = rs[f].current_state;
         unsigned long state_timeout_us;
-
-        CALL_EMBC(f, tick); /* call the embedded C tick function, if defined */
         
         state_timeout_us = STATE_TIMEOUT_US(fsm, state);
         
@@ -1674,6 +1674,8 @@ static void *doFSM (void *arg)
         /* If we aren't paused.. detect timeout events and input events */
         if ( !rs[f].paused  ) {
           
+          CALL_EMBC(f, tick); /* call the embedded C tick function, if defined */
+
           /* Check for state timeout -- 
              IF Curent state *has* a timeout (!=0) AND the timeout expired */
           if ( !got_timeout && state_timeout_us != 0 && TIMER_EXPIRED(f, state_timeout_us) ) {
@@ -3191,6 +3193,8 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->logArray = &emblib_logArray;
   embc->readAI = &emblib_readAI;
   embc->writeAO = &emblib_writeAO;
+  embc->readDIO = &emblib_readDIO;
+  embc->writeDIO = &emblib_writeDIO;
   embc->forceJumpToState = &emblib_gotoState;
   embc->printf = &emblib_printf;
   embc->sqrt = &sqrt;
@@ -3283,11 +3287,27 @@ static double emblib_readAI(unsigned chan)
     WARNING("The embedded-C code got an error in emblib_getAI() for channel %u\n", chan);
     return 0.0; /* what to do on error? */
 }
-
 static int emblib_writeAO(unsigned chan, double volts)
 {
     int ret = comedi_data_write(dev_ao, subdev_ao, chan, ao_range, 0, VOLTS_TO_SAMPLE_AO(volts)); 
     return ret == 1;
+}
+static int emblib_readDIO(unsigned chan)
+{
+    unsigned bitpos = 0x1<<chan;
+    if ( bitpos & di_chans_in_use_mask ) 
+        return  (dio_bits & bitpos) ? 1 : 0;
+    /* otherwise channel is invalid or not configued for input, return error */
+    return -1;
+}
+static int emblib_writeDIO(unsigned chan, unsigned val)
+{
+    unsigned bitpos = 0x1<<chan;
+    if ( bitpos & do_chans_in_use_mask ) {
+        dataWrite(chan, val);
+        return 1;
+    }
+    return 0;
 }
 
 static int emblib_gotoState(uint fsm, unsigned state, int eventid)
@@ -3298,15 +3318,16 @@ static int emblib_gotoState(uint fsm, unsigned state, int eventid)
 
 static int emblib_printf(const char *format, ...) 
 {
-    char buf[192], buf2[192]; /* we can't make this too big since it may break stack.. */
+    char buf[256]; /* we can't make this too big since it may break stack.. */
     int ret;
     va_list ap;
 
+    buf[0] = 0;
     va_start(ap, format);
     ret = float_vsnprintf(buf, sizeof(buf), format, ap);/* first, format floats into buf, %d %x etc are copied verbatim from format! */
-    ret += vsnprintf(buf2, sizeof(buf2), buf, ap); /* next, sprintf it back to a string, buf2.. */
     va_end(ap);
-    rt_printk("%s", buf2); /* finally, really print it using rt-safe printf */
+    if (ret > -1)
+    rt_printk("%s", buf); /* finally, really print it using rt-safe printf */
     return ret;
 }
 
