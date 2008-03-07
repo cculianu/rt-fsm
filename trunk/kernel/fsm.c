@@ -278,7 +278,7 @@ static inline long Micro2Sec(long long micro, unsigned long *remainder);
 static inline long long timespec_to_nano(const struct timespec *);
 static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig);
 static inline void SET_EXT_TRIG(unsigned which, unsigned trig);
-static inline void CHK_AND_DO_EXT_TRIG(FSMID_t f, unsigned which, unsigned trig);
+static inline void doExtTrigOutput(unsigned which, unsigned trig);
 /** Return nonzero on error */
 static int fsmLinkProgram(FSMID_t f, struct FSMSpec *fsmspec_ptr);
 static void swapFSMs(FSMID_t);
@@ -499,6 +499,9 @@ static int emblib_writeDIO(unsigned,unsigned);
 static int emblib_gotoState(uint fsm, unsigned state, int eventid);
 static int emblib_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 static int emblib_snprintf(char *buf, unsigned long sz, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
+static void emblib_sendPacket(unsigned fsm, int proto, const char *host, unsigned short port, const void *data, unsigned len);
+static void emblib_trigSchedWave(unsigned fsm_id, unsigned sched_wave_bits);
+static void emblib_trigExt(unsigned which, unsigned trig);
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -900,7 +903,8 @@ static int initAISubdev(void)
       if (s < 0) {
         ERROR("Could not find any AI subdevice on %s!\n", COMEDI_DEVICE_FILE);
         return -EINVAL;          
-      }
+      } else
+        n_chans_ai_subdev = comedi_get_n_channels(dev_ai, s);
       subdev_ai = s;
   } else { /* They specified probe of AI:  minordev_ai < 0 */
 
@@ -1014,7 +1018,8 @@ static int initAOSubdev(void)
       if (s < 0) {
         ERROR("Could not find any AO subdevice on %s!\n", COMEDI_DEVICE_FILE);
         return -EINVAL;          
-      }
+      } else
+        n_chans_ao_subdev = comedi_get_n_channels(dev_ao, s);
       subdev_ao = s;
   } else { /* They specified probe:  minordev_ao < 0 */
 
@@ -1931,10 +1936,46 @@ static int gotoState(FSMID_t f, unsigned state, int event_id)
   return 0; /* Not reached.. */
 }
 
+static void doNRTOutput(FSMID_t f, unsigned type, unsigned col, int trig, const char *host, unsigned short port, const void *data, unsigned datalen)
+{
+    static struct NRTOutput nrt_out;
+
+    nrt_out.magic = NRTOUTPUT_MAGIC;
+    nrt_out.state = rs[f].current_state;
+    nrt_out.trig = trig;
+    nrt_out.ts_nanos = rs[f].current_ts;
+    nrt_out.type = type;
+    nrt_out.col = col;
+    snprintf(nrt_out.ip_host, IP_HOST_LEN, "%s", host);
+    nrt_out.ip_port = port;
+    if (type & NRT_BINDATA) {
+        nrt_out.datalen = datalen;
+        memcpy(nrt_out.data, data, MIN(datalen, sizeof(nrt_out.data)));
+    } else {
+        snprintf(nrt_out.ip_packet_fmt, FMT_TEXT_LEN, "%s", (const char *)data);
+    }
+    rtf_put(shm->fifo_nrt_output[f], &nrt_out, sizeof(nrt_out));
+}
+
+static void doSchedWaveOutput(FSMID_t f, int swBits)
+{
+        /* HACK!! Untriggering is funny since you need to do:
+           -(2^wave1_id+2^wave2_id) in your FSM to untrigger! */
+        int op = 1;
+        /* if it's negative, invert the bitpattern so we can identify
+           the wave id in question, then use 'op' to supply a negative waveid to
+           scheduleWave() */
+        if (swBits < 0)  { op = -1; swBits = -swBits; }
+        /* Do scheduled wave outputs, if any */
+        while (swBits) {
+          int wave = __ffs(swBits);
+          swBits &= ~(0x1<<wave);
+          scheduleWave(f, wave, op);
+        }
+}
+
 static void doOutput(FSMID_t f)
 {
-  static struct NRTOutput nrt_out;
-
   unsigned i;
   unsigned trigs = 0, conts = 0, contmask = rs[f].do_chans_cont_mask; 
   unsigned state = rs[f].current_state;
@@ -1951,24 +1992,10 @@ static void doOutput(FSMID_t f)
       break;
     case OSPEC_EXT:
       /* Do Ext 'virtual' triggers... */
-      CHK_AND_DO_EXT_TRIG(f, spec->object_num, STATE_OUTPUT(fsm, state, i));
+      doExtTrigOutput(spec->object_num, STATE_OUTPUT(fsm, state, i));
       break;
     case OSPEC_SCHED_WAVE: 
-      {
-        /* HACK!! Untriggering is funny since you need to do:
-           -(2^wave1_id+2^wave2_id) in your FSM to untrigger! */
-        int swBits = STATE_OUTPUT(fsm, state, i), op = 1;
-        /* if it's negative, invert the bitpattern so we can identify
-           the wave id in question, then use 'op' to supply a negative waveid to
-           scheduleWave() */
-        if (swBits < 0)  { op = -1; swBits = -swBits; }
-        /* Do scheduled wave outputs, if any */
-        while (swBits) {
-          int wave = __ffs(swBits);
-          swBits &= ~(0x1<<wave);
-          scheduleWave(f, wave, op);
-        }
-      }
+        doSchedWaveOutput(f, STATE_OUTPUT(fsm, state, i));
       break;
     case OSPEC_TCP:
     case OSPEC_UDP:  /* write non-realtime TCP/UDP packet to fifo */
@@ -1980,16 +2007,15 @@ static void doOutput(FSMID_t f)
           || rs[f].last_ip_outs[i] != STATE_OUTPUT(fsm, state, i)) {
         rs[f].last_ip_outs[i] = STATE_OUTPUT(fsm, state, i);
         rs[f].last_ip_outs_is_valid[i] = 1;
-        nrt_out.magic = NRTOUTPUT_MAGIC;
-        nrt_out.state = rs[f].current_state;
-        nrt_out.trig = STATE_OUTPUT(fsm, state, i);
-        nrt_out.ts_nanos = rs[f].current_ts;
-        nrt_out.type = spec->type == OSPEC_TCP ? NRT_TCP : NRT_UDP;
-        nrt_out.col = FIRST_OUT_COL(fsm)+i;
-        snprintf(nrt_out.ip_host, IP_HOST_LEN, "%s", spec->host);
-        nrt_out.ip_port = spec->port;
-        snprintf(nrt_out.ip_packet_fmt, FMT_TEXT_LEN, "%s", spec->fmt_text);
-        rtf_put(shm->fifo_nrt_output[f], &nrt_out, sizeof(nrt_out));
+        doNRTOutput(f, /* fsm id */
+                    (spec->type == OSPEC_TCP) ? NRT_TCP : NRT_UDP,  /* type */
+                    FIRST_OUT_COL(fsm)+i,  /* col */
+                    STATE_OUTPUT(fsm, state, i), /* trig */
+                    spec->host,
+                    spec->port,
+                    spec->fmt_text, /* data */
+                    0 /*datalen, ignored because type flag NRT_BINDATA is not set */
+                   );
       }
       break;
     }
@@ -2162,6 +2188,9 @@ static void handleFifos(FSMID_t f)
              last fsm.. */
           swapFSMs(f);
         else
+        /* TODO FIXME BUG XXX: need to figure out how to gracefully handle
+           pending fsm swaps and things like AOWave specs, input specs, sched-waves,
+           etc!  Right now the old FSM gets the AOWaves, sched waves, etc of the *new* fsm! */
           /* fsm requested to cleanly wait for last FSM to exit.. */
           rs[f].pending_fsm_swap = 1;
       }
@@ -2385,7 +2414,7 @@ static void handleFifos(FSMID_t f)
             which = OUTPUT_ROUTING(f, i)->object_num;
             break;
           }
-        CHK_AND_DO_EXT_TRIG(f, which, msg->u.forced_triggers);
+        doExtTrigOutput(which, msg->u.forced_triggers);
         do_reply = 1;
       }
       break;
@@ -2831,7 +2860,7 @@ static inline void SET_EXT_TRIG(unsigned which, unsigned trig)
   FSM_EXT_TRIG(extTrigShm, which, trig); 
 }
 
-static inline void CHK_AND_DO_EXT_TRIG(FSMID_t f, unsigned which, unsigned t) 
+static inline void doExtTrigOutput(unsigned which, unsigned t) 
 {
   int trig = *(int *)&t;
   if (!trig) return;
@@ -3233,6 +3262,9 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->forceJumpToState = &emblib_gotoState;
   embc->printf = &emblib_printf;
   embc->snprintf = &emblib_snprintf;
+  embc->sendPacket = &emblib_sendPacket;
+  embc->trigExt = &emblib_trigExt;
+  embc->trigSchedWave = &emblib_trigSchedWave;
   embc->sqrt = &sqrt;
   embc->exp = &exp;
   embc->exp2 = &exp2;
@@ -3348,8 +3380,11 @@ static int emblib_writeDIO(unsigned chan, unsigned val)
 
 static int emblib_gotoState(uint fsm, unsigned state, int eventid)
 {
-    int ret = gotoState(fsm, state, eventid); /* NB: gotoState() returns 1 on new state, 0 on same state, -1 on error */
-    return ret > -1; 
+    if (fsm < NUM_STATE_MACHINES) {
+        int ret = gotoState(fsm, state, eventid); /* NB: gotoState() returns 1 on new state, 0 on same state, -1 on error */
+        return ret > -1; 
+    }
+    return 0;
 }
 
 static int emblib_printf(const char *format, ...) 
@@ -3376,6 +3411,31 @@ static int emblib_snprintf(char *buf, unsigned long sz, const char *format, ...)
     ret = float_vsnprintf(buf, sz, format, ap);
     va_end(ap);
     return ret;
+}
+
+static void emblib_sendPacket(unsigned fsm, int proto, const char *host, unsigned short port, const void *data, unsigned len)
+{
+    if (fsm < NUM_STATE_MACHINES && (proto == EMBC_TCP || proto == EMBC_UDP) && data && host) {
+        doNRTOutput(
+            fsm, /* fsm id */
+            (proto == EMBC_TCP ? NRT_TCP : NRT_UDP) | NRT_BINDATA,  /* type -- make sure it's marked as binary */
+            0xff,  /* col */
+            0xff, /* trig */
+            host,
+            port,
+            data, /* data */
+            len /*datalen */
+        );
+    }
+}
+static void emblib_trigSchedWave(unsigned fsm_id, unsigned sched_wave_bits)
+{
+    if (fsm_id < NUM_STATE_MACHINES)
+        doSchedWaveOutput(fsm_id, sched_wave_bits);
+}
+static void emblib_trigExt(unsigned which, unsigned trig)
+{
+    doExtTrigOutput(which, trig);
 }
 
 static void swapFSMs(FSMID_t f)

@@ -18,6 +18,8 @@ typedef int TRISTATE; /* A tristate value takes one of 3 states: POSITIVE, NEGAT
 #define ISPOSITIVE(t) (t > 0)
 #define ISNEGATIVE(t) (t < 0)
 #define ISNEUTRAL(t)   t == 0)
+#define EMBC_TCP 0
+#define EMBC_UDP 1
 
 struct EmbCTransition 
 {
@@ -65,6 +67,10 @@ struct EmbC
   int (*readDIO)(unsigned);
   /* Write to a DIO line, 1 on success, 0 on failure. */
   int (*writeDIO)(unsigned, unsigned);
+  
+  void (*sendPacket)(uint fsm, int proto, const char *, unsigned short, const void *, unsigned);
+  void (*trigExt)(unsigned, unsigned);
+  void (*trigSchedWave)(unsigned, unsigned);
   
   // prints a message (most likely to the kernel log buffer)
   int (*printf)(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
@@ -151,6 +157,16 @@ static inline double randNormalized(void) {  return __embc->randNormalized(); }
 static inline void logValue(const char *vn, double vv) {   __embc->logValue(*__embc->fsm, vn, vv); }
 
 static inline void logArray(const char *vn, const double *vv, uint num) {   __embc->logArray(*__embc->fsm, vn, vv, num); }
+
+/*------------------------------
+  MISC C-Library-like-functions
+  -----------------------------*/
+#define printf(x...) (__embc->printf(x))
+#define snprintf(x...) (__embc->snprintf(x))
+
+extern void *memset(void *, int c, unsigned long);
+extern void *memcpy(void *, const void *, unsigned long);
+extern unsigned long strlen(const char *s);
 
 /*------------------------
   MATH LIBRARY SUPPORT
@@ -252,15 +268,28 @@ static inline int readDIO(unsigned chan) { return __embc->readDIO(chan); }
     Failure reasons may include: an invalid channel ID, or trying to write
     to a channel that is currently configured for digital input. */
 static inline int writeDIO(unsigned chan, unsigned bitval) { return __embc->writeDIO(chan, bitval); }
-
-/*------------------------------
-  MISC C-Library-like-functions
-  -----------------------------*/
-#define printf(x...) (__embc->printf(x))
-#define snprintf(x...) (__embc->snprintf(x))
-
-extern void *memset(void *, int c, unsigned long);
-extern void *memcpy(void *, const void *, unsigned long);
+/** Similar to the 'tcp' output routing type.  Basically, sometime in the 
+    future,a userspace non-realtime thread will initiate a connection to 
+    host:port and send data of length datalen, then it will close the connection. */
+static inline void sendTCPPacket(const char *host, unsigned short port, const void *data, unsigned datalen) { __embc->sendPacket(fsm(),EMBC_TCP,host,port,data,datalen); }
+/** Similar to above -- a shortcut for sending string data: expects a NUL-terminated string */
+static inline void sendTCPPacketStr(const char *host, unsigned short port, const char *str) { sendTCPPacket(host, port, str, strlen(str)); }
+/** Similar to the 'udp' output routing type.  Basically, sometime in the future,
+    a userspace non-realtime thread will send dataString as a datagram to 
+    host:port. */
+static inline void sendUDPPacket(const char *host, unsigned short port, const void *data, unsigned datalen) { __embc->sendPacket(fsm(),EMBC_UDP,host,port,data,datalen); }
+/** Similar to above -- a shortcut for sending string data: expects a NUL-terminated string */
+static inline void sendUDPPacketStr(const char *host, unsigned short port, const char *str) { sendUDPPacket(host, port, str, strlen(str)); }
+/** Call the external triggerable module passing it data 'which' and trigger 'trig'.  
+    This is typically how you trigger sound! */
+static inline void triggerExt(unsigned which, int trig) { __embc->trigExt(which, trig); }
+/** Synonym for triggerExt() but named triggerSound() for convenience */
+static inline void triggerSound(unsigned card, unsigned snd) { triggerExt(card, snd); }
+static inline void untriggerSound(unsigned card, unsigned snd) { triggerExt(card, -(int)snd); }
+/** Trigger a scheduled wave to play.  */
+static inline void triggerSchedWave(unsigned wave_id) { __embc->trigSchedWave(fsm(), 0x1<<wave_id); }
+/** Un-trigger a scheduled wave.  */
+static inline void untriggerSchedWave(unsigned wave_id) { __embc->trigSchedWave(fsm(), -(int)(0x1<<wave_id)); }
 
 /*--------------------------------------------------------------------------*/
 #endif /* EMBC_GENERATED_CODE */

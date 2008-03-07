@@ -338,13 +338,14 @@ struct ShmMsg {
 
   /** For use in NRTOutput struct below */
   enum NRTOutputType {
-    NRT_TCP = 0,
-    NRT_UDP,
+    NRT_TCP = 1,
+    NRT_UDP = 2,
+    NRT_BINDATA = (1<<7), /* set this bit in type to suppress formatting and just send raw data*/
   };
 
   /** This struct gets written to fifo_nrt_output for userspace processing */
   struct NRTOutput {
-#   define NRTOUTPUT_MAGIC (0x12c8)
+#   define NRTOUTPUT_MAGIC (0x12c9)
 #   define NRTOUTPUT_DATA_SIZE OUTPUT_SPEC_DATA_SIZE
     unsigned short magic;
     unsigned short state; /* the state machine state that caused this */
@@ -353,10 +354,9 @@ struct ShmMsg {
     unsigned long long ts_nanos;
     unsigned char type; /* one of NRTOutputType above */
     unsigned char col;  /* the state machine column */
+    char ip_host[IP_HOST_LEN];
+    unsigned short ip_port;
     union { 
-      struct { /* for type == NRT_TCP || NRT_UDP */
-        char ip_host[IP_HOST_LEN];
-        unsigned short ip_port;
         /* - This packet gets formatted based on the 'template' below 
              with params being interpreted based on specifal %-codes: 
                 %v - the value of the state matrix column (trig above struct)
@@ -377,9 +377,11 @@ struct ShmMsg {
              connection or a UDP datagram.  
            - The connection is then immediately terminated and/or the socket is
              closed right away. */
-        char ip_packet_fmt[FMT_TEXT_LEN];
-      };
-      char data[NRTOUTPUT_DATA_SIZE];
+        char ip_packet_fmt[FMT_TEXT_LEN]; /* for NRT_TCP or NRT_UDP */
+        struct { /* iff bit NRT_BINDATA is set in 'type', use this struct and ignore above.. */
+            unsigned datalen;
+            unsigned char data[FMT_TEXT_LEN-sizeof(unsigned)];
+        };
     };
   };
 
