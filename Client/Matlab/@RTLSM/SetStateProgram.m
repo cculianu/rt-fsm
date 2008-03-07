@@ -309,6 +309,9 @@
 %   // prints a message (most likely to the kernel log buffer)
 %   extern int printf(const char *format, ...);
 %
+%   // print formatted to a string 
+%   extern int snprintf(char *buf, unsigned long bufsz, const char *format, ...);
+%
 %
 %   /*------------------------
 %    MATH FUNCTIONS
