@@ -2254,7 +2254,7 @@ IntStringMap ConnectionThread::parseIntStringMapBlock(const std::string & strblk
   // format is state_num -> sometext, one per line
   IntStringMap ret;
   // split lines on newline..
-  std::vector<std::string> nv_pairs = splitString(strblk, "\n");
+  std::vector<std::string> nv_pairs = splitString(strblk, ",");
   int ct = 1;
   for(std::vector<std::string>::const_iterator it = nv_pairs.begin(); it != nv_pairs.end(); ++it, ++ct) {
     // split strings on '->'
