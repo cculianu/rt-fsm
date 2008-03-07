@@ -498,6 +498,7 @@ static int emblib_readDIO(unsigned);
 static int emblib_writeDIO(unsigned,unsigned);
 static int emblib_gotoState(uint fsm, unsigned state, int eventid);
 static int emblib_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+static int emblib_snprintf(char *buf, unsigned long sz, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -627,7 +628,9 @@ static int initBuddyTask(void)
 {
   FSMID_t f;
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
-    buddyTask[f] = softTaskCreate(buddyTaskHandler, MODULE_NAME" Buddy Task");
+    char namebuf[64];
+    snprintf(namebuf, 64, MODULE_NAME" Buddy Task %d", (int)f);
+    buddyTask[f] = softTaskCreate(buddyTaskHandler, namebuf);
     if (!buddyTask[f]) return -ENOMEM;
   }
   buddyTaskComedi = softTaskCreate(buddyTaskComediHandler, MODULE_NAME" Comedi Buddy Task");
@@ -2189,6 +2192,11 @@ static void handleFifos(FSMID_t f)
       do_reply = 1;
       break;
 
+    case LOGITEMS:
+    case TRANSITIONS:
+        do_reply = 1; /* just reply that it's done */
+        break;
+        
     default:
       ERROR_INT(" Got bogus reply %d from non-RT buddy task!\n", BUDDY_TASK_RESULT);
       break;
@@ -2240,7 +2248,7 @@ static void handleFifos(FSMID_t f)
       {
         unsigned *from = &msg->u.transitions.from; /* Shorthand alias.. */
         unsigned *num = &msg->u.transitions.num; /* alias.. */
-        unsigned i;
+        /*unsigned i;*/
 
         if ( *from >= NUM_TRANSITIONS(f)) 
           *from = NUM_TRANSITIONS(f) ? NUM_TRANSITIONS(f)-1 : 0;
@@ -2250,11 +2258,12 @@ static void handleFifos(FSMID_t f)
         if (*num > MSG_MAX_TRANSITIONS)
           *num = MSG_MAX_TRANSITIONS;
 
-        for (i = 0; i < *num; ++i)
+        /*for (i = 0; i < *num; ++i)
           memcpy((void *)&msg->u.transitions.transitions[i],
                  (const void *)historyAt(f, *from + i),
                  sizeof(struct StateTransition));
-        do_reply = 1;
+        do_reply = 1;*/
+        BUDDY_TASK_PEND(TRANSITIONS);
       }
       break;
 
@@ -2262,7 +2271,7 @@ static void handleFifos(FSMID_t f)
       {
         unsigned *from = &msg->u.log_items.from; /* Shorthand alias.. */
         unsigned *num = &msg->u.log_items.num; /* alias.. */
-        unsigned i;
+        /*unsigned i;*/
 
         if ( *from >= NUM_LOG_ITEMS(f)) 
           *from = NUM_LOG_ITEMS(f) ? NUM_LOG_ITEMS(f)-1 : 0;
@@ -2272,11 +2281,12 @@ static void handleFifos(FSMID_t f)
         if (*num > MSG_MAX_LOG_ITEMS)
           *num = MSG_MAX_LOG_ITEMS;
 
-        for (i = 0; i < *num; ++i)
+        /*for (i = 0; i < *num; ++i)
           memcpy((void *)&msg->u.log_items.items[i],
                  (const void *)logItemAt(f, *from + i),
                  sizeof(struct VarLogItem));
-        do_reply = 1;
+        do_reply = 1;*/
+        BUDDY_TASK_PEND(LOGITEMS);
       }
       break;
       
@@ -3066,6 +3076,7 @@ static void buddyTaskHandler(void *arg)
       }
     }
   }
+
     break;
   case GETFSM:
     if (!rs[f].valid) {  
@@ -3113,7 +3124,31 @@ static void buddyTaskHandler(void *arg)
       }
     }
     break;
-  }
+  case TRANSITIONS: {
+        unsigned const from = msg->u.transitions.from; /* Shorthand alias.. */
+        unsigned const num = msg->u.transitions.num; /* alias.. */
+        unsigned i;
+
+        for (i = 0; i < num; ++i)
+            memcpy((void *)&msg->u.transitions.transitions[i],
+                    (const void *)historyAt(f, from + i),
+                    sizeof(struct StateTransition));
+    }
+    break;
+
+  case LOGITEMS: {
+        unsigned const from = msg->u.log_items.from; /* Shorthand alias.. */
+        unsigned const num = msg->u.log_items.num; /* alias.. */
+        unsigned i;
+
+        for (i = 0; i < num; ++i)
+            memcpy((void *)&msg->u.log_items.items[i],
+                    (const void *)logItemAt(f, from + i),
+                    sizeof(struct VarLogItem));
+    }
+    break;
+
+  } /* end switch */
 
   /* indicate to RT task that request is done.. */
   atomic_set(&buddyTaskCmds[f], -req);
@@ -3197,6 +3232,7 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->writeDIO = &emblib_writeDIO;
   embc->forceJumpToState = &emblib_gotoState;
   embc->printf = &emblib_printf;
+  embc->snprintf = &emblib_snprintf;
   embc->sqrt = &sqrt;
   embc->exp = &exp;
   embc->exp2 = &exp2;
@@ -3328,6 +3364,17 @@ static int emblib_printf(const char *format, ...)
     va_end(ap);
     if (ret > -1)
     rt_printk("%s", buf); /* finally, really print it using rt-safe printf */
+    return ret;
+}
+
+static int emblib_snprintf(char *buf, unsigned long sz, const char *format, ...)
+{
+    int ret;
+    va_list ap;
+    
+    va_start(ap, format);
+    ret = float_vsnprintf(buf, sz, format, ap);
+    va_end(ap);
     return ret;
 }
 

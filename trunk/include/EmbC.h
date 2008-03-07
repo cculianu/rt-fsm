@@ -68,6 +68,8 @@ struct EmbC
   
   // prints a message (most likely to the kernel log buffer)
   int (*printf)(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+  // print formatted to a string 
+  int (*snprintf)(char *buf, unsigned long len, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
 
   // just like math library
   double (*sqrt)(double);
@@ -255,6 +257,7 @@ static inline int writeDIO(unsigned chan, unsigned bitval) { return __embc->writ
   MISC C-Library-like-functions
   -----------------------------*/
 #define printf(x...) (__embc->printf(x))
+#define snprintf(x...) (__embc->snprintf(x))
 
 extern void *memset(void *, int c, unsigned long);
 extern void *memcpy(void *, const void *, unsigned long);
