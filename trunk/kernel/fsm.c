@@ -280,7 +280,7 @@ static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig);
 static inline void SET_EXT_TRIG(unsigned which, unsigned trig);
 static inline void doExtTrigOutput(unsigned which, unsigned trig);
 /** Return nonzero on error */
-static int fsmLinkProgram(FSMID_t f, struct FSMSpec *fsmspec_ptr);
+static int initializeFSM(FSMID_t f, struct FSMSpec *fsmspec_ptr);
 static void swapFSMs(FSMID_t);
 /* calls rmmod, does cleanup of a particular fsm's embc ptr, etc*/
 static void unloadDetachFSM(struct FSMSpec *fsm);
@@ -3102,8 +3102,8 @@ static void buddyTaskHandler(void *arg)
     } else {
       /* set up the error handler */
       FSMSpec *fsm = OTHER_FSM_PTR(f);
-      if (fsmLinkProgram(f, fsm)) {
-        ERROR("Failed to 'link' the FSM with Shm %s!\n", fsm->shm_name);
+      if (!initializeFSM(f, fsm)) {
+        ERROR("Failed to initialize the FSM %s!\n", fsm->shm_name);
         unloadDetachFSM(fsm);
       }
     }
@@ -3243,21 +3243,11 @@ static void updateHasSchedWaves(FSMID_t f)
 	FSM_PTR(f)->has_sched_waves = yesno;
 }
 
-
-/** Return nonzero on error */
-static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
+static void fsmLinkProgram(FSMID_t f, struct EmbC *embc)
 {
-  struct EmbC *embc = spec->embc;
   volatile const struct RunState *r = &rs[f];
 
-  if (!embc) return -1;
-
-  embc->lock(); /* NB: unlock called by unloadDetachFSM */
-
-  /* clear all AO wave pointers */
-  memset(spec->aowaves, 0, sizeof(spec->aowaves));
-  
-  /* first put symbols.. see Embedded_C_FSM_Notes.txt or EmbC.h 
+ /*  'link' symbols.. see Embedded_C_FSM_Notes.txt or EmbC.h 
      to see which pointers need to be added.. */
   
   embc->time = &r->current_ts_secs;
@@ -3311,10 +3301,26 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->sinh = &sinh;
   embc->tanh = &tanh;
 
+}
+
+/** Return nonzero on error */
+static int initializeFSM(FSMID_t f, struct FSMSpec *spec)
+{
+  struct EmbC *embc = spec->embc;
+
+  if (!embc) return 0;
+
+  embc->lock(); /* NB: unlock called by unloadDetachFSM */
+
+  fsmLinkProgram(f, embc);
+  
+  /* clear all AO wave pointers */
+  memset(spec->aowaves, 0, sizeof(spec->aowaves));
+ 
   /* call init here in non-realtime context.  Note that cleanup is called in non-realtime context too in unloadDetachFSM() */
   if (embc->init) embc->init(); 
   
-  return 0;
+  return 1;
 }
 
 static double emblib_rand(void) 

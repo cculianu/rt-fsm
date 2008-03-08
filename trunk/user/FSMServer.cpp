@@ -140,6 +140,7 @@ namespace
   volatile struct Shm *shm = 0;
   int listen_fd = -1; /* Our listen socket.. */
   unsigned short listenPort = 3333;
+  const unsigned MinimumClientVersion = 220080308;
   typedef std::map<ConnectionThread *, ConnectionThread *> ConnectedThreadsList;
 
   bool debug = false; // set with -d command-line switch to enable debug mode.
@@ -253,7 +254,7 @@ private:
   // FSM/Globals mutex lock around global data so threads don't stomp on each other
   pthread_t handle;
   int sock, myid, fsm_id;
-  unsigned shm_num;
+  unsigned shm_num, client_ver;
   std::string remoteHost;
   volatile bool thread_running, thread_ran;
 
@@ -328,7 +329,7 @@ private:
 /* some statics for class ConnectionThread */
 int ConnectionThread::id = 0;
 
-ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false) { myid = id++; fsm_id = 0; shm_num = 0; }
+ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; }
 ConnectionThread::~ConnectionThread()
 { 
   if (sock > -1)  ::shutdown(sock, SHUT_RDWR), ::close(sock), sock = -1;
@@ -661,424 +662,444 @@ void *ConnectionThread::threadFunc(void)
         os << VersionNUM << " - [" << VersionSTR << "]\n";
         sockSend(os.str());
         cmd_error = false;
-    } else if (line.find("SET STATE PROGRAM") == 0) {
-      cmd_error = !doSetStateProgram();
-    } else if (line.find("SET STATE MATRIX") == 0) {
-      /* FSM Upload.. */
-        
-      // determine M and N
+    } else if (line.find("CLIENTVERSION") == 0) {
       std::string::size_type pos = line.find_first_of("0123456789");
-
-      if (pos != std::string::npos) {
-        unsigned m = 0, n = 0, num_Events = 0, num_SchedWaves = 0, readyForTrialState = 0, num_ContChans = 0, num_TrigChans = 0, num_Vtrigs = 0, state0_fsm_swap_flg = 0;
-        std::string outputSpecStr = "";
-        std::string inChanType = "ERROR";
-        std::stringstream s(line.substr(pos));
-        s >> m >> n >> num_Events >> num_SchedWaves >> inChanType >> readyForTrialState >> num_ContChans >> num_TrigChans >> num_Vtrigs >> outputSpecStr >> state0_fsm_swap_flg;
-        if (m && n) {
-          if (outputSpecStr.length() == 0 && (num_ContChans || num_TrigChans || num_Vtrigs || num_SchedWaves)) {
-            // old FSM client, so build an output spec string for them
-            Log() << "Client appears to use old SET STATE MATRIX interface, trying to create an output spec string that matches.\n"; 
-            std::stringstream s("");
-            if (num_ContChans+num_TrigChans) 
-              s << "\1" << "dout" << "\2" << "0-" << (num_ContChans+num_TrigChans);
-            if (num_Vtrigs)
-              s << "\1" << "sound" << "\2" << fsm_id;
-            if (num_SchedWaves)
-              s << "\1" << "sched_wave" << "\2" << "Ignored";
-            outputSpecStr = s.str();
-          } else
-            outputSpecStr = UrlDecode(outputSpecStr);
-
-          // guard against memory hogging DoS
-          if (m*n*sizeof(double) > FSM_MEMORY_BYTES) {
-            Log() << "Error, incoming matrix would exceed cell limit of " << FSM_MEMORY_BYTES/sizeof(double) << std::endl; 
-            break;
+      if ( pos != std::string::npos ) {
+          unsigned ver = 0;
+          std::istringstream is(line.substr(pos));
+          is >> ver;
+          if (ver >= MinimumClientVersion) {
+              cmd_error = false;
+              client_ver = ver;
+          } else {
+              Log() << "Client version " << ver << " does not meet minimum requirement of " << MinimumClientVersion << "\n";
+              sockSend("ERROR client version is incompatible\n");
+              break;
           }
-          if ( (count = sockSend("READY\n")) <= 0 ) {
-            Log() << "Send error..." << std::endl; 
-            break;
-          }
-          Log() << "Getting ready to receive matrix of  " << m << "x" << n << " with one row for (" << num_Events << ") event mapping and row(s) for " <<  num_SchedWaves << " scheduled waves " << std::endl; 
-            
-          Matrix mat (m, n);
-          count = sockReceiveData(mat.buf(), mat.bufSize());
-          if (count == (int)mat.bufSize()) {
-            cmd_error = !matrixToRT(mat, num_Events, num_SchedWaves, inChanType, readyForTrialState, outputSpecStr, state0_fsm_swap_flg);
-          } else if (count <= 0) {
-            break;
-          }
-        } 
       }
-    } else if (line.find("GET STATE MATRIX") == 0) {
-      cmd_error = !sendStringMatrix(matrixFromRT());
-    } else if (line.find("GET STATE PROGRAM") == 0) {
-      msg.id = GETFSM;
-      sendToRT(msg);
-      std::auto_ptr<char> program(new char[msg.u.fsm.program_len+1]);
-      memcpy(program.get(), msg.u.fsm.program_z, msg.u.fsm.program_z_len);
-      inflateInplace(program.get(), msg.u.fsm.program_z_len, msg.u.fsm.program_len);
-      program.get()[msg.u.fsm.program_len] = 0;
-      std::vector<std::string> lines = splitString(program.get(), "\n", false, false);
-      std::stringstream s;
-      s << "LINES " << lines.size() << "\n" << program.get();
-      std::string str = s.str();
-      if (str[str.length()-1] != '\n') str = str + "\n";
-      sockSend(str);
-      cmd_error = false;
-    } else if (line.find("INITIALIZE") == 0) {
-      sendToRT(RESET_);
-      cmd_error = false;
-    } else if (line.find("HALT") == 0) {
-      msg.id = GETPAUSE;
-      sendToRT(msg);
-      if ( ! msg.u.is_paused ) 
-        sendToRT(PAUSEUNPAUSE);
-      cmd_error = false;
-    } else if (line.find("RUN") == 0) {
-      msg.id = GETPAUSE;
-      sendToRT(msg);
-      if ( msg.u.is_paused ) 
-        sendToRT(PAUSEUNPAUSE);
-      cmd_error = false;        
-    } else if (line.find("FORCE TIME UP") == 0 ) { 
-      sendToRT(FORCETIMESUP);
-      cmd_error = false;
-    } else if (line.find("READY TO START TRIAL") == 0 ) { 
-      sendToRT(READYFORTRIAL);
-      cmd_error = false;
-    } else if (line.find("TRIGEXT") == 0 ) { 
-      int trigmask = 0;
-      std::string::size_type pos = line.find_first_of("-0123456789");
-      if (pos != std::string::npos) {
-        std::stringstream s(line.substr(pos));
-        s >> trigmask;
-        msg.id = FORCEEXT;
-        msg.u.forced_triggers = trigmask;
-        sendToRT(msg);
-        cmd_error = false;
-      }
-    } else if (line.find("BYPASS DOUT") == 0) {
-      int bypassmask = 0;
-      std::string::size_type pos = line.find_first_of("-0123456789");
-      if (pos != std::string::npos) {
-        std::stringstream s(line.substr(pos));
-        s >> bypassmask;
-        msg.id = FORCEOUTPUT;
-        msg.u.forced_outputs = bypassmask;
-        sendToRT(msg);
-        cmd_error = false;
-      }
-    } else if (line.find("FORCE STATE") == 0 ) { 
-      unsigned forced_state = 0;
-      std::string::size_type pos = line.find_first_of("0123456789");
-      if (pos != std::string::npos) {
-        unsigned rows, cols;
-        getFSMSizeFromRT(rows, cols);
-        std::stringstream s(line.substr(pos));
-        s >> forced_state;
-        if (forced_state < rows) { // ensure legal state here..
-          msg.id = FORCESTATE;
-          msg.u.forced_state = forced_state;
-          sendToRT(msg);
-          cmd_error = false;
-        }
-      }
-    } else if (line.find("GET EVENT COUNTER") == 0) {
-      msg.id = TRANSITIONCOUNT;
-      sendToRT(msg);
-      std::stringstream s;
-      s << msg.u.transition_count << std::endl;
-      sockSend(s.str());
-      cmd_error = false;
-    } else if (line.find("GET VARLOG COUNTER") == 0) {
-      msg.id = LOGITEMCOUNT;
-      sendToRT(msg);
-      std::stringstream s;
-      s << msg.u.log_item_count << std::endl;
-      sockSend(s.str());
-      cmd_error = false;
-    } else if (line.find("IS RUNNING") == 0) {
-      msg.id = GETPAUSE;
-      sendToRT(msg);
-      std::stringstream s;
-      s << !msg.u.is_paused << std::endl;
-      sockSend(s.str());
-      cmd_error = false;
-    } else if (line.find("GET TIME") == 0 && line.find(", EVENTS, AND STATE") == std::string::npos) {
-      msg.id = GETRUNTIME;
-      sendToRT(msg);
-      std::stringstream s;
-      s << static_cast<double>(msg.u.runtime_us)/1000000.0 << std::endl;
-      sockSend(s.str());
-      cmd_error = false;        
-    } else if (line.find("GET CURRENT STATE") == 0) {
-      msg.id = GETCURRENTSTATE;
-      sendToRT(msg);
-      std::stringstream s;
-      s << msg.u.current_state << std::endl;
-      sockSend(s.str());
-      cmd_error = false;        
-    } else if (line.find("GET EVENTS") == 0) {
-      std::string::size_type pos = line.find_first_of("0123456789");
-      if (pos != std::string::npos) {
-        std::stringstream s(line.substr(pos));
-        int first = -1, last = -1;
-        s >> first >> last;
-        Matrix mat = doGetTransitionsFromRT(first, last);
-
-        std::ostringstream os;
-        os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
-        sockSend(os.str());
-
-        line = sockReceiveLine(); // wait for "READY" from client
-
-        if (line.find("READY") != std::string::npos) {
-            sockSend(mat.buf(), mat.bufSize(), true);
-            cmd_error = false;
-        }
-      }
-    } else if (line.find("GET VARLOG") == 0) {
-      std::string::size_type pos = line.find_first_of("0123456789");
-      if (pos != std::string::npos) {
-        std::stringstream s(line.substr(pos));
-        int first = -1, last = -1, n_items = 0;
-        s >> first >> last;
-
-        // query the count first to check sanity
-        msg.id = LOGITEMCOUNT;
-        sendToRT(msg);
-          
-        n_items = msg.u.log_item_count;
-        if (first < 0) first = 0;
-        if (last < 0) last = 0;
-        if (last > n_items) last = n_items;
-        int desired = last-first+1;
-        if (first <= last && desired <= n_items) {
-          int received = 0, ct = 0;
-          StringMatrix mat(desired, 3);
-            
-
-          // keep 'downloading' the matrix from RT until we get all the transitions we require
-          while (received < desired) {
-            msg.id = LOGITEMS;
-            msg.u.log_items.num = desired - received;
-            msg.u.log_items.from = first + received;
-            sendToRT(msg);
-            received += (int)msg.u.log_items.num;              
-            for (int i = 0; i < (int)msg.u.log_items.num; ++i, ++ct) {
-              struct VarLogItem & v = msg.u.log_items.items[i];
-              mat.at(ct,0) = ToString(v.ts);
-              mat.at(ct,1) = v.name;
-              mat.at(ct,2) = ToString(v.value);
-            }
-          }
-          cmd_error = !sendStringMatrix(mat);
-        } else {
-          cmd_error = sendStringMatrix(StringMatrix(0,3));
-        }
-      }
-    } else if ( line.find("EXIT") == 0 || line.find("BYE") == 0 || line.find("QUIT") == 0) {
-      Log() << "Graceful exit requested." << std::endl;
-      break;
-    } else if (line.find("NOTIFY EVENTS") == 0) {
-      std::string::size_type pos = line.find("VERBOSE");
-      bool verbose = pos != std::string::npos;
-      sockSend("OK\n"); // tell them we accept the command..
-      doNotifyEvents(verbose); // this doesn't return for a LONG time normally..
-      break; // if we return from the above, means there is a socket error
     } else if (line.find("NOOP") == 0) {
       // noop is just used to test the connection, keep it alive, etc
       // it doesn't touch the shm...
       cmd_error = false;        
-    } else if (line.find("START DAQ") == 0) { // START DAQ
-      // determine chans and range
-      std::string::size_type pos = line.find_first_of("0123456789");
+    } else if ( line.find("EXIT") == 0 || line.find("BYE") == 0 || line.find("QUIT") == 0) {
+      Log() << "Graceful exit requested." << std::endl;
+      break;
+    } else if (client_ver) { // the rest of these commands require that the client has told us its version!
+        
+        if (line.find("SET STATE PROGRAM") == 0) {
+            cmd_error = !doSetStateProgram();
+        } else if (line.find("SET STATE MATRIX") == 0) {
+            /* FSM Upload.. */
+        
+      // determine M and N
+            std::string::size_type pos = line.find_first_of("0123456789");
 
-      if (pos != std::string::npos) {
-        std::string chanstr, rangestr;
-        std::stringstream s(line.substr(pos));
-        s >> chanstr >> rangestr;
-        std::vector<double> chans = splitNumericString(chanstr);
-        std::vector<double> ranges = splitNumericString(rangestr);
-        unsigned chanMask = 0, nChans = 0;
-        for (unsigned i = 0; i < chans.size(); ++i) {
-          unsigned ch = i;
-          if (ch < sizeof(int)*8 && !(chanMask&(0x1<<ch)))
-            (chanMask |= 0x1<<ch), nChans++;
-        }
-        if (!chanMask || !nChans || ranges.size() != 2) {
-          Log() << "Chan or range spec for START DAQ has invalid chanspec or rangespec" << std::endl; 
-        } else {
-          msg.id = STARTDAQ;
-          msg.u.start_daq.chan_mask = chanMask;
-          msg.u.start_daq.range_min = int(ranges[0]*1e6);
-          msg.u.start_daq.range_max = int(ranges[1]*1e6);
-          msg.u.start_daq.started_ok = 0;
-          sendToRT(msg);
-          if (msg.u.start_daq.started_ok) {
+            if (pos != std::string::npos) {
+                unsigned m = 0, n = 0, num_Events = 0, num_SchedWaves = 0, readyForTrialState = 0, num_ContChans = 0, num_TrigChans = 0, num_Vtrigs = 0, state0_fsm_swap_flg = 0;
+                std::string outputSpecStr = "";
+                std::string inChanType = "ERROR";
+                std::stringstream s(line.substr(pos));
+                s >> m >> n >> num_Events >> num_SchedWaves >> inChanType >> readyForTrialState >> num_ContChans >> num_TrigChans >> num_Vtrigs >> outputSpecStr >> state0_fsm_swap_flg;
+                if (m && n) {
+                    if (outputSpecStr.length() == 0 && (num_ContChans || num_TrigChans || num_Vtrigs || num_SchedWaves)) {
+            // old FSM client, so build an output spec string for them
+                        Log() << "Client appears to use old SET STATE MATRIX interface, trying to create an output spec string that matches.\n"; 
+                        std::stringstream s("");
+                        if (num_ContChans+num_TrigChans) 
+                            s << "\1" << "dout" << "\2" << "0-" << (num_ContChans+num_TrigChans);
+                        if (num_Vtrigs)
+                            s << "\1" << "sound" << "\2" << fsm_id;
+                        if (num_SchedWaves)
+                            s << "\1" << "sched_wave" << "\2" << "Ignored";
+                        outputSpecStr = s.str();
+                    } else
+                        outputSpecStr = UrlDecode(outputSpecStr);
+
+          // guard against memory hogging DoS
+                        if (m*n*sizeof(double) > FSM_MEMORY_BYTES) {
+                            Log() << "Error, incoming matrix would exceed cell limit of " << FSM_MEMORY_BYTES/sizeof(double) << std::endl; 
+                            break;
+                        }
+                        if ( (count = sockSend("READY\n")) <= 0 ) {
+                            Log() << "Send error..." << std::endl; 
+                            break;
+                        }
+                        Log() << "Getting ready to receive matrix of  " << m << "x" << n << " with one row for (" << num_Events << ") event mapping and row(s) for " <<  num_SchedWaves << " scheduled waves " << std::endl; 
+            
+                        Matrix mat (m, n);
+                        count = sockReceiveData(mat.buf(), mat.bufSize());
+                        if (count == (int)mat.bufSize()) {
+                            cmd_error = !matrixToRT(mat, num_Events, num_SchedWaves, inChanType, readyForTrialState, outputSpecStr, state0_fsm_swap_flg);
+                        } else if (count <= 0) {
+                            break;
+                        }
+                } 
+            }
+        } else if (line.find("GET STATE MATRIX") == 0) {
+            cmd_error = !sendStringMatrix(matrixFromRT());
+        } else if (line.find("GET STATE PROGRAM") == 0) {
+            msg.id = GETFSM;
+            sendToRT(msg);
+            std::auto_ptr<char> program(new char[msg.u.fsm.program_len+1]);
+            memcpy(program.get(), msg.u.fsm.program_z, msg.u.fsm.program_z_len);
+            inflateInplace(program.get(), msg.u.fsm.program_z_len, msg.u.fsm.program_len);
+            program.get()[msg.u.fsm.program_len] = 0;
+            std::vector<std::string> lines = splitString(program.get(), "\n", false, false);
+            std::stringstream s;
+            s << "LINES " << lines.size() << "\n" << program.get();
+            std::string str = s.str();
+            if (str[str.length()-1] != '\n') str = str + "\n";
+            sockSend(str);
+            cmd_error = false;
+        } else if (line.find("INITIALIZE") == 0) {
+            sendToRT(RESET_);
+            cmd_error = false;
+        } else if (line.find("HALT") == 0) {
+            msg.id = GETPAUSE;
+            sendToRT(msg);
+            if ( ! msg.u.is_paused ) 
+                sendToRT(PAUSEUNPAUSE);
+            cmd_error = false;
+        } else if (line.find("RUN") == 0) {
+            msg.id = GETPAUSE;
+            sendToRT(msg);
+            if ( msg.u.is_paused ) 
+                sendToRT(PAUSEUNPAUSE);
             cmd_error = false;        
-            pthread_mutex_lock(&fsms[fsm_id].daqLock);
-            fsms[fsm_id].daqNumChans = nChans;
-            fsms[fsm_id].daqMaxData = msg.u.start_daq.maxdata;
+        } else if (line.find("FORCE TIME UP") == 0 ) { 
+            sendToRT(FORCETIMESUP);
+            cmd_error = false;
+        } else if (line.find("READY TO START TRIAL") == 0 ) { 
+            sendToRT(READYFORTRIAL);
+            cmd_error = false;
+        } else if (line.find("TRIGEXT") == 0 ) { 
+            int trigmask = 0;
+            std::string::size_type pos = line.find_first_of("-0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                s >> trigmask;
+                msg.id = FORCEEXT;
+                msg.u.forced_triggers = trigmask;
+                sendToRT(msg);
+                cmd_error = false;
+            }
+        } else if (line.find("BYPASS DOUT") == 0) {
+            int bypassmask = 0;
+            std::string::size_type pos = line.find_first_of("-0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                s >> bypassmask;
+                msg.id = FORCEOUTPUT;
+                msg.u.forced_outputs = bypassmask;
+                sendToRT(msg);
+                cmd_error = false;
+            }
+        } else if (line.find("FORCE STATE") == 0 ) { 
+            unsigned forced_state = 0;
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                unsigned rows, cols;
+                getFSMSizeFromRT(rows, cols);
+                std::stringstream s(line.substr(pos));
+                s >> forced_state;
+                if (forced_state < rows) { // ensure legal state here..
+                    msg.id = FORCESTATE;
+                    msg.u.forced_state = forced_state;
+                    sendToRT(msg);
+                    cmd_error = false;
+                }
+            }
+        } else if (line.find("GET EVENT COUNTER") == 0) {
+            msg.id = TRANSITIONCOUNT;
+            sendToRT(msg);
+            std::stringstream s;
+            s << msg.u.transition_count << std::endl;
+            sockSend(s.str());
+            cmd_error = false;
+        } else if (line.find("GET VARLOG COUNTER") == 0) {
+            msg.id = LOGITEMCOUNT;
+            sendToRT(msg);
+            std::stringstream s;
+            s << msg.u.log_item_count << std::endl;
+            sockSend(s.str());
+            cmd_error = false;
+        } else if (line.find("IS RUNNING") == 0) {
+            msg.id = GETPAUSE;
+            sendToRT(msg);
+            std::stringstream s;
+            s << !msg.u.is_paused << std::endl;
+            sockSend(s.str());
+            cmd_error = false;
+        } else if (line.find("GET TIME") == 0 && line.find(", EVENTS, AND STATE") == std::string::npos) {
+            msg.id = GETRUNTIME;
+            sendToRT(msg);
+            std::stringstream s;
+            s << static_cast<double>(msg.u.runtime_us)/1000000.0 << std::endl;
+            sockSend(s.str());
+            cmd_error = false;        
+        } else if (line.find("GET CURRENT STATE") == 0) {
+            msg.id = GETCURRENTSTATE;
+            sendToRT(msg);
+            std::stringstream s;
+            s << msg.u.current_state << std::endl;
+            sockSend(s.str());
+            cmd_error = false;        
+        } else if (line.find("GET EVENTS") == 0) {
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                int first = -1, last = -1;
+                s >> first >> last;
+                Matrix mat = doGetTransitionsFromRT(first, last);
+
+                std::ostringstream os;
+                os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
+                sockSend(os.str());
+
+                line = sockReceiveLine(); // wait for "READY" from client
+
+                if (line.find("READY") != std::string::npos) {
+                    sockSend(mat.buf(), mat.bufSize(), true);
+                    cmd_error = false;
+                }
+            }
+        } else if (line.find("GET VARLOG") == 0) {
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                int first = -1, last = -1, n_items = 0;
+                s >> first >> last;
+
+        // query the count first to check sanity
+                msg.id = LOGITEMCOUNT;
+                sendToRT(msg);
+          
+                n_items = msg.u.log_item_count;
+                if (first < 0) first = 0;
+                if (last < 0) last = 0;
+                if (last > n_items) last = n_items;
+                int desired = last-first+1;
+                if (first <= last && desired <= n_items) {
+                    int received = 0, ct = 0;
+                    StringMatrix mat(desired, 3);
+            
+
+          // keep 'downloading' the matrix from RT until we get all the transitions we require
+                    while (received < desired) {
+                        msg.id = LOGITEMS;
+                        msg.u.log_items.num = desired - received;
+                        msg.u.log_items.from = first + received;
+                        sendToRT(msg);
+                        received += (int)msg.u.log_items.num;              
+                        for (int i = 0; i < (int)msg.u.log_items.num; ++i, ++ct) {
+                            struct VarLogItem & v = msg.u.log_items.items[i];
+                            mat.at(ct,0) = ToString(v.ts);
+                            mat.at(ct,1) = v.name;
+                            mat.at(ct,2) = ToString(v.value);
+                        }
+                    }
+                    cmd_error = !sendStringMatrix(mat);
+                } else {
+                    cmd_error = sendStringMatrix(StringMatrix(0,3));
+                }
+            }
+        } else if (line.find("NOTIFY EVENTS") == 0) {
+            std::string::size_type pos = line.find("VERBOSE");
+            bool verbose = pos != std::string::npos;
+            sockSend("OK\n"); // tell them we accept the command..
+            doNotifyEvents(verbose); // this doesn't return for a LONG time normally..
+            break; // if we return from the above, means there is a socket error
+        } else if (line.find("START DAQ") == 0) { // START DAQ
+      // determine chans and range
+            std::string::size_type pos = line.find_first_of("0123456789");
+
+            if (pos != std::string::npos) {
+                std::string chanstr, rangestr;
+                std::stringstream s(line.substr(pos));
+                s >> chanstr >> rangestr;
+                std::vector<double> chans = splitNumericString(chanstr);
+                std::vector<double> ranges = splitNumericString(rangestr);
+                unsigned chanMask = 0, nChans = 0;
+                for (unsigned i = 0; i < chans.size(); ++i) {
+                    unsigned ch = i;
+                    if (ch < sizeof(int)*8 && !(chanMask&(0x1<<ch)))
+                        (chanMask |= 0x1<<ch), nChans++;
+                }
+                if (!chanMask || !nChans || ranges.size() != 2) {
+                    Log() << "Chan or range spec for START DAQ has invalid chanspec or rangespec" << std::endl; 
+                } else {
+                    msg.id = STARTDAQ;
+                    msg.u.start_daq.chan_mask = chanMask;
+                    msg.u.start_daq.range_min = int(ranges[0]*1e6);
+                    msg.u.start_daq.range_max = int(ranges[1]*1e6);
+                    msg.u.start_daq.started_ok = 0;
+                    sendToRT(msg);
+                    if (msg.u.start_daq.started_ok) {
+                        cmd_error = false;        
+                        pthread_mutex_lock(&fsms[fsm_id].daqLock);
+                        fsms[fsm_id].daqNumChans = nChans;
+                        fsms[fsm_id].daqMaxData = msg.u.start_daq.maxdata;
             //fsms[fsm_id].daqRangeMin = msg.u.start_daq.range_min/1e6;
             //fsms[fsm_id].daqRangeMax = msg.u.start_daq.range_max/1e6;
-            pthread_mutex_unlock(&fsms[fsm_id].daqLock);
-          } else { 
-            Log() << "RT Task refused to do start a DAQ task -- probably invalid parameters are to blame" << std::endl;
-          }
-        }
-      }
-    } else if (line.find("STOP DAQ") == 0) { // STOP DAQ
-      sendToRT(STOPDAQ);
+                        pthread_mutex_unlock(&fsms[fsm_id].daqLock);
+                    } else { 
+                        Log() << "RT Task refused to do start a DAQ task -- probably invalid parameters are to blame" << std::endl;
+                    }
+                }
+            }
+        } else if (line.find("STOP DAQ") == 0) { // STOP DAQ
+            sendToRT(STOPDAQ);
       //fifoReadAllAvail(fifo_daq); // discard fifo data for stopped scan
       // FIXME avoid race coditions with daq thread
-      pthread_mutex_lock(&fsms[fsm_id].daqLock);
-      fsms[fsm_id].daqBuf.clear();
-      pthread_mutex_unlock(&fsms[fsm_id].daqLock);
-      cmd_error = false;        
-    } else if (line.find("GET DAQ SCANS") == 0) { // GET DAQ SCANS
+            pthread_mutex_lock(&fsms[fsm_id].daqLock);
+            fsms[fsm_id].daqBuf.clear();
+            pthread_mutex_unlock(&fsms[fsm_id].daqLock);
+            cmd_error = false;        
+        } else if (line.find("GET DAQ SCANS") == 0) { // GET DAQ SCANS
 
-      Matrix mat = fsms[fsm_id].getDAQScans();
-      std::ostringstream os;
-      os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl; 
-      sockSend(os.str());
+            Matrix mat = fsms[fsm_id].getDAQScans();
+            std::ostringstream os;
+            os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl; 
+            sockSend(os.str());
 
-      line = sockReceiveLine(); // wait for "READY" from client
+            line = sockReceiveLine(); // wait for "READY" from client
             
-      if (line.find("READY") != std::string::npos) {
-        sockSend(mat.buf(), mat.bufSize(), true);
-        cmd_error = false;
-      }
+            if (line.find("READY") != std::string::npos) {
+                sockSend(mat.buf(), mat.bufSize(), true);
+                cmd_error = false;
+            }
  
-    } else if (line.find("SET AO WAVE") == 0) { // SET AO WAVE
+        } else if (line.find("SET AO WAVE") == 0) { // SET AO WAVE
 
       // determine M N id aoline loop
-      std::string::size_type pos = line.find_first_of("0123456789");
+            std::string::size_type pos = line.find_first_of("0123456789");
 
-      if (pos != std::string::npos) {
-          unsigned m = 0, n = 0, id = 0, aoline = 0, loop = 0, pend_flg = 0;
-          std::stringstream s(line.substr(pos));
-          s >> m >> n >> id >> aoline >> loop >> pend_flg;
-          if (m && n) {
+            if (pos != std::string::npos) {
+                unsigned m = 0, n = 0, id = 0, aoline = 0, loop = 0, pend_flg = 0;
+                std::stringstream s(line.substr(pos));
+                s >> m >> n >> id >> aoline >> loop >> pend_flg;
+                if (m && n) {
         // guard against memory hogging DoS
-              if (m*n*sizeof(double) > FSM_MEMORY_BYTES) {
-                  Log() << "Error, incoming matrix would exceed cell limit of " << FSM_MEMORY_BYTES/sizeof(double) << std::endl; 
-                  break;
-              }
-              msg.id = GETVALID;
-              sendToRT(msg);
-              if (!msg.u.is_valid) {
+                    if (m*n*sizeof(double) > FSM_MEMORY_BYTES) {
+                        Log() << "Error, incoming matrix would exceed cell limit of " << FSM_MEMORY_BYTES/sizeof(double) << std::endl; 
+                        break;
+                    }
+                    msg.id = GETVALID;
+                    sendToRT(msg);
+                    if (!msg.u.is_valid) {
                   // can't upload AOWaves to an invalid fsm!
-                  cmd_error = true;
-              } else { 
+                        cmd_error = true;
+                    } else { 
 
-                  if ( (count = sockSend("READY\n")) <= 0 ) {
-                      Log() << "Send error..." << std::endl; 
-                      break;
-                  }
-                  Log() << "Getting ready to receive AO wave matrix sized " << m << "x" << n << std::endl; 
+                        if ( (count = sockSend("READY\n")) <= 0 ) {
+                            Log() << "Send error..." << std::endl; 
+                            break;
+                        }
+                        Log() << "Getting ready to receive AO wave matrix sized " << m << "x" << n << std::endl; 
                 
-                  Matrix mat (m, n);
-                  count = sockReceiveData(mat.buf(), mat.bufSize());
-                  if (count == (int)mat.bufSize()) {
-                      msg.id = GETAOMAXDATA;
-                      sendToRT(msg);
-                      fsms[fsm_id].aoMaxData = msg.u.ao_maxdata;
-                      msg.id = AOWAVE;
-                      msg.u.aowave.id = id;
-                      msg.u.aowave.aoline = aoline;
-                      msg.u.aowave.loop = loop;
-                      msg.u.aowave.pend_flg = pend_flg;
+                        Matrix mat (m, n);
+                        count = sockReceiveData(mat.buf(), mat.bufSize());
+                        if (count == (int)mat.bufSize()) {
+                            msg.id = GETAOMAXDATA;
+                            sendToRT(msg);
+                            fsms[fsm_id].aoMaxData = msg.u.ao_maxdata;
+                            msg.id = AOWAVE;
+                            msg.u.aowave.id = id;
+                            msg.u.aowave.aoline = aoline;
+                            msg.u.aowave.loop = loop;
+                            msg.u.aowave.pend_flg = pend_flg;
                 // scale data from [-1,1] -> [0,aoMaxData]
-                      for (unsigned i = 0; i < n && i < AOWAVE_MAX_SAMPLES; ++i) {
-                          msg.u.aowave.samples[i] = static_cast<unsigned short>(((mat.at(0, i) + 1.0) / 2.0) * fsms[fsm_id].aoMaxData);
-                          if (m > 1)
-                              msg.u.aowave.evt_cols[i] = static_cast<signed char>(mat.at(1, i));
-                          else
-                              msg.u.aowave.evt_cols[i] = -1;
-                      }
-                      msg.u.aowave.nsamples = n;
+                            for (unsigned i = 0; i < n && i < AOWAVE_MAX_SAMPLES; ++i) {
+                                msg.u.aowave.samples[i] = static_cast<unsigned short>(((mat.at(0, i) + 1.0) / 2.0) * fsms[fsm_id].aoMaxData);
+                                if (m > 1)
+                                    msg.u.aowave.evt_cols[i] = static_cast<signed char>(mat.at(1, i));
+                                else
+                                    msg.u.aowave.evt_cols[i] = -1;
+                            }
+                            msg.u.aowave.nsamples = n;
                 // send to kernel
-                      sendToRT(msg);
-                  } else if (count <= 0) {
-                      break;
-                  }
-                  cmd_error = false;        
-              }
-          } else { 
+                            sendToRT(msg);
+                        } else if (count <= 0) {
+                            break;
+                        }
+                        cmd_error = false;        
+                    }
+                } else { 
               // m or n were 0.. indicates we are clearing an existing wave
-              msg.id = AOWAVE;
-              msg.u.aowave.id = id;
-              msg.u.aowave.nsamples = 0;
-              sendToRT(msg);
-          }
-      }
-    } else if (line.find("GET STATE MACHINE") == 0) { // GET STATE MACHINE
-      std::ostringstream s;
-      s << fsm_id << "\n";      
-      sockSend(s.str());
-      cmd_error = false;
-    } else if (line.find("GET NUM STATE MACHINES") == 0) { // GET NUM STATE MACHINES
-      std::ostringstream s;
-      s << NUM_STATE_MACHINES << "\n";      
-      sockSend(s.str());
-      cmd_error = false;
-    } else if (line.find("SET STATE MACHINE") == 0) { // SET STATE MACHINE
-      // determine param
-      std::string::size_type pos = line.find_first_of("0123456789");
-      if (pos != std::string::npos) {
-        std::istringstream s(line.substr(pos));
-        unsigned in_id = NUM_STATE_MACHINES;
-        s >> in_id;
-        if (in_id < NUM_STATE_MACHINES) {
-          cmd_error = false;
-          fsm_id = in_id;
-        }
-      }
-    } else if (line.find("GET LASTERROR") == 0) { // GET LASTERROR
-      msg.id = GETERROR;
-      msg.u.error[0] = 0;
-      sendToRT(msg);
-      if (!strlen(msg.u.error)) {
-        sockSend("None.\n");
-      } else
-        sockSend(std::string(msg.u.error) + "\n");
-      cmd_error = false;
-    } else if (line.find("GET TIME, EVENTS, AND STATE") == 0) { // GET TIME AND EVENTS   takes 1 param, a state id to start from 
-      msg.id = GETRUNTIME;
-      sendToRT(msg);
-      double currentTime  = static_cast<double>(msg.u.runtime_us)/1000000.0;
-      std::string::size_type pos = line.find_first_of("0123456789");
-      if (pos != std::string::npos) {
-        std::stringstream s(line.substr(pos));
-        int first = -1, last = -1, state = 0;
-        s >> first;
-        Matrix mat = doGetTransitionsFromRT(first, last, state);
-
-        std::ostringstream os;
-        os << "TIME " << currentTime << "\n";
-        os << "STATE " << state << "\n";
-        os << "EVENT COUNTER " << (last-first+1) << "\n";
-        os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
-        sockSend(os.str());
-
-        line = sockReceiveLine(); // wait for "READY" from client
-
-        if (line.find("READY") != std::string::npos) {
-            sockSend(mat.buf(), mat.bufSize(), true);
+                    msg.id = AOWAVE;
+                    msg.u.aowave.id = id;
+                    msg.u.aowave.nsamples = 0;
+                    sendToRT(msg);
+                }
+            }
+        } else if (line.find("GET STATE MACHINE") == 0) { // GET STATE MACHINE
+            std::ostringstream s;
+            s << fsm_id << "\n";      
+            sockSend(s.str());
             cmd_error = false;
-        }
-      }
-    }
+        } else if (line.find("GET NUM STATE MACHINES") == 0) { // GET NUM STATE MACHINES
+            std::ostringstream s;
+            s << NUM_STATE_MACHINES << "\n";      
+            sockSend(s.str());
+            cmd_error = false;
+        } else if (line.find("SET STATE MACHINE") == 0) { // SET STATE MACHINE
+      // determine param
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::istringstream s(line.substr(pos));
+                unsigned in_id = NUM_STATE_MACHINES;
+                s >> in_id;
+                if (in_id < NUM_STATE_MACHINES) {
+                    cmd_error = false;
+                    fsm_id = in_id;
+                }
+            }
+        } else if (line.find("GET LASTERROR") == 0) { // GET LASTERROR
+            msg.id = GETERROR;
+            msg.u.error[0] = 0;
+            sendToRT(msg);
+            if (!strlen(msg.u.error)) {
+                sockSend("None.\n");
+            } else
+                sockSend(std::string(msg.u.error) + "\n");
+                cmd_error = false;
+        } else if (line.find("GET TIME, EVENTS, AND STATE") == 0) { // GET TIME AND EVENTS   takes 1 param, a state id to start from 
+            msg.id = GETRUNTIME;
+            sendToRT(msg);
+            double currentTime  = static_cast<double>(msg.u.runtime_us)/1000000.0;
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                int first = -1, last = -1, state = 0;
+                s >> first;
+                Matrix mat = doGetTransitionsFromRT(first, last, state);
 
+                std::ostringstream os;
+                os << "TIME " << currentTime << "\n";
+                os << "STATE " << state << "\n";
+                os << "EVENT COUNTER " << (last-first+1) << "\n";
+                os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
+                sockSend(os.str());
+
+                line = sockReceiveLine(); // wait for "READY" from client
+
+                if (line.find("READY") != std::string::npos) {
+                    sockSend(mat.buf(), mat.bufSize(), true);
+                    cmd_error = false;
+                }
+            }
+        } // end if to compare line to cmds
+    } // end if client_ver
     if (cmd_error) {
-      sockSend("ERROR\n"); 
+      if (client_ver)
+        sockSend("ERROR\n"); 
+      else
+        sockSend("ERROR - please send CLIENTVERSION!\n");
     } else {
       sockSend("OK\n"); 
     }
 
-  }
+  } // end while
     
   Log() << "Connection to host " << remoteHost << " ended after " << connectionTimer.elapsed() << " seconds." << std::endl; 
     
