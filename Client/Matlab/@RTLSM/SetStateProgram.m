@@ -681,7 +681,7 @@ function [sm] = SetStateProgram(varargin)
   [res] = FSMClient('sendstring', sm.handle, cmd);
   ReceiveOK(sm, 'SET STATE PROGRAM');
   
-  res = SendAllAOWaves(sm);
+  res = SendAllAOWaves(sm, fsm_swap_on_state_0);
   
   return;
 
