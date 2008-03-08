@@ -77,6 +77,7 @@ struct OutputSpec
 };
 
 struct EmbC;
+struct AOWaveINTERNAL; /**< opaque here */
 
 enum { DIO_TYPE = 0, AI_TYPE, UNKNOWN_TYPE };
 
@@ -147,8 +148,11 @@ struct FSMSpec
     struct OutputSpec output_routing[FSM_MAX_OUT_EVENTS];
   } routing;
 
-  /* Used by RealtimeFSM to point to compiled code */
+  /** Used by RealtimeFSM to point to compiled code */
   struct EmbC *embc;
+  
+  /** Array of pointers to allocated scheduled waves.  A NULL ptr indicates not allocated/used */
+  struct AOWaveINTERNAL *aowaves[FSM_MAX_SCHED_WAVES];
 };
 
 #ifndef __cplusplus
@@ -188,6 +192,7 @@ struct AOWave
   unsigned aoline;
   unsigned nsamples;
   unsigned loop; /* if true, playing will loop until untriggered */
+  unsigned pend_flg; /* if true, apply this AOWave to the pending fsm that has yet to be swapped-in */
   unsigned short samples[AOWAVE_MAX_SAMPLES]; /** samples already scaled to 
                                                   ai_maxdata */
   signed char evt_cols[AOWAVE_MAX_SAMPLES]; /**< the state matrix
@@ -425,7 +430,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf0010116)) /*< Magic no. for shm... 'fool0116'  */
+#define FSM_SHM_MAGIC ((int)(0xf0010117)) /*< Magic no. for shm... 'fool0117'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }

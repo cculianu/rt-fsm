@@ -106,9 +106,9 @@ static void reconfigureIO(void); /* helper that reconfigures DIO channels
 static int initAISubdev(void); /* Helper for initComedi() */
 static int initAOSubdev(void); /* Helper for initComedi() */
 static int setupComediCmd(void);
-static void cleanupAOWaves(FSMID_t);
+static void cleanupAOWaves(volatile struct FSMSpec *);
 struct AOWaveINTERNAL;
-static void cleanupAOWave(volatile struct AOWaveINTERNAL *, FSMID_t fsm_id, int bufnum);
+static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, int bufnum);
 
 /* The callback called by rtos scheduler every task period... */
 static void *doFSM (void *);
@@ -378,17 +378,6 @@ struct RunState {
       in this mask correspond to array indices of the aowaves array outside 
       this struct. */
   unsigned active_ao_wave_mask; 
-  /** Store pointers to analog output wave data -- 
-   *  Note: to avoid memory leaks make sure initRunState() is never called when
-   *  we have active valid pointers here!  This means that aowaves should be cleaned
-   *  up (freed) using cleanupAOWaves() whenever we get a new FSM.  cleanupAOWaves()
-   *  needs to be called in Linux process context. */
-  struct AOWaveINTERNAL 
-  {
-    unsigned aoline, nsamples, loop, cur;
-    unsigned short *samples;
-    signed char *evt_cols;
-  } aowaves[FSM_MAX_SCHED_WAVES];
 
   /** Keep track, on a per-state-machine-basis the AI channels used for DAQ */
   unsigned daq_ai_nchans, daq_ai_chanmask;
@@ -416,6 +405,18 @@ struct RunState {
 
 volatile static struct RunState rs[NUM_STATE_MACHINES];
 
+  /** fsmspec->aowaves points to this struct -- analog output wave data -- 
+   *  Note: to avoid memory leaks make sure initRunState() is never called when
+   *  we have active valid pointers here!  AOWaves should be cleaned
+   *  up (freed) using cleanupAOWaves() whenever we unload an existing FSM.  cleanupAOWaves()
+   *  needs to be called in Linux process context -- preferably in unloadDetachFSM().
+   */
+  struct AOWaveINTERNAL 
+  {
+    unsigned aoline, nsamples, loop, cur;
+    unsigned short *samples;
+    signed char *evt_cols;
+  };
 
 /*---------------------------------------------------------------------------
  Some helper functions
@@ -550,8 +551,6 @@ void cleanup (void)
   }
 
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
-    cleanupAOWaves(f);
-
     if (buddyTask[f]) softTaskDestroy(buddyTask[f]);
     buddyTask[f] = 0;
   }
@@ -1389,7 +1388,7 @@ static int doSanityChecksRuntime(FSMID_t f)
 /*   int n_chans = n_chans_dio_subdev + NUM_AI_CHANS, ret = 0; */
 /*   char buf[256]; */
 /*   static int not_first_time[NUM_STATE_MACHINES] = {0}; */
-  if (!rs[f].states->embc) return -EINVAL;
+  if (!FSM_PTR(f)->embc) return -EINVAL;
   if (READY_FOR_TRIAL_JUMPSTATE(f) >= NUM_ROWS(f) || READY_FOR_TRIAL_JUMPSTATE(f) <= 0)  
     WARNING("ready_for_trial_jumpstate of %d need to be between 0 and %d!\n", 
             (int)READY_FOR_TRIAL_JUMPSTATE(f), (int)NUM_ROWS(f)); 
@@ -1477,7 +1476,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
         char *embCProgram;
         memcpy(ss, (struct RunState *)&rs[f], structlen);
         /* setup the pointer to the real fsm correctly */
-        ss->states = (rs[f].states == &rs[f].states1 ? &ss->states1 : &ss->states2);
+        ss->states = FSM_PTR(f);
         
         seq_printf(m, "Current State: %d\t"    "Transition Count:%d\t"   "C-Var. Log Items: %d\n", 
                    (int)ss->current_state,     (int)NUM_TRANSITIONS(f),  (int)NUM_LOG_ITEMS(f));      
@@ -1573,8 +1572,9 @@ static int myseq_show (struct seq_file *m, void *dummy)
                           "-------------------------\n", f);
           /* Print stats on AO Waves */
           for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
-            if (ss->aowaves[i].nsamples && ss->aowaves[i].samples) {
-              seq_printf(m, "AO  Sched. Wave %d  %u bytes (%s)\n", i, (unsigned)(ss->aowaves[i].nsamples*(sizeof(*ss->aowaves[i].samples)+sizeof(*ss->aowaves[i].evt_cols))), ss->active_ao_wave_mask & 0x1<<i ? "playing" : "idle");
+            volatile struct AOWaveINTERNAL *w = ss->states->aowaves[i];
+            if ( w && w->nsamples && w->samples) {
+              seq_printf(m, "AO  Sched. Wave %d  %u bytes (%s)\n", i, (unsigned)(w->nsamples*(sizeof(*w->samples)+sizeof(*w->evt_cols))+sizeof(*w)), ss->active_ao_wave_mask & 0x1<<i ? "playing" : "idle");
             }
           }
           /* Print stats on DIO Sched Waves */
@@ -1657,7 +1657,7 @@ static void *doFSM (void *arg)
 
         unsigned long events_bits = 0;
         int got_timeout = 0, n_evt_loops;
-        FSMSpec *fsm = rs[f].states; 
+        FSMSpec *fsm = FSM_PTR(f); 
         unsigned state = rs[f].current_state;
         unsigned long state_timeout_us;
         
@@ -1979,7 +1979,7 @@ static void doOutput(FSMID_t f)
   unsigned i;
   unsigned trigs = 0, conts = 0, contmask = rs[f].do_chans_cont_mask; 
   unsigned state = rs[f].current_state;
-  FSMSpec *fsm = rs[f].states;
+  FSMSpec *fsm = FSM_PTR(f);
   
   for (i = 0; i < FSM_NUM_OUTPUT_COLS(fsm); ++i) {
     struct OutputSpec *spec = OUTPUT_ROUTING(f,i);
@@ -1995,7 +1995,7 @@ static void doOutput(FSMID_t f)
       doExtTrigOutput(spec->object_num, STATE_OUTPUT(fsm, state, i));
       break;
     case OSPEC_SCHED_WAVE: 
-        doSchedWaveOutput(f, STATE_OUTPUT(fsm, state, i));
+      doSchedWaveOutput(f, STATE_OUTPUT(fsm, state, i));
       break;
     case OSPEC_TCP:
     case OSPEC_UDP:  /* write non-realtime TCP/UDP packet to fifo */
@@ -2116,7 +2116,7 @@ static unsigned long detectInputEvents(FSMID_t f)
 static void dispatchEvent(FSMID_t f, unsigned event_id)
 {
   unsigned next_state = 0;
-  FSMSpec *fsm = rs[f].states;
+  FSMSpec *fsm = FSM_PTR(f);
   unsigned state = rs[f].current_state;
 
   if (event_id > NUM_INPUT_EVENTS(f)) {
@@ -2370,8 +2370,8 @@ static void handleFifos(FSMID_t f)
         
         rs[f].valid = 0; /* lock fsm? */       
         
-        msg->u.fsm_size[0] = rs[f].states->n_rows;
-        msg->u.fsm_size[1] = rs[f].states->n_cols;
+        msg->u.fsm_size[0] = FSM_PTR(f)->n_rows;
+        msg->u.fsm_size[1] = FSM_PTR(f)->n_cols;
         
         rs[f].valid = 1; /* Unlock FSM.. */
         
@@ -2406,7 +2406,7 @@ static void handleFifos(FSMID_t f)
         break;
 
     case FORCEEXT:
-      { /* umm.. have to figure out which ext trig object they want from output 
+      if (rs[f].valid) { /* umm.. have to figure out which ext trig object they want from output 
            spec */
         unsigned which = f, i;
         for (i = 0; i < NUM_OUT_COLS(f); ++i)
@@ -2414,7 +2414,8 @@ static void handleFifos(FSMID_t f)
             which = OUTPUT_ROUTING(f, i)->object_num;
             break;
           }
-        doExtTrigOutput(which, msg->u.forced_triggers);
+        if (i < NUM_OUT_COLS(f)) /* otherwise we didn't find one */
+            doExtTrigOutput(which, msg->u.forced_triggers);
         do_reply = 1;
       }
       break;
@@ -2440,10 +2441,10 @@ static void handleFifos(FSMID_t f)
 
       case READYFORTRIAL:
         if (rs[f].current_state == READY_FOR_TRIAL_JUMPSTATE(f)) {
-          rs[f].ready_for_trial_flg = 0;
-          gotoState(f, 0, -1);
+            rs[f].ready_for_trial_flg = 0;
+            if(rs[f].valid) gotoState(f, 0, -1);
         } else
-          rs[f].ready_for_trial_flg = 1;
+            rs[f].ready_for_trial_flg = 1;
         do_reply = 1;
         break;
 
@@ -2453,7 +2454,7 @@ static void handleFifos(FSMID_t f)
         break;
 
       case FORCESTATE:
-        if ( gotoState(f, msg->u.forced_state, -1) < 0 )
+        if ( !rs[f].valid || gotoState(f, msg->u.forced_state, -1) < 0 )
           msg->u.forced_state = -1; /* Indicate error.. */
         do_reply = 1;
         break;
@@ -2489,11 +2490,11 @@ static void handleFifos(FSMID_t f)
 
     case AOWAVE:
         
-        BUDDY_TASK_PEND(AOWAVE); /* a slow operation -- it has to allocate
-                                    memory, etc, so pend to a linux process
-                                    context buddy task 
-                                    (see buddyTaskHandler()) */
-
+        if (rs[f].valid)
+            BUDDY_TASK_PEND(AOWAVE); /* a slow operation -- it has to allocate
+                                        memory, etc, so pend to a linux process
+                                        context buddy task 
+                                        (see buddyTaskHandler()) */
         break;
 
       default:
@@ -2938,14 +2939,17 @@ static unsigned long processSchedWaves(FSMID_t f)
 
 static unsigned long processSchedWavesAO(FSMID_t f)
 {  
-  unsigned wave_mask = rs[f].active_ao_wave_mask;
+  unsigned wave_mask = rs[f].valid ? rs[f].active_ao_wave_mask : 0;
   unsigned long wave_events = 0;
 
   while (wave_mask) {
     unsigned wave = __ffs(wave_mask);
-    volatile struct AOWaveINTERNAL *w = &rs[f].aowaves[wave];
+    volatile struct AOWaveINTERNAL *w = FSM_PTR(f)->aowaves[wave];
     wave_mask &= ~(0x1<<wave);
-
+    if (!w) {
+        ERROR_INT("FSM %u has AOWave %u marked as active but it has a NULL AOWaveINTERNAL pointer!\n", (unsigned)f, wave);
+        continue;
+    }
     if (w->cur >= w->nsamples && w->loop) w->cur = 0;
     if (w->cur < w->nsamples) {
       int evt_col = w->evt_cols[w->cur];
@@ -2981,7 +2985,7 @@ static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
   const struct SchedWave *s;
 
   if (wave_id >= FSM_MAX_SCHED_WAVES  /* it's an invalid id */
-      || !rs[f].states->sched_waves[wave_id].enabled /* wave def is not valid */ )
+      || !FSM_PTR(f)->sched_waves[wave_id].enabled /* wave def is not valid */ )
     return; /* silently ignore invalid wave.. */
   
   if (op > 0) {
@@ -3017,9 +3021,10 @@ static void scheduleWaveAO(FSMID_t f, unsigned wave_id, int op)
 {
   volatile struct AOWaveINTERNAL *w = 0;
   if (wave_id >= FSM_MAX_SCHED_WAVES  /* it's an invalid id */
-      || !rs[f].aowaves[wave_id].nsamples /* wave def is not valid */ )
+      || !rs[f].valid
+      || !(w = FSM_PTR(f)->aowaves[wave_id])
+      || !w->nsamples /* wave def is not valid */ )
     return; /* silently ignore invalid wave.. */
-  w = &rs[f].aowaves[wave_id];
   if (op > 0) {
     /* start/trigger a scheduled AO wave */    
     if ( rs[f].active_ao_wave_mask & 0x1<<wave_id ) /* wave is already running! */
@@ -3083,14 +3088,12 @@ static void buddyTaskHandler(void *arg)
   switch (req) {
   case FSM: {
     struct EmbC **embc = &OTHER_FSM_PTR(f)->embc;
-    unloadDetachFSM(OTHER_FSM_PTR(f));
+    unloadDetachFSM(OTHER_FSM_PTR(f)); /* NB: may be a noop if no old fsm exists.. */
+    
     /* use alternate FSM as temporary space during this interruptible copy 
        realtime task will swap the pointers when it realizes the copy
-       is done */
+       is done and/or when it's time to swap fsms (see pending_fsm_swap stuff)  */
     memcpy(OTHER_FSM_PTR(f), (void *)&msg->u.fsm, sizeof(*OTHER_FSM_PTR(f)));  
-
-    cleanupAOWaves(f); /* we have to free existing AO waves here because a new
-                          FSM might not have a sched_waves column.. */
     
     *embc = (struct EmbC *) mbuff_attach(OTHER_FSM_PTR(f)->shm_name, sizeof(**embc));
     
@@ -3119,7 +3122,6 @@ static void buddyTaskHandler(void *arg)
     memset(msg->u.error, 0, FSM_ERROR_BUF_SIZE);
     break;
   case RESET_:
-    cleanupAOWaves(f); /* frees any allocated AO waves.. */
     /* make sure to clean up all fsms */
     unloadDetachFSM(FSM_PTR(f)); 
     unloadDetachFSM(OTHER_FSM_PTR(f));
@@ -3129,10 +3131,16 @@ static void buddyTaskHandler(void *arg)
       struct AOWave *w = &msg->u.aowave;
       if (w->id < FSM_MAX_SCHED_WAVES && w->aoline < NUM_AO_CHANS) {
         volatile struct AOWaveINTERNAL *wint = 0;
+        volatile struct FSMSpec *spec;
+        if (rs[f].pending_fsm_swap && w->pend_flg)
+            spec = OTHER_FSM_PTR(f);
+        else 
+            spec = FSM_PTR(f);
         if (w->nsamples > AOWAVE_MAX_SAMPLES) w->nsamples = AOWAVE_MAX_SAMPLES;
-        wint = &rs[f].aowaves[w->id];
-        cleanupAOWave(wint, f, w->id);
-        if (w->nsamples) {
+        wint = spec->aowaves[w->id];
+        cleanupAOWave(wint, (char *)spec->shm_name, w->id);
+        wint = kmalloc(sizeof(*wint), GFP_KERNEL);
+        if (wint && w->nsamples) {
           int ssize = w->nsamples * sizeof(*wint->samples),
               esize = w->nsamples * sizeof(*wint->evt_cols);
           wint->samples = vmalloc(ssize);
@@ -3144,12 +3152,15 @@ static void buddyTaskHandler(void *arg)
             wint->cur = 0;
             memcpy((void *)(wint->samples), w->samples, ssize);
             memcpy((void *)(wint->evt_cols), w->evt_cols, esize);
-            DEBUG("FSM %u AOWave: allocated %d bytes for AOWave %u\n", f, ssize+esize, w->id);
+            DEBUG("FSM %u AOWave: allocated %d bytes for AOWave %s:%u\n", f, ssize+esize+sizeof(*wint), spec->shm_name, w->id);
           } else {
-            ERROR("FSM %u In AOWAVE Buddy Task Handler: failed to allocate memory for an AO wave! Argh!!\n", f);
-            cleanupAOWave(wint, f, w->id);
+            ERROR_INT("FSM %u In AOWAVE Buddy Task Handler: failed to allocate memory for an AO wave! Argh!!\n", f);
+            cleanupAOWave(wint, (char *)spec->shm_name, w->id);
           }
+        } else if (!wint) {
+            ERROR_INT("FSM %u In AOWAVE Buddy Task Handler: failed to allocate memory for an AO wave struct! Argh!!\n", f);
         }
+        spec->aowaves[w->id] = (struct AOWaveINTERNAL *)wint;
       }
     }
     break;
@@ -3200,14 +3211,16 @@ static inline long long timespec_to_nano(const struct timespec *ts)
   return ((long long)ts->tv_sec) * 1000000000LL + (long long)ts->tv_nsec;
 }
 
-static void cleanupAOWaves(FSMID_t f)
+static void cleanupAOWaves(volatile struct FSMSpec *spec)
 {
   unsigned i;
-  for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) 
-    cleanupAOWave(&rs[f].aowaves[i], f, i);
+  for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
+    cleanupAOWave(spec->aowaves[i], (char *)spec->shm_name, i); /* ok if null, cleanup func just returns then */
+    spec->aowaves[i] = 0;
+  }
 }
 
-static void cleanupAOWave(volatile struct AOWaveINTERNAL *wint, FSMID_t f, int bufnum)
+static void cleanupAOWave(volatile struct AOWaveINTERNAL *wint, const char *name, int bufnum)
 {
   int freed = 0, nsamps = 0;
   if (!wint) return;
@@ -3216,8 +3229,9 @@ static void cleanupAOWave(volatile struct AOWaveINTERNAL *wint, FSMID_t f, int b
   mb();
   if (wint->samples) vfree(wint->samples), wint->samples = 0, freed += nsamps*sizeof(*wint->samples);
   if (wint->evt_cols) vfree(wint->evt_cols), wint->evt_cols = 0, freed += nsamps*sizeof(*wint->evt_cols);
+  if (wint) kfree((void *)wint), freed += sizeof(*wint);
   if (freed) 
-    DEBUG("AOWave: freed %d bytes for AOWave wave buffer %u:%d\n", freed, f, bufnum);
+    DEBUG("AOWave: freed %d bytes for AOWave wave buffer %s:%d\n", freed, name, bufnum);
 }
 
 static void updateHasSchedWaves(FSMID_t f)
@@ -3226,7 +3240,7 @@ static void updateHasSchedWaves(FSMID_t f)
 	int yesno = 0;
 	for (i = 0; i < NUM_OUT_COLS(f); ++i)
       yesno = yesno || (OUTPUT_ROUTING(f,i)->type == OSPEC_SCHED_WAVE);  	
-	rs[f].states->has_sched_waves = yesno;
+	FSM_PTR(f)->has_sched_waves = yesno;
 }
 
 
@@ -3240,6 +3254,9 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
 
   embc->lock(); /* NB: unlock called by unloadDetachFSM */
 
+  /* clear all AO wave pointers */
+  memset(spec->aowaves, 0, sizeof(spec->aowaves));
+  
   /* first put symbols.. see Embedded_C_FSM_Notes.txt or EmbC.h 
      to see which pointers need to be added.. */
   
@@ -3294,6 +3311,9 @@ static int fsmLinkProgram(FSMID_t f, struct FSMSpec *spec)
   embc->sinh = &sinh;
   embc->tanh = &tanh;
 
+  /* call init here in non-realtime context.  Note that cleanup is called in non-realtime context too in unloadDetachFSM() */
+  if (embc->init) embc->init(); 
+  
   return 0;
 }
 
@@ -3440,21 +3460,14 @@ static void emblib_trigExt(unsigned which, unsigned trig)
 
 static void swapFSMs(FSMID_t f)
 {
-  unsigned long flags;
   stopActiveWaves(f); /* since we are starting a new trial, force any
                          active timer waves to abort! */ 
-  rt_critical(flags);
-  CALL_EMBC(f, cleanup);
-  rt_end_critical(flags);
   rs[f].states = OTHER_FSM_PTR(f); /* swap in the new fsm.. */
   /*LOG_MSG("Cycle: %lu  Got new FSM\n", (unsigned long)cycle);*/
   updateHasSchedWaves(f); /* just updates rs.states->has_sched_waves flag*/
   reconfigureIO(); /* to have new routing take effect.. */
   rs[f].valid = 1; /* Unlock FSM.. */
   rs[f].pending_fsm_swap = 0; 
-  rt_critical(flags);
-  CALL_EMBC(f, init);
-  rt_end_critical(flags);
   if (NUM_ROWS(f) && NUM_ROWS(f) >= rs[f].current_state)
     gotoState(f, 0, -1); /* force a state 0 if the new fsm doesn't contain current_state!! */
 }
@@ -3463,15 +3476,19 @@ static void unloadDetachFSM(struct FSMSpec *fsm)
 {
     struct EmbC **embc = &fsm->embc;
     if (*embc) {
-      if ((*embc)->cleanup) {
-        unsigned long flags;
-        rt_critical(flags);
-        (*embc)->cleanup();
-        rt_end_critical(flags);
-      }
-      (*embc)->unlock(); /* decrease use count .. was incremented by fsmLinkProgram */
+      
+      if ((*embc)->cleanup) 
+          (*embc)->cleanup();
+      
+      /* now, free any allocated ao wav data */
+      cleanupAOWaves(fsm);
+      
+      /* decrease use count .. was incremented by fsmLinkProgram */
+      (*embc)->unlock(); 
+      
       mbuff_detach(fsm->shm_name, *embc);
       *embc = 0; /* clean up old embc ptr, if any */
+      
       {
         char *argv[] = {
           "/sbin/rmmod",

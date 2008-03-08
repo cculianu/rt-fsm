@@ -25,6 +25,7 @@
 %                state matrix.
 %
 function [sm] = RTLSM(host,port,which_sm)
+  sm.MIN_SERVER_VERSION = 220080308; % update this on protocol change
   sm.host = 'localhost';
   sm.port = 3333;
   sm.fsm_id = 0;
@@ -65,6 +66,7 @@ function [sm] = RTLSM(host,port,which_sm)
   % just to make sure to explode here if the connection failed
   FSMClient('connect', sm.handle);
   ChkConn(sm);
+  ChkVersion(sm);
   sm = SetStateMachine(sm, sm.fsm_id);
   sm = SetInputEvents(sm, 6, 'ai'); % 6 input events, two for each nosecone
 

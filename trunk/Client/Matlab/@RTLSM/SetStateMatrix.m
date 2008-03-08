@@ -167,6 +167,6 @@ function [sm] = SetStateMatrix(varargin)
   % now, send the AO waves *that changed* Note that sending an empty matrix
   % is like clearing a specific wave
   %
-  [res] = SendAllAOWaves(sm);
+  [res] = SendAllAOWaves(sm,pend_sm_swap_flg);
   
   return;

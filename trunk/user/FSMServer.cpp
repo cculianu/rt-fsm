@@ -656,7 +656,12 @@ void *ConnectionThread::threadFunc(void)
   while ( (line = sockReceiveLine()).length() > 0) {
       
     bool cmd_error = true;
-    if (line.find("SET STATE PROGRAM") == 0) {
+    if (line.find("VERSION") == 0) {
+        std::ostringstream os;
+        os << VersionNUM << " - [" << VersionSTR << "]\n";
+        sockSend(os.str());
+        cmd_error = false;
+    } else if (line.find("SET STATE PROGRAM") == 0) {
       cmd_error = !doSetStateProgram();
     } else if (line.find("SET STATE MATRIX") == 0) {
       /* FSM Upload.. */
@@ -952,53 +957,62 @@ void *ConnectionThread::threadFunc(void)
       std::string::size_type pos = line.find_first_of("0123456789");
 
       if (pos != std::string::npos) {
-        unsigned m = 0, n = 0, id = 0, aoline = 0, loop = 0;
-        std::stringstream s(line.substr(pos));
-        s >> m >> n >> id >> aoline >> loop;
-        if (m && n) {
-          // guard against memory hogging DoS
-          if (m*n*sizeof(double) > FSM_MEMORY_BYTES) {
-            Log() << "Error, incoming matrix would exceed cell limit of " << FSM_MEMORY_BYTES/sizeof(double) << std::endl; 
-            break;
+          unsigned m = 0, n = 0, id = 0, aoline = 0, loop = 0, pend_flg = 0;
+          std::stringstream s(line.substr(pos));
+          s >> m >> n >> id >> aoline >> loop >> pend_flg;
+          if (m && n) {
+        // guard against memory hogging DoS
+              if (m*n*sizeof(double) > FSM_MEMORY_BYTES) {
+                  Log() << "Error, incoming matrix would exceed cell limit of " << FSM_MEMORY_BYTES/sizeof(double) << std::endl; 
+                  break;
+              }
+              msg.id = GETVALID;
+              sendToRT(msg);
+              if (!msg.u.is_valid) {
+                  // can't upload AOWaves to an invalid fsm!
+                  cmd_error = true;
+              } else { 
+
+                  if ( (count = sockSend("READY\n")) <= 0 ) {
+                      Log() << "Send error..." << std::endl; 
+                      break;
+                  }
+                  Log() << "Getting ready to receive AO wave matrix sized " << m << "x" << n << std::endl; 
+                
+                  Matrix mat (m, n);
+                  count = sockReceiveData(mat.buf(), mat.bufSize());
+                  if (count == (int)mat.bufSize()) {
+                      msg.id = GETAOMAXDATA;
+                      sendToRT(msg);
+                      fsms[fsm_id].aoMaxData = msg.u.ao_maxdata;
+                      msg.id = AOWAVE;
+                      msg.u.aowave.id = id;
+                      msg.u.aowave.aoline = aoline;
+                      msg.u.aowave.loop = loop;
+                      msg.u.aowave.pend_flg = pend_flg;
+                // scale data from [-1,1] -> [0,aoMaxData]
+                      for (unsigned i = 0; i < n && i < AOWAVE_MAX_SAMPLES; ++i) {
+                          msg.u.aowave.samples[i] = static_cast<unsigned short>(((mat.at(0, i) + 1.0) / 2.0) * fsms[fsm_id].aoMaxData);
+                          if (m > 1)
+                              msg.u.aowave.evt_cols[i] = static_cast<signed char>(mat.at(1, i));
+                          else
+                              msg.u.aowave.evt_cols[i] = -1;
+                      }
+                      msg.u.aowave.nsamples = n;
+                // send to kernel
+                      sendToRT(msg);
+                  } else if (count <= 0) {
+                      break;
+                  }
+                  cmd_error = false;        
+              }
+          } else { 
+              // m or n were 0.. indicates we are clearing an existing wave
+              msg.id = AOWAVE;
+              msg.u.aowave.id = id;
+              msg.u.aowave.nsamples = 0;
+              sendToRT(msg);
           }
-          if ( (count = sockSend("READY\n")) <= 0 ) {
-            Log() << "Send error..." << std::endl; 
-            break;
-          }
-          Log() << "Getting ready to receive AO wave matrix sized " << m << "x" << n << std::endl; 
-            
-          Matrix mat (m, n);
-          count = sockReceiveData(mat.buf(), mat.bufSize());
-          if (count == (int)mat.bufSize()) {
-            msg.id = GETAOMAXDATA;
-            sendToRT(msg);
-            fsms[fsm_id].aoMaxData = msg.u.ao_maxdata;
-            msg.id = AOWAVE;
-            msg.u.aowave.id = id;
-            msg.u.aowave.aoline = aoline;
-            msg.u.aowave.loop = loop;
-            // scale data from [-1,1] -> [0,aoMaxData]
-            for (unsigned i = 0; i < n && i < AOWAVE_MAX_SAMPLES; ++i) {
-              msg.u.aowave.samples[i] = static_cast<unsigned short>(((mat.at(0, i) + 1.0) / 2.0) * fsms[fsm_id].aoMaxData);
-              if (m > 1)
-                msg.u.aowave.evt_cols[i] = static_cast<signed char>(mat.at(1, i));
-              else
-                msg.u.aowave.evt_cols[i] = -1;
-            }
-            msg.u.aowave.nsamples = n;
-            // send to kernel
-            sendToRT(msg);
-          } else if (count <= 0) {
-            break;
-          }
-        } else {
-          // indicates we are clearing an existing wave
-          msg.id = AOWAVE;
-          msg.u.aowave.id = id;
-          msg.u.aowave.nsamples = 0;
-          sendToRT(msg);
-        }
-        cmd_error = false;        
       }
     } else if (line.find("GET STATE MACHINE") == 0) { // GET STATE MACHINE
       std::ostringstream s;
@@ -2071,7 +2085,7 @@ void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP, bool isBin) const
         else
           // TCP
           ret = send(theSock, data, datalen, MSG_NOSIGNAL);
-        if (ret != datalen) {
+        if (ret != (int)datalen) {
           Log() << "ERROR In doNRT_IP() sending " << datalen << " bytes to " << nrt->ip_host << ":" << nrt->ip_port << " got error (errno=" << strerror(errno) << ") in send() call\n"; 
         }
         ::close(theSock);
