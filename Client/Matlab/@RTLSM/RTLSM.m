@@ -67,7 +67,6 @@ function [sm] = RTLSM(host,port,which_sm)
   FSMClient('connect', sm.handle);
   ChkConn(sm);
   ChkVersion(sm);
-  DoSimpleCmd(sm, sprintf('CLIENTVERSION %u', sm.MIN_SERVER_VERSION));
   sm = SetStateMachine(sm, sm.fsm_id);
   sm = SetInputEvents(sm, 6, 'ai'); % 6 input events, two for each nosecone
 
