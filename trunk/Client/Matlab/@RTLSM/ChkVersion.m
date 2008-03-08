@@ -17,6 +17,10 @@ function [ok] = ChkVersion(sm)
     if (~ok),
         error(sprintf('The FSM server does not meet the minimum protocol version requirement of %u', sm.MIN_SERVER_VERSION));
     end;
+
+    % Now, tell the server about our version!
+    DoSimpleCmd(sm, sprintf('CLIENTVERSION %u', sm.MIN_SERVER_VERSION));
+
     
 return;
 
