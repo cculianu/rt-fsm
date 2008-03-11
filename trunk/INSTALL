@@ -1,6 +1,6 @@
 Install Guide for Realtime FSM
 by Calin Culianu <calin@ajvar.org>
-Last Updated: Feb. 27, 2008
+Last Updated: Mar. 11, 2008
 
 These instructions tell you how to setup a system to run this software.  This
 includes brief instructions for setting up RTAI 3.6, Linux 2.6.23, and compiling
@@ -128,6 +128,8 @@ M)
             
     ---->   Kernel hacking
         ----> [ ] Use 4Kb for kernel stacks instead of 8Kb (OFF) (we prefer larger stacks, thank you very much!)
+    ---->   Cryptographic API
+        ----> <M> Deflate compression algorithm (Either on or as a Module)
       
 3. Feel free to set/unset any other options.  
    Hit ESC-ESC, and say 'Y' to saving your config.  Then do:

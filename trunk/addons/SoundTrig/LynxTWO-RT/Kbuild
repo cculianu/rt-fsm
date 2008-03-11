@@ -7,12 +7,12 @@ RTAIDIR = /usr/realtime
 PWD = $(shell pwd)
 DEST = /lib/modules/$(CURRENT)/kernel/$(MDIR)
 EXTRA_CFLAGS += -DEXPORT_SYMTAB $(shell $(RTAIDIR)/bin/rtai-config --module-cflags)  -I$(src)   -I$(src)/LynxTWO -I$(src)/Include -DRTAI -DLINUX 
-MACH=$(shell uname -m)
+MACH=$(shell uname -i)
 
-ifeq ($MACH,x86)
-EXTRA_CFLAGS += -Dx86
-else
+ifeq ($MACH,x86_64)
 EXTRA_CFLAGS += -Dx86_64 -msse -msse2
+else
+EXTRA_CFLAGS += -Dx86
 endif
 obj-m      := $(TARGET).o
 $(TARGET)-y  := $(OBJS)

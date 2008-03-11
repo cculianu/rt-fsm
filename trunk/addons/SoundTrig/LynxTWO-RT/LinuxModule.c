@@ -1,5 +1,8 @@
 #define MODULE_NAME KBUILD_MODNAME
-
+#ifdef x86
+#define had_x86
+#undef x86 /* fix broken linux headers */
+#endif
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/pci_ids.h>
@@ -15,6 +18,14 @@
 #include <asm/io.h>
 #include <asm/page.h>
 #include <asm/system.h>
+#include <asm/atomic.h>
+#ifdef had_x86
+#define x86
+#undef had_x86
+#endif
+#ifdef x86
+#include <asm/div64.h>
+#endif
 #define HALENV_INTERNAL /* Turn off some #defines that interfere with this file, such as memcpy, etc.. */
 #include "HalEnv.h"
 #include "LinuxInterface.h"
@@ -98,7 +109,7 @@ L22LINKAGE int linux_allocate_dma_mem(LinuxContext *ctx, void **pVirt, unsigned 
     *pPhys = 0;
     return 1;
   }
-  *pVirt = pci_pool_alloc(pool, GFP_KERNEL|__GFP_DMA, &addr); /* KERNEL (may sleep) and DMA - ensures DMA mem?*/
+  *pVirt = pci_pool_alloc(pool, GFP_KERNEL|GFP_DMA32|GFP_DMA, &addr); /* KERNEL (may sleep) and DMA - ensures DMA mem?*/
   *pPhys = addr;
   return *pVirt == 0;
 }
@@ -246,6 +257,15 @@ L22LINKAGE void linux_memory_barrier(void)
   mb();
 }
 
+L22LINKAGE long long linux_div64(long long dividend, long long divisor)
+{
+#ifdef x86
+    return div64_64(dividend, divisor);
+#else
+    return dividend / divisor;
+#endif
+}
+
 struct L22Lock
 {
   pthread_mutex_t mutex;
@@ -253,11 +273,13 @@ struct L22Lock
 
 L22LINKAGE void rtlinux_l22_lock(struct LinuxContext *ctx)
 {
+  DEBUG_CRAZY("Locking device mutex for device %u\n", ctx->adapter_num);
   pthread_mutex_lock(&ctx->lock->mutex);
 }
 
 L22LINKAGE void rtlinux_l22_unlock(struct LinuxContext *ctx)
 {
+  DEBUG_CRAZY("Unlocking device mutex for device %u\n", ctx->adapter_num);
   pthread_mutex_unlock(&ctx->lock->mutex);
 }
 
@@ -272,7 +294,7 @@ L22LINKAGE void rtlinux_yield(void)
 -----------------------------------------------------------------------------*/
 #define MINIMUM_DMA_BUF_SIZE (128)
 #define MAXIMUM_DMA_BUF_SIZE ((0x1<<24)-1)
-#define DEFAULT_DMA_BUF_SIZE (256) /* Testing.. 256 byte DMA buffers enough? */
+#define DEFAULT_DMA_BUF_SIZE (256) /* Testing.. 256-byte DMA buffers enough? */
 #define MINIMUM_SAMPLE_RATE (8000)
 #define MAXIMUM_SAMPLE_RATE (200000)
 #define DEFAULT_SAMPLE_RATE (200000)
@@ -280,7 +302,7 @@ int dma_size = DEFAULT_DMA_BUF_SIZE, sample_rate = DEFAULT_SAMPLE_RATE;
 /* Variables identical to above, but 'exported' to C++ code via 
    LinuxInterface.h */
 unsigned DMABufferSize = 0; 
-unsigned SampleRate = 0;
+volatile unsigned SampleRate = 0;
 
 MODULE_AUTHOR("Calin A. Culianu <calin@ajvar.org>");
 #ifdef MODULE_LICENSE
@@ -310,26 +332,17 @@ static struct pci_driver driver = { .name = MODULE_NAME,
                                     .resume = 0 };
 
 static LinuxContext dev_contexts[L22_MAX_DEVS];
-static int num_contexts = 0;
+static atomic_t num_contexts = ATOMIC_INIT(0);
 static int did_register_driver = 0;
 
 
 static int createL22Lock(struct LinuxContext *);
 static void destroyL22Lock(struct LinuxContext *);
 
-typedef enum 
-{
-  NONE = 0,
-  SAMPLERATE_CHANGE,
-  NOOP,
-  EXIT
-} ThreadReq;
-
 struct ThreadData
 {
   pthread_t thread;
-  pthread_cond_t cond; /* associated mutex is the l22 mutex */
-  ThreadReq req; 
+  atomic_t stop_flg; 
 };
 
 static int createThread(struct LinuxContext *);
@@ -377,24 +390,30 @@ static void checkAndSetupModuleParams(void)
 
 static int do_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
-  int status = 0;
-  struct LinuxContext *ctx;
+  int status = 0, i;
+  struct LinuxContext *ctx = 0;
 
   if (!dev) { 
     ERROR("Could not find PCI device %04x:%04x\n", (int)id->vendor, (int)id->device);
     return -ENODEV;
   }
 
-  if (num_contexts >= L22_MAX_DEVS) {
+  if (atomic_read(&num_contexts) >= L22_MAX_DEVS) {
     ERROR("Could not attach L22 Device %s as the driver only supports max %d L22 devices, need to change L22_MAX_DEVS and recompile.  Sorry.. :(.\n", pci_name(dev), L22_MAX_DEVS);
     return -EINVAL;
   }
-
-  ctx = &dev_contexts[num_contexts];
+  for (i = 0; i < L22_MAX_DEVS; ++i, ctx = 0)
+    if ( cmpxchg(&((ctx = &dev_contexts[i])->is_allocated), 0, 1) == 0 )
+      break;
+    
+  if (!ctx) {
+      ERROR("Could not find a free device context to use! Too many L22 devices allocated!");
+      return -ENOMEM;
+  }
   memset(ctx, 0, sizeof(*ctx));
   ctx->dev = dev;
   ctx->id = id;
-  ctx->adapter_num = num_contexts;
+  ctx->adapter_num = i;
 
   if ( createL22Lock(ctx) ) {
     ERROR("createL22Lock() failed, no memory?\n");
@@ -435,17 +454,17 @@ static int do_probe(struct pci_dev *dev, const struct pci_device_id *id)
     do_remove(dev);
     return -EINVAL;
   }
+  
+  /* Must mark linux as using FPU because of embedded C code startup */
+  rt_linux_use_fpu(1);
 
   if (!rt_is_hard_timer_running()) {
     rt_set_oneshot_mode();
     start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
   }
-  
-  /* Must mark linux as using FPU because of embedded C code startup */
-  rt_linux_use_fpu(1);
 
   LOG_MSG("Found L22 device %s, activated.\n", pci_name(ctx->dev));
-  ++num_contexts;
+  atomic_inc(&num_contexts);
   return 0;
 }
 
@@ -454,11 +473,12 @@ static void do_remove(struct pci_dev *dev)
   int i;
   struct LinuxContext *ctx = 0;
 
+  DEBUG_CRAZY("do_remove(%p)\n", dev); 
   for (i = 0; !ctx && i < L22_MAX_DEVS; ++i)
     if (dev_contexts[i].dev == dev) 
       ctx = &dev_contexts[i];
-
   
+  DEBUG_CRAZY("do_remove() found ctx %p\n", ctx); 
   if (ctx && ctx->dev) {
     destroyThread(ctx);
 
@@ -488,6 +508,7 @@ static void do_remove(struct pci_dev *dev)
 
     LOG_MSG("L22 device %s deactivated.\n", pci_name(dev));
     memset(ctx, 0, sizeof(*ctx));
+    atomic_dec(&num_contexts);
   }
 }
 
@@ -495,6 +516,7 @@ static int createThread(struct LinuxContext *ctx)
 {
   pthread_attr_t attr;
   struct sched_param sched_param;
+  
   int error;
 
   ctx->td = (struct ThreadData *)kmalloc(sizeof(*ctx->td), GFP_KERNEL);
@@ -503,32 +525,35 @@ static int createThread(struct LinuxContext *ctx)
     return -ENOMEM;
   }
   memset(ctx->td, 0, sizeof(*ctx->td));
+  atomic_set(&ctx->td->stop_flg, 0);
   pthread_attr_init(&attr);
   sched_param.sched_priority = 5; /* Make sure our sched_priority is decent */
   pthread_attr_setschedparam(&attr, &sched_param);
-  /*  pthread_attr_setfp_np(&attr, 1);*/
-  pthread_cond_init(&ctx->td->cond, 0);
+  /*  pthread_attr_setfp_np(&attr, 1);*/  
   error = pthread_create(&ctx->td->thread, &attr, deviceThread, ctx);
   if (error) {
     ERROR("Could not create deviceThread, pthread_create returned %d!\n", error);
     return -error;
   }
+  pthread_attr_destroy(&attr);
   return 0;
 }
 
 static void destroyThread(struct LinuxContext *ctx)
 {
+  DEBUG_CRAZY("destroyThread(%p)\n", ctx);
   if (ctx && ctx->td) {
     void *threadRet;
+    DEBUG_CRAZY("destroyThread() about to acquire lock...\n");
     LOCK_L22(ctx);
-    ctx->td->req = EXIT;
-    pthread_cond_signal(&ctx->td->cond);
+    atomic_set(&ctx->td->stop_flg, 1);
+    DEBUG_CRAZY("destroyThread() set stop flag, about to unlock...\n");
     UNLOCK_L22(ctx);
+    DEBUG_CRAZY("destroyThread() unlocked, about to join...\n");
     pthread_join(ctx->td->thread, &threadRet);
-    pthread_cond_destroy(&ctx->td->cond);
     kfree(ctx->td); 
     ctx->td = 0; 
-    DEBUG_MSG("deviceThread exited after %lu cycles.\n", (unsigned long)threadRet);
+    DEBUG_CRAZY("deviceThread exited after %lu cycles.\n", (unsigned long)threadRet);
   }
 }
 
@@ -552,47 +577,44 @@ static void destroyL22Lock(struct LinuxContext *ctx)
 static inline RTIME computeTaskPeriod(long long srate, long long bsize)
 {
   static const RTIME BILLION = 1000000000LL;
-  return ((BILLION / srate) * ((RTIME)DMABufferSize) / bsize) / 2LL;
+  return linux_div64(linux_div64(BILLION, srate) * linux_div64(((RTIME)DMABufferSize), bsize), 2LL);
 }
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 /*  Board rt-thread for managing loading of DMA data  */
 static void *deviceThread(void *arg)
 {
   struct LinuxContext *ctx = (struct LinuxContext *)arg;
-  int stop = 0;
   unsigned long count = 0;
+  unsigned savedSampleRate = SampleRate;
   struct timespec ts;
   RTIME period = computeTaskPeriod(SampleRate, 4*2 /* TODO this is the sample block size */);
   DEBUG_MSG("deviceThread: Task period is %ld\n", (long)period);
   clock_gettime(CLOCK_REALTIME, &ts);
   LOCK_L22(ctx);
   LynxPlay(ctx, L22_ALL_CHANS);
-  while (!stop) {
+  while (!atomic_read(&ctx->td->stop_flg)) {
     int retval = 0;
     timespec_add_ns(&ts, period);
-    retval = pthread_cond_timedwait(&ctx->td->cond, &ctx->lock->mutex, &ts);
-
-    if (ABS(retval) != ETIMEDOUT && retval != 0) {
-      ERROR("deviceThread: pthread_cond_timedwait returned %d! Stopping all playback.\n", retval);
+    UNLOCK_L22(ctx); /* ghey, but pthread_cond_timedwait() is broken.. */
+    /*retval = pthread_cond_timedwait(&ctx->td->cond, &ctx->lock->mutex, &ts);*/
+    retval = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &ts, 0);
+    LOCK_L22(ctx);
+    
+    if (ABS(retval) != ETIMEDOUT && ABS(retval) != EINTR && retval != 0) {
+      ERROR("deviceThread: clock_nanosleep() returned %d! Stopping all playback.\n", retval);
       break;
     }
-    switch (ctx->td->req) {
-    case SAMPLERATE_CHANGE:
+    if (SampleRate != savedSampleRate) {
       /* not normal case, sampling rate changed.. */
       period = computeTaskPeriod(SampleRate, 4*2 /* TODO make this specific to format(s)? */ );
       clock_gettime(CLOCK_REALTIME, &ts);
-      /* notice fall-through.. we should still check the buffers */
-    case NONE:
-      /* normal case, we waited for 1 task perdiod.. */
-      LynxDoDMAPoll(ctx);
-      break;
-    case EXIT: stop = 1; break;
-    default:
-      WARNING("deviceThread: got unknown request %d!\n", ctx->td->req);
+      savedSampleRate = SampleRate;
     }
-    ctx->td->req = NONE;
+    /* normal case, we waited for 1 task perdiod.. */
+    LynxDoDMAPoll(ctx);
     ++count;
   }
+  DEBUG_CRAZY("devicethread about to call LynxStop()\n");
   LynxStop(ctx, L22_ALL_CHANS);
   UNLOCK_L22(ctx);
   return (void *)count;
@@ -623,13 +645,13 @@ EXPORT_SYMBOL(L22Close);
 
 #define  DECLARE_CTX_FROM_HANDLE(handle, ctx) \
 struct LinuxContext *ctx; \
-  if (handle < 0 || handle >= num_contexts) \
+  if (handle < 0 || handle >= L22_MAX_DEVS) \
     return 0;\
 \
   ctx = &dev_contexts[handle]\
 
 /** returns true if the L22 device exists and is ready for commands.. */
-L22LINKAGE int L22GetNumDevices(void) {  return num_contexts; }
+L22LINKAGE int L22GetNumDevices(void) {  return atomic_read(&num_contexts); }
 
 /** Specify an audio buffer for the audio data to play.  
     Currently only 32-bit stereo PCM format (8 bytes per channel pair)

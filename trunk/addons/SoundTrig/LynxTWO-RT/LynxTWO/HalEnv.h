@@ -32,9 +32,7 @@
 #ifndef _HALENV_H
 #define _HALENV_H
 
-#ifndef L22LINKAGE
-#define L22LINKAGE __attribute__((regparm(0)))
-#endif
+#define L22LINKAGE __attribute__((regparm(3)))
 
 /////////////////////////////////////////////////////////////////////////////
 // Figure out which compiler we are using
@@ -1086,10 +1084,10 @@ extern void operator delete[](void *p);
 #endif
 
 
-#	define READ_REGISTER_ULONG( pAddr )				read_register_ulong((volatile const ULONG  *)(pAddr))
+#	define READ_REGISTER_ULONG( pAddr )				read_register_ulong(pAddr)
 
 
-#	define WRITE_REGISTER_ULONG( pAddr, ulValue )		write_register_ulong(((ULONG *)pAddr),ulValue)
+#	define WRITE_REGISTER_ULONG( pAddr, ulValue )		write_register_ulong(pAddr,ulValue)
 
 #	define READ_REGISTER_BUFFER_ULONG(x, y, z)   memcpy_fromio_linux(y, x, z)
 /*	{ \

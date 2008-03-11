@@ -1,7 +1,7 @@
 #ifndef LYNX_TWO_RT_H
 #define LYNX_TWO_RT_H
 
-#define L22LINKAGE __attribute__((regparm(0)))
+#define L22LINKAGE __attribute__((regparm(3)))
 
 /** defines for format_code below.. */
 #define PCM8 0

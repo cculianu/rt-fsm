@@ -21,6 +21,7 @@ namespace LinuxGlue
   extern USHORT MapIO( PVOID pContext, PPCI_CONFIGURATION pPCI );
   extern USHORT UnmapIO( PVOID pContext, PPCI_CONFIGURATION pPCI );
   extern PHALADAPTER GetHalAdapter(PVOID pContext, ULONG ulAdapterNum);
+  extern LONGLONG Div64(LONGLONG dividend, LONGLONG divisor);
 }
 
 #endif

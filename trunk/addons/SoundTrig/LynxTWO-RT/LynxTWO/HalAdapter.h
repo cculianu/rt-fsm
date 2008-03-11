@@ -77,7 +77,7 @@ public:
 
 	void	EnableInterrupts( void );
 	void	DisableInterrupts( void );
-
+    LONGLONG Div64(LONGLONG dividend, LONGLONG divisor) const { return m_HalDriverInfo.pDiv64(dividend, divisor); }
 	// called at interrupt time to get the current device interrupt status
 	USHORT	SaveInterruptContext( ULONG ulAISTAT = 0, ULONG ulMISTAT = 0 );
 	// called at interrupt time to service the devices requesting service
@@ -232,7 +232,7 @@ private:
 	CHalRegister		m_RegLTCControl;
 
 	PDMABUFFERLIST		m_pDMA_VAddr;			// Virtual Address of DMA Buffer List
-	ULONG				m_pDMA_PAddr;			// Physical Address of DMA Buffer List
+    void *        		m_pDMA_PAddr;			// Physical Address of DMA Buffer List
 
 	LYNXTWOINTERRUPTCONEXT	m_aInterruptContext[ MAX_PENDING_INTERRUPTS ];
 	ULONG				m_ulICHead;

@@ -10,6 +10,8 @@
 %                SetOutputRouting.m
 function [fsm] = SetStateMachine(fsm, which_sm)
 
+   if (length(which_sm) ~= 1), error('Invalid argument to SetStateMachine'); end;
+   
    DoSimpleCmd(fsm, sprintf('SET STATE MACHINE %d', which_sm));
    fsm.fsm_id = which_sm;
    

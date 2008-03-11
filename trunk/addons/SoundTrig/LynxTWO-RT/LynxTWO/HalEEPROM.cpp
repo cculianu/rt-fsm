@@ -1071,7 +1071,7 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 		
 		gpL2ControlReg	= &((PLYNXTWOREGISTERS)pL2Registers)->PCICTL;
 		gpL2StatusReg	= &((PLYNXTWOREGISTERS)pL2Registers)->MISTAT;
-		DEBUG_CRAZY("gpL2ControlReg=%x  gpL2StatusReg=%x\n", gpL2ControlReg, gpL2StatusReg);
+		DEBUG_CRAZY("gpL2ControlReg=%p  gpL2StatusReg=%p\n", gpL2ControlReg, gpL2StatusReg);
         
         gulControlReg	= 0;
 
