@@ -572,7 +572,7 @@ static void *deviceThread(void *arg)
     timespec_add_ns(&ts, period);
     retval = pthread_cond_timedwait(&ctx->td->cond, &ctx->lock->mutex, &ts);
 
-    if (retval != ETIMEDOUT && retval != 0) {
+    if (ABS(retval) != ETIMEDOUT && retval != 0) {
       ERROR("deviceThread: pthread_cond_timedwait returned %d! Stopping all playback.\n", retval);
       break;
     }

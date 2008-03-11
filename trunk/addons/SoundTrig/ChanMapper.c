@@ -9,7 +9,7 @@
 #ifdef RTAI
 #  define handler_wrpr xxxyyyzzzz_why_are_rtai_headers_broken
 #  include "rtos_compat.h"
-#  undef hanlder_wrpr
+#  undef handler_wrpr
 #endif
 
 struct Channels
