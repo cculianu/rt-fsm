@@ -26,12 +26,11 @@ CXXFLAGS += -Dx86
 
 else
 # x86_64
-CXXFLAGS += -mcmodel=kernel -Dx86_64
+CXXFLAGS += -mcmodel=kernel -Dx86_64 
 
 endif
-
 CXX=g++
-CXXFLAGS += -W -Wall -fno-rtti -nostartfiles -nostdinc -fno-exceptions -nostdinc++ -fms-extensions -fno-pic -fno-PIC -DLINUX -DRTAI  $(DEBUG) -I../ -I. -I../Include
+CXXFLAGS += -W -Wall -fno-rtti -nostartfiles -nostdinc -fno-exceptions -nostdinc++ -fms-extensions -fno-pic -fno-PIC -msoft-float -mpreferred-stack-boundary=2 -DLINUX -DRTAI  $(DEBUG) -I../ -I. -I../Include
 TARGET=LynxTWO.o
 
 .cpp.o:

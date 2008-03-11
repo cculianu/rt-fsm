@@ -1005,6 +1005,7 @@ extern "C" {
     typedef ULONG FAR	*PULONG;
 	
 	typedef unsigned char FAR	*PBYTE;
+    typedef const unsigned char FAR *PCBYTE;
 	typedef unsigned char FAR	*PUCHAR;
 	typedef unsigned char FAR	*PVOID;
 	typedef unsigned char FAR	*LPUCHAR;

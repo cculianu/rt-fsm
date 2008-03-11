@@ -971,7 +971,7 @@ int xsvfExecute( pSXsvfInfo pXsvfInfo )
     return( pXsvfInfo->iErrorCode );
 }
 
-PBYTE	gpCurrentBufferBase = NULL;
+PCBYTE	gpCurrentBufferBase = NULL;
 ULONG	gulCurrentOffset = 0;
 ULONG	gulControlReg = 0;
 PULONG	gpL2ControlReg;	
@@ -983,6 +983,7 @@ PULONG	gpL2StatusReg;
 void EESetPort( short p, short val )
 /////////////////////////////////////////////////////////////////////////////
 {
+    DEBUG_CRAZY("EESetPort(%hd, %hd)\n", p, val);
 	if( p==TMS )	// bit 5
 	{
 		if( val )	SET( gulControlReg, kBit5 );
@@ -999,6 +1000,7 @@ void EESetPort( short p, short val )
 		else		CLR( gulControlReg, kBit6 );
 
 		//DPF(("[%08lx] ", gulControlReg )); 
+        DEBUG_CRAZY("EESetPort writing reg..\n");
 		WRITE_REGISTER_ULONG( gpL2ControlReg, gulControlReg );
 		EEWaitTime(WAIT_TIME);
 	}
@@ -1048,7 +1050,7 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
     DEBUG_MSG("EEPROMGetSerialNumber(%p,%p)\n", pulSerialNumber, pL2Registers);
 	BOOLEAN	bFail = FALSE;
 	SXsvfInfo xsvfInfo;
-	BYTE ucL2IDRead[] = 
+	static const BYTE ucL2IDRead[] = 
 	{
 		0x07,0x00,0x12,0x00,0x12,0x01,0x04,0x00,0x00,0x00,0x00,0x02,0x0d,0x1f,0xff,0x02,
 		0x0d,0x1f,0xdf,0x08,0x00,0x00,0x00,0x21,0x01,0x01,0xff,0xf9,0xff,0xff,0x09,0x01,
@@ -1069,14 +1071,17 @@ BOOLEAN	EEPROMGetSerialNumber( PULONG pulSerialNumber, PVOID pL2Registers  )
 		
 		gpL2ControlReg	= &((PLYNXTWOREGISTERS)pL2Registers)->PCICTL;
 		gpL2StatusReg	= &((PLYNXTWOREGISTERS)pL2Registers)->MISTAT;
-		
+		DEBUG_CRAZY("gpL2ControlReg=%x  gpL2StatusReg=%x\n", gpL2ControlReg, gpL2StatusReg);
+        
         gulControlReg	= 0;
 
 		RtlZeroMemory( &xsvfInfo, sizeof( SXsvfInfo ) );
 		
+        DEBUG_CRAZY("about to call EESetPort()\n");
 		// Initialize the I/O.  SetPort initializes I/O on first call 
 		EESetPort( TMS, 1 );
 		
+        DEBUG_CRAZY("about to call xsvfExecute()\n");
 		// Execute the XSVF in the file 
 		xsvfExecute( &xsvfInfo );
         		

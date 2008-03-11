@@ -1392,7 +1392,7 @@ static int doSanityChecksRuntime(FSMID_t f)
   if (READY_FOR_TRIAL_JUMPSTATE(f) >= NUM_ROWS(f) || READY_FOR_TRIAL_JUMPSTATE(f) <= 0)  
     WARNING("ready_for_trial_jumpstate of %d need to be between 0 and %d!\n", 
             (int)READY_FOR_TRIAL_JUMPSTATE(f), (int)NUM_ROWS(f)); 
-  if (NUM_ROWS(f) >= rs[f].current_state && !FSM_PTR(f)->wait_for_jump_to_state_0_to_swap_fsm)
+  if (rs[f].current_state >= NUM_ROWS(f) && !FSM_PTR(f)->wait_for_jump_to_state_0_to_swap_fsm)
     WARNING("specified a new state machine with %d states, but current_state is %d -- will force a jump to state 0!\n", (int)NUM_ROWS(f), (int)rs[f].current_state);
   
 /*   if (dev && n_chans != NUM_CHANS(f) && debug) */
@@ -3474,7 +3474,7 @@ static void swapFSMs(FSMID_t f)
   reconfigureIO(); /* to have new routing take effect.. */
   rs[f].valid = 1; /* Unlock FSM.. */
   rs[f].pending_fsm_swap = 0; 
-  if (NUM_ROWS(f) && NUM_ROWS(f) >= rs[f].current_state)
+  if (rs[f].current_state >= NUM_ROWS(f))
     gotoState(f, 0, -1); /* force a state 0 if the new fsm doesn't contain current_state!! */
 }
 
