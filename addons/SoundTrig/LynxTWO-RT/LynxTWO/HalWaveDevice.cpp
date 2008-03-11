@@ -761,7 +761,7 @@ USHORT	CHalWaveDevice::GetSamplePosition( PULONG pulSamplePosition )
 {
 	if( m_lBytesPerBlock )
 	{
-		*pulSamplePosition = (ULONG)(m_ullBytePosition / m_lBytesPerBlock);
+		*pulSamplePosition = (ULONG)m_pHalAdapter->Div64(m_ullBytePosition, m_lBytesPerBlock);
 	}
 	else
 	{

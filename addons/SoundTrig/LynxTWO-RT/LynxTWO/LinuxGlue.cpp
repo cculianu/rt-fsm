@@ -75,6 +75,7 @@ USHORT LinuxGlue::AllocateDMA(PVOID pCtx, PVOID *pVAddr, PVOID *pPAddr,
     // clear the memory
     memset(virt, 0, ulLength);
   }
+  DEBUG_MSG("LinuxGlue::AllocateDMA() allocated virt(%p) phys(%p)\n", *pVAddr, *pPAddr);
   return ret;
 }
 
@@ -103,7 +104,7 @@ USHORT LinuxGlue::MapIO( PVOID pContext, PPCI_CONFIGURATION pPCI )
     if (vaddr) {
       // save values in PCI_CONFIGURATION... 
       base.ulPhysicalAddress = phys;
-      base.ulAddress = static_cast<ULONG>(reinterpret_cast<unsigned long>(vaddr));
+      base.ulAddress = vaddr;
       base.ulSize = len;
       base.usType = PCI_BARTYPE_MEM; // erm it's all memory mapped, right?!
       ++ok;
@@ -130,6 +131,11 @@ PHALADAPTER LinuxGlue::GetHalAdapter(PVOID pContext, ULONG ulAdapterNum)
   if (ctx && ctx->priv)
     return ctx->priv->adapter;
   return 0;
+}
+
+LONGLONG LinuxGlue::Div64(LONGLONG dividend, LONGLONG divisor)
+{
+    return linux_div64(dividend, divisor);
 }
 
 void *operator new(SIZE_T size)
@@ -186,6 +192,7 @@ extern "C" {
     driverInfo->pGetAdapter = LinuxGlue::GetHalAdapter;
     driverInfo->pAllocateMemory = LinuxGlue::AllocateDMA;
     driverInfo->pFreeMemory = LinuxGlue::FreeDMA;
+    driverInfo->pDiv64 = LinuxGlue::Div64;
     driverInfo->pContext = reinterpret_cast<PVOID>(ctx);
     PHALADAPTER adapter; // alias for ctx->priv->adapter...
     adapter = ctx->priv->adapter = new CHalAdapter(driverInfo, ctx->adapter_num);
@@ -541,7 +548,7 @@ static void CopyAudioToNextDMABuffer(LinuxContext *ctx, PHALDMA dma)
         // the sample ended, just add an empty DMA buffer..
         memset(mem.virt, 0, mem.len);
         dma->AddEntry(reinterpret_cast<PVOID>(mem.phys), mem.len/sizeof(int), false);
-        DEBUG_MSG("CopyAudioToNextDMABuffer: added silence entry %u:%u\n", chanNo, bufno);
+        DEBUG_CRAZY("CopyAudioToNextDMABuffer: added silence entry %u:%u\n", chanNo, bufno);
         buf.unlock();
         return;
       }
@@ -570,9 +577,9 @@ static void CopyAudioToNextDMABuffer(LinuxContext *ctx, PHALDMA dma)
                     space_bytes / sizeof(int), /* Ergh, size param must be in DWORDs.. gross */ 
                     false);
       buf.num_played += space_bytes/(buf.sample_size*buf.num_chans);    
-      DEBUG_MSG("LinuxGlue::CopyAudioToNextDMABuffer() copied %lu %d-byte sample-blocks to buffer num %u at %p (phys: %p)\n",
+      DEBUG_CRAZY("LinuxGlue::CopyAudioToNextDMABuffer() copied %lu %d-byte sample-blocks to buffer num %u at %p (phys: %p)\n",
                 space_bytes/(buf.sample_size*buf.num_chans), (int)buf.sample_size*buf.num_chans, bufno, mem.virt, (void *)linux_virt_to_phys(mem.virt));
-      DEBUG_MSG("LinuxGlue::CopyAudioToNextDMABuffer() Current hardware index for DMA buffers is %d\n", (int)dma->GetDMABufferIndex());
+      DEBUG_CRAZY("LinuxGlue::CopyAudioToNextDMABuffer() Current hardware index for DMA buffers is %d\n", (int)dma->GetDMABufferIndex());
       buf.unlock();
 }
 
@@ -609,9 +616,9 @@ L22LINKAGE void LynxDoDMAPoll(struct LinuxContext *ctx)
     PHALDMA dma = dev->GetDMA();
 #ifdef DEBUG
     ULONG h = dma->GetEntriesInHardware(), e = dma->GetNumberOfEntries();
-    DEBUG_MSG("LynxDoDMAPoll: h: %u  e: %u  r0: %u r1: %u\n", h, e, dma->GetBytesRemaining(0), dma->GetBytesRemaining(1));
+    DEBUG_CRAZY("LynxDoDMAPoll: h: %u  e: %u  r0: %u r1: %u\n", h, e, dma->GetBytesRemaining(0), dma->GetBytesRemaining(1));
     if (dma->IsDMAStarved()) {
-      DEBUG_MSG("LynxDoDMAPoll: dma is starved for channel %d\n", chan);
+      DEBUG_CRAZY("LynxDoDMAPoll: dma is starved for channel %d\n", chan);
     }
 #endif
     // free any used-up entries

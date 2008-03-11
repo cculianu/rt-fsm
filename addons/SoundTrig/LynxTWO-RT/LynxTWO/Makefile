@@ -21,16 +21,15 @@ MOD_OBJS = \
           
 ifneq ($(MACH),x86_64)
 # regular x86?
-MOD_OBJS +=  _divdi3.o _udivdi3.o
-CXXFLAGS += -Dx86
+CXXFLAGS += -Dx86 -msoft-float -mpreferred-stack-boundary=2
 
 else
 # x86_64
-CXXFLAGS += -mcmodel=kernel -Dx86_64 
+CXXFLAGS += -mcmodel=kernel -Dx86_64 -mhard-float 
 
 endif
 CXX=g++
-CXXFLAGS += -W -Wall -fno-rtti -nostartfiles -nostdinc -fno-exceptions -nostdinc++ -fms-extensions -fno-pic -fno-PIC -msoft-float -mpreferred-stack-boundary=2 -DLINUX -DRTAI  $(DEBUG) -I../ -I. -I../Include
+CXXFLAGS += -W -Wall -fno-rtti -nostartfiles -nostdinc -fno-exceptions -nostdinc++ -fms-extensions -fno-pic -fno-PIC -fomit-frame-pointer -DLINUX -DRTAI  $(DEBUG) -I../ -I. -I../Include
 TARGET=LynxTWO.o
 
 .cpp.o:
@@ -42,12 +41,6 @@ all: .deps $(TARGET)
 	-makedepend -- $(CXXFLAGS) --  $(SRC_CXX) 2> mkdep.out || cat mkdep.out 1>&2
 	-rm -f mkdep.out
 	touch .deps
-
-_divdi3.o:
-	ar x `gcc  --print-libgcc-file-name` _divdi3.o
-	
-_udivdi3.o:
-	ar x `gcc  --print-libgcc-file-name` _udivdi3.o
 
 clean:
 	cp -f Makefile.bak Makefile 2>/dev/null || true 

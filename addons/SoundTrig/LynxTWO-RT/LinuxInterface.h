@@ -61,6 +61,7 @@ extern "C" {
     const struct pci_device_id *id;
     unsigned adapter_num;
     unsigned region_ct;
+    volatile unsigned is_allocated;
   };
 
 #  ifndef __cplusplus
@@ -92,7 +93,8 @@ extern "C" {
   /* Wait (synchronously) for microseconds to pass by
      -- it's a tight busy loop that keeps checking the pentium's tsc! */
   L22LINKAGE extern void linux_microwait(unsigned long microseconds);
-
+  /* Returns the quotient.*/
+  L22LINKAGE extern long long linux_div64(long long dividend, long long divisor);
   /* returns the Pentium TSC (time since powerup in ns) */
   L22LINKAGE extern unsigned long long linux_get_cycles(void);
 
@@ -115,8 +117,8 @@ extern "C" {
       small to reduce latency, or larger to minimize DMA starvation risks.
       This comes from the module parameter dma_size */
   extern unsigned DMABufferSize;
-  extern unsigned SampleRate; /**< Comes from a module param -- the sample
-                                 rate the all L22s are running at. */
+  extern volatile unsigned SampleRate; /**< Comes from a module param -- the sample
+                                            rate the all L22s are running at. */
 
   /* If set, produce verbose debug output, otherwise don't. */
   extern int debug;

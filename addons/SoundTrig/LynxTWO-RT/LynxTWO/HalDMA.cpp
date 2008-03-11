@@ -254,7 +254,8 @@ USHORT	CHalDMA::AddEntry( PVOID pBuffer, ULONG ulSize, BOOLEAN bInterrupt )
 	//DB('a',COLOR_BOLD_U);
 
 	//DX32( m_pBufferBlock->Entry[ m_ulPCBufferIndex-1 ].ulHostPtr, COLOR_UNDERLINE );
-
+    DEBUG_CRAZY("CHalDma::AddEntry(%p, %u, %u)\n", pBuffer, (unsigned)ulSize, (unsigned)bInterrupt);
+    
 	if( !ulSize || !pBuffer )
 	{
 		DPF(("CHalDMA::AddEntry: Invalid Parameter!\n"));

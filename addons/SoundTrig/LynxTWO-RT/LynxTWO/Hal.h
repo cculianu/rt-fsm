@@ -118,10 +118,10 @@ typedef	CHalLStream *PHALLSTREAM;
 
 typedef struct
 {
-	ULONG				ulPhysicalAddress;
-	ULONG				ulAddress;
-	ULONG				ulSize;
-	USHORT				usType;
+	unsigned long       ulPhysicalAddress;
+    void *              ulAddress;
+	ULONG               ulSize;
+	USHORT              usType;
 } PCI_BASEADDRESS, *PPCI_BASEADDRESS;
 
 enum
@@ -169,6 +169,9 @@ typedef HALALLOCMEMORY *PHALALLOCMEMORY;
 typedef USHORT (HALFREEMEMORY)( PVOID pContext, PVOID pMemory );
 typedef HALFREEMEMORY *PHALFREEMEMORY;
 
+typedef LONGLONG (HALDIV64) (LONGLONG, LONGLONG);
+typedef HALDIV64 *PHALDIV64;
+
 typedef struct
 {
 	PHALFINDPROC		pFind;
@@ -177,6 +180,7 @@ typedef struct
 	PHALGETADAPTER		pGetAdapter;
 	PHALALLOCMEMORY		pAllocateMemory;
 	PHALFREEMEMORY		pFreeMemory;
+    PHALDIV64           pDiv64;
 	PVOID				pContext;
 } HALDRIVERINFO, *PHALDRIVERINFO;
 

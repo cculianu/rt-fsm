@@ -262,10 +262,10 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 
 	// now inform the hardware where the DMA Double Buffer is Located
 	// only shift out 10 bits because GDBLADDR starts at bit position 1
-	WRITE_REGISTER_ULONG( &m_pRegisters->DMACTL, ((m_pDMA_PAddr >> 10) | REG_DMACTL_GDMAEN) );
+	WRITE_REGISTER_ULONG( &m_pRegisters->DMACTL, (reinterpret_cast<unsigned long>(m_pDMA_PAddr) >> 10) | REG_DMACTL_GDMAEN );
 
 	DPF(("HalAdapter::Open(): DMACTL is now %08lx and DBL is at %08lx\n",
-	     (unsigned long)((m_pDMA_PAddr >> 10) | REG_DMACTL_GDMAEN), 
+	     (reinterpret_cast<unsigned long>(m_pDMA_PAddr) >> 10) | REG_DMACTL_GDMAEN, 
 	     (unsigned long)(m_pDMA_PAddr)));
 	     
 	
@@ -1028,7 +1028,7 @@ USHORT	CHalAdapter::GetFrequencyCounter( USHORT usRegister, PULONG pulFrequency 
 		// Range of SCALE is 0..9, but we allow 0..15
 		// by using a LONGLONG as the llReference, the intermediate number is 64 bit
 		// We add ulCount/2 for rounding
-		ulValue = (ULONG)(((llReference<<(ulScale+2))+(ulCount/2)) / ulCount);
+		ulValue = static_cast<ULONG>(m_HalDriverInfo.pDiv64(((llReference<<(static_cast<long long>(ulScale+2)))+(static_cast<long long>(ulCount/2))), ulCount));
 
 		//DPF(("Counter %lu Scale %lu Count %lu Value %lu\n", (ULONG)usRegister, ulScale, ulCount, ulValue ));
 
