@@ -1776,7 +1776,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
     for (j = 0; j < (int)m.cols(); ++j) {
       double val = m.at(i, j);
       if (j == (int)TIMEOUT_TIME_COL(&msg.u.fsm)) val *= 1e6;  
-      prog << std::setw(5) << static_cast<unsigned long>(val);  
+      prog << std::setw(5) << static_cast<unsigned long>(val) << "UL";  
       if (j+1 < m.cols()) prog << ", ";
     }
     prog << " }"; if (i+1 < m.rows()) prog << ", ";
