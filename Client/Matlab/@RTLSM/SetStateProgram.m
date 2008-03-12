@@ -286,10 +286,20 @@
 %      DIO channel 'chan' should have already been configured for digital output.
 %      This happens automatically if you are using input routing of type 'ai' 
 %      (thus freeing up all DIO channels to be digital outputs).
+%      [Note that output routing is not checked, so that chan is the global
+%      hardware channel ID and not relative to the first channel in the output 
+%      routing spec. (As compared to how BypassDOut works).]
 %      Returns true on success or 0 on failure. 
 %      Failure reasons may include: an invalid channel ID, or trying to write
 %      to a channel that is currently configured for digital input. */
 %  extern int writeDIO(unsigned chan, unsigned bitval);
+%
+%  /** Similar to the matlab client-side BypassDOout call -- simultaneously forces
+%      all of the channels in bitmask to be on until the next call to bypassDOut(0). Note 
+%      that the channels in this specification are actually relative to the output routing spec
+%      for this state machine! 
+%      Returns 1 on success or 0 on failure. */
+%  extern int bypassDOut(unsigned bitmask);
 %
 %  /** Similar to the 'tcp' output routing type.  Basically, sometime in the 
 %      future,a userspace non-realtime thread will initiate a connection to 
