@@ -151,8 +151,7 @@ int minordev = 0, minordev_ai = -1, minordev_ao = -1,
     ai_sampling_rate = DEFAULT_AI_SAMPLING_RATE, 
     ai_settling_time = DEFAULT_AI_SETTLING_TIME,  /* in microsecs. */
     trigger_ms = DEFAULT_TRIGGER_MS,    
-    debug = 0,
-    avoid_redundant_writes = 0;
+    debug = 0;
 char *ai = DEFAULT_AI;
 
 #ifndef STR
@@ -176,8 +175,6 @@ module_param(trigger_ms, int, 0444);
 MODULE_PARM_DESC(trigger_ms, "The amount of time, in milliseconds, to sustain trigger outputs.  Defaults to " STR(DEFAULT_TRIGGER_MS) ".");
 module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "If true, print extra (cryptic) debugging output.  Defaults to 0.");
-module_param(avoid_redundant_writes, int, 0444);
-MODULE_PARM_DESC(avoid_redundant_writes, "If true, do not do comedi DIO writes during scans that generated no new output.  Defaults to 0 (false).");
 module_param(ai, charp, 0444);
 MODULE_PARM_DESC(ai, "This can either be \"synch\" or \"asynch\" to determine whether we use asynch IO (comedi_cmd: faster, less compatible) or synch IO (comedi_data_read: slower, more compatible) when acquiring samples from analog channels.  Note that for asynch to work properly it needs a dedicated realtime interrupt.  Defaults to \""DEFAULT_AI"\".");
 
@@ -843,7 +840,7 @@ static void reconfigureIO(void)
        until an output occurs on that ip_out column */
     memset((void *)&rs[f].last_ip_outs_is_valid, 0, sizeof(rs[f].last_ip_outs_is_valid));
 
-    for (i = FIRST_IN_CHAN(f); i < NUM_IN_CHANS(f)+FIRST_IN_CHAN(f); ++i)
+    for (i = FIRST_IN_CHAN(f); i < AFTER_LAST_IN_CHAN(f); ++i)
       if (IN_CHAN_TYPE(f) == AI_TYPE)
         ai_chans_in_use_mask |= 0x1<<i;
       else
@@ -2544,24 +2541,21 @@ static void commitDIOWrites(void)
 {
   hrtime_t dio_ts = 0, dio_te = 0;
   FSMID_t f;
+  unsigned dbg_output_bits;
   
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
     /* Override with the 'forced' bits. */
     pending_output_mask |= rs[f].forced_outputs_mask;
     pending_output_bits |= rs[f].forced_outputs_mask;
   }
-
-  if ( avoid_redundant_writes && (pending_output_bits & pending_output_mask) == (dio_bits & pending_output_mask) )
-    /* Optimization, only do the writes if the bits we last saw disagree
-       with the bits as we would like them */
-    return;
- 
+  dbg_output_bits = pending_output_bits&pending_output_mask;
+   
   if (debug > 2)  dio_ts = gethrtime();
   if (dev) comedi_dio_bitfield(dev, subdev, pending_output_mask, &pending_output_bits);
   if (debug > 2)  dio_te = gethrtime();
-  
+    
   if(debug > 2)
-    DEBUG("WRITES: dio_out mask: %x bits: %x for cycle %s took %u ns\n", pending_output_mask, pending_output_bits, uint64_to_cstr(cycle), (unsigned)(dio_te - dio_ts));
+    DEBUG("WRITES: dio_out mask: %x bits: %x for cycle %s took %u ns\n", pending_output_mask, dbg_output_bits, uint64_to_cstr(cycle), (unsigned)(dio_te - dio_ts));
 
   pending_output_bits = 0;
   pending_output_mask = 0;
@@ -2573,7 +2567,7 @@ static void grabAllDIO(void)
   dio_bits_prev = dio_bits;
   /* Grab all the input channels at once */
   if (dev) comedi_dio_bitfield(dev, subdev, 0, (unsigned int *)&dio_bits);
-
+  dio_bits = dio_bits & di_chans_in_use_mask;
   /* Debugging comedi reads.. */
   if (dio_bits && ullmod(cycle, task_rate) == 0 && debug > 1)
     DEBUG("READS 0x%x\n", dio_bits);
