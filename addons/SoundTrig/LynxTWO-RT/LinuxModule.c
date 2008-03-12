@@ -446,14 +446,6 @@ static int do_probe(struct pci_dev *dev, const struct pci_device_id *id)
     do_remove(dev);
     return -EINVAL;
   }
-  
-  /* Must mark linux as using FPU because of embedded C code startup */
-  rt_linux_use_fpu(1);
-
-  if (!rt_is_hard_timer_running()) {
-    rt_set_oneshot_mode();
-    start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
-  }
 
   LOG_MSG("Found L22 device %s, activated.\n", pci_name(ctx->dev));
   atomic_inc(&num_contexts);
@@ -524,6 +516,16 @@ static int createThread(struct LinuxContext *ctx)
   sched_param.sched_priority = 5; /* Make sure our sched_priority is decent */
   pthread_attr_setschedparam(&attr, &sched_param);
   /*  pthread_attr_setfp_np(&attr, 1);*/  
+#ifdef RTAI
+  /* Must mark linux as using FPU because of embedded C code startup */
+  rt_linux_use_fpu(1);
+
+  if (!rt_is_hard_timer_running()) {
+    rt_set_oneshot_mode();
+    start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
+  }    
+#endif
+
   error = pthread_create(&ctx->td->thread, &attr, deviceThread, ctx);
   if (error) {
     ERROR("Could not create deviceThread, pthread_create returned %d!\n", error);
