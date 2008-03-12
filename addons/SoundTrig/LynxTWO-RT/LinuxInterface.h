@@ -46,7 +46,7 @@ extern "C" {
   typedef struct MemRegion MMIORegion;
   struct Private; /* A C++ Private structure that is opaque to C. */
   struct ThreadData; /* A C struct that is private and is in LinuxModule.c */
-  struct L22Lock; /* A C struct that is private and is in LinuxModule.c */
+  struct RTLinux_Lock_t;  
   struct LinuxContext 
   {
     struct pci_dev *dev;
@@ -56,12 +56,12 @@ extern "C" {
     struct Private *priv; /* A C++ private struct that's up to LinuxGlue.cpp */
     struct ThreadData *td; /* A struct that is private and is in LinuxModule.c 
                               mnemonic: 'thread data' */
-    struct L22Lock *lock;
+    struct RTLinux_Lock_t *lock;
     int did_lynx_startup;
     const struct pci_device_id *id;
     unsigned adapter_num;
     unsigned region_ct;
-    volatile unsigned is_allocated;
+    volatile unsigned is_allocated; /* NB: this has to be the last member! */
   };
 
 #  ifndef __cplusplus
@@ -107,7 +107,6 @@ extern "C" {
   L22LINKAGE extern void rtlinux_l22_unlock(struct LinuxContext *);
   L22LINKAGE extern void rtlinux_yield(void);
   
-  struct RTLinux_Lock_t;  
   L22LINKAGE extern struct RTLinux_Lock_t *rtlinux_lock_create(void);
   L22LINKAGE extern void rtlinux_lock_destroy(struct RTLinux_Lock_t *);
   L22LINKAGE extern void rtlinux_lock(struct RTLinux_Lock_t *);
