@@ -292,7 +292,9 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 			m_ulSerialNumber = 0xFFFFFFFF;
 		}
 	}
-
+    
+    DEBUG_MSG("adapter version info: PCBRev: %hu  FirmwareRev: %hu  FirmwareDate: %hu  MinSoftwareAPIRev: %hu  SerialNumber: %u\n", m_usPCBRev, m_usFirmwareRev, m_usFirmwareDate, m_usMinSoftwareAPIRev, m_ulSerialNumber);
+    
 	/////////////////////////////////////////////////////////////////////////
 	// do any serial number specific work
 	/////////////////////////////////////////////////////////////////////////

@@ -67,6 +67,8 @@ struct EmbC
   int (*readDIO)(unsigned);
   /* Write to a DIO line, 1 on success, 0 on failure. */
   int (*writeDIO)(unsigned, unsigned);
+  /* Like matlab-side BypassDOout.m -- override state machine outputs relative to output routing spec */
+  int (*bypassDOut)(unsigned,unsigned);
   
   void (*sendPacket)(uint fsm, int proto, const char *, unsigned short, const void *, unsigned);
   void (*trigExt)(unsigned, unsigned);
@@ -252,6 +254,9 @@ static inline int    writeAO(unsigned chan, double voltage) { return __embc->wri
     Note that the line should already have been configured for digital input
     (normally done by telling the state machine to use input events of 
     type 'dio').
+    [Note that input routing is not checked, so that chan is the global
+    hardware channel ID and not relative to the first channel in the input 
+    routing spec.]
     Returns 0/1 for the bitvalue or negative on failure.
     Failure reasons include an invalid channel id or trying to read from a 
     channel that is currently configured for digital output. */
@@ -264,10 +269,20 @@ static inline int readDIO(unsigned chan) { return __embc->readDIO(chan); }
     DIO channel 'chan' should have already been configured for digital output.
     This happens automatically if you are using input routing of type 'ai' 
     (thus freeing up all DIO channels to be digital outputs).
+    [Note that output routing is not checked, so that chan is the global
+    hardware channel ID and not relative to the first channel in the output 
+    routing spec. (As compared to how BypassDOut works).]
     Returns true on success or 0 on failure. 
     Failure reasons may include: an invalid channel ID, or trying to write
     to a channel that is currently configured for digital input. */
 static inline int writeDIO(unsigned chan, unsigned bitval) { return __embc->writeDIO(chan, bitval); }
+/** Similar to the matlab client-side BypassDOout call -- simultaneously forces
+    all of the channels in bitmask to be on until the next call to bypassDOut(0). Note 
+    that the channels in this specification are actually relative to the output routing spec
+    for this state machine! 
+     Returns 1 on success or 0 on failure. */
+static inline int bypassDOut(unsigned bitmask) {  return __embc->bypassDOut(fsm(), bitmask); }
+    
 /** Similar to the 'tcp' output routing type.  Basically, sometime in the 
     future,a userspace non-realtime thread will initiate a connection to 
     host:port and send data of length datalen, then it will close the connection. */

@@ -494,6 +494,7 @@ static double emblib_readAI(unsigned);
 static int emblib_writeAO(unsigned,double);
 static int emblib_readDIO(unsigned);
 static int emblib_writeDIO(unsigned,unsigned);
+static int emblib_bypassDOut(unsigned, unsigned);
 static int emblib_gotoState(uint fsm, unsigned state, int eventid);
 static int emblib_printf(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 static int emblib_snprintf(char *buf, unsigned long sz, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
@@ -2418,17 +2419,7 @@ static void handleFifos(FSMID_t f)
       break;
         
     case FORCEOUTPUT:
-      rs[f].forced_outputs_mask = 0;
-      if (rs[f].do_chans_cont_mask) {
-            unsigned forced_mask = rs[f].forced_outputs_mask;
-            /* Clear previous forced outputs  */
-            while (forced_mask) {
-              unsigned chan = __ffs(forced_mask);
-              forced_mask &= ~(0x1<<chan);
-              dataWrite(chan, 0);
-            }
-            rs[f].forced_outputs_mask = (msg->u.forced_outputs << __ffs(rs[f].do_chans_cont_mask)) & rs[f].do_chans_cont_mask;
-      }
+      emblib_bypassDOut(f, msg->u.forced_outputs);
       do_reply = 1;
       break;
 
@@ -3261,6 +3252,7 @@ static void fsmLinkProgram(FSMID_t f, struct EmbC *embc)
   embc->writeAO = &emblib_writeAO;
   embc->readDIO = &emblib_readDIO;
   embc->writeDIO = &emblib_writeDIO;
+  embc->bypassDOut = &emblib_bypassDOut;
   embc->forceJumpToState = &emblib_gotoState;
   embc->printf = &emblib_printf;
   embc->snprintf = &emblib_snprintf;
@@ -3394,6 +3386,22 @@ static int emblib_writeDIO(unsigned chan, unsigned val)
     unsigned bitpos = 0x1<<chan;
     if ( bitpos & do_chans_in_use_mask ) {
         dataWrite(chan, val);
+        return 1;
+    }
+    return 0;
+}
+static int emblib_bypassDOut(unsigned f, unsigned mask)
+{
+    rs[f].forced_outputs_mask = 0;
+    if (rs[f].do_chans_cont_mask) {
+        unsigned forced_mask = rs[f].forced_outputs_mask;
+        /* Clear previous forced outputs  */
+        while (forced_mask) {
+            unsigned chan = __ffs(forced_mask);
+            forced_mask &= ~(0x1<<chan);
+            dataWrite(chan, 0);
+        }
+        rs[f].forced_outputs_mask = (mask << __ffs(rs[f].do_chans_cont_mask)) & rs[f].do_chans_cont_mask;
         return 1;
     }
     return 0;

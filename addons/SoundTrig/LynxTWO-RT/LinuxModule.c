@@ -174,7 +174,7 @@ L22LINKAGE void *linux_allocate(unsigned size) { return kmalloc(size, GFP_KERNEL
 
 L22LINKAGE int linux_printk(const char *fmt, ...) 
 {
-  char print_buf[128];
+  char print_buf[164];
   int ret;
   va_list args;
   va_start(args, fmt);
@@ -187,7 +187,7 @@ L22LINKAGE int linux_printk(const char *fmt, ...)
 
 static int do_message_print(const char *prepend, const char *fmt, va_list args)
 {
-  char print_buf1[128 + 16], print_buf2[sizeof(print_buf1)];
+  char print_buf1[164 + 16], print_buf2[sizeof(print_buf1)];
   snprintf(print_buf1, sizeof(print_buf1), "%s%s: %s", prepend, MODULE_NAME, fmt);
   vsnprintf(print_buf2, sizeof(print_buf2), print_buf1, args);
   print_buf2[sizeof(print_buf2)-1] = 0;
