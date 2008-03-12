@@ -266,21 +266,16 @@ L22LINKAGE long long linux_div64(long long dividend, long long divisor)
 #endif
 }
 
-struct L22Lock
-{
-  pthread_mutex_t mutex;
-};
-
 L22LINKAGE void rtlinux_l22_lock(struct LinuxContext *ctx)
 {
-  DEBUG_CRAZY("Locking device mutex for device %u\n", ctx->adapter_num);
-  pthread_mutex_lock(&ctx->lock->mutex);
+  DEBUG_CRAZY("Locking device spinlock for device %u\n", ctx->adapter_num);
+  rtlinux_lock(ctx->lock);
 }
 
 L22LINKAGE void rtlinux_l22_unlock(struct LinuxContext *ctx)
 {
-  DEBUG_CRAZY("Unlocking device mutex for device %u\n", ctx->adapter_num);
-  pthread_mutex_unlock(&ctx->lock->mutex);
+  DEBUG_CRAZY("Unlocking device spinlock for device %u\n", ctx->adapter_num);
+  rtlinux_unlock(ctx->lock);
 }
 
 L22LINKAGE void rtlinux_yield(void)
@@ -334,10 +329,6 @@ static struct pci_driver driver = { .name = MODULE_NAME,
 static LinuxContext dev_contexts[L22_MAX_DEVS];
 static atomic_t num_contexts = ATOMIC_INIT(0);
 static int did_register_driver = 0;
-
-
-static int createL22Lock(struct LinuxContext *);
-static void destroyL22Lock(struct LinuxContext *);
 
 struct ThreadData
 {
@@ -410,13 +401,14 @@ static int do_probe(struct pci_dev *dev, const struct pci_device_id *id)
       ERROR("Could not find a free device context to use! Too many L22 devices allocated!");
       return -ENOMEM;
   }
-  memset(ctx, 0, sizeof(*ctx));
+  memset(ctx, 0, ((char *)&ctx->is_allocated)-((char *)ctx));
   ctx->dev = dev;
   ctx->id = id;
   ctx->adapter_num = i;
 
-  if ( createL22Lock(ctx) ) {
-    ERROR("createL22Lock() failed, no memory?\n");
+  if ( !(ctx->lock = rtlinux_lock_create()) ) {
+    ctx->is_allocated =  0;
+    ERROR("creation of the L22 lock failed, no memory?\n");
     return -ENOMEM;
   }
 
@@ -504,11 +496,13 @@ static void do_remove(struct pci_dev *dev)
 
     UNLOCK_L22(ctx);
 
-    destroyL22Lock(ctx);
-
+    rtlinux_lock_destroy(ctx->lock);
+    ctx->lock = 0;
+    
     LOG_MSG("L22 device %s deactivated.\n", pci_name(dev));
-    memset(ctx, 0, sizeof(*ctx));
+    memset(ctx, 0, ((char *)&ctx->is_allocated)-(char *)ctx);
     atomic_dec(&num_contexts);
+    ctx->is_allocated = 0;
   }
 }
 
@@ -544,33 +538,13 @@ static void destroyThread(struct LinuxContext *ctx)
   DEBUG_CRAZY("destroyThread(%p)\n", ctx);
   if (ctx && ctx->td) {
     void *threadRet;
-    DEBUG_CRAZY("destroyThread() about to acquire lock...\n");
     LOCK_L22(ctx);
     atomic_set(&ctx->td->stop_flg, 1);
-    DEBUG_CRAZY("destroyThread() set stop flag, about to unlock...\n");
     UNLOCK_L22(ctx);
-    DEBUG_CRAZY("destroyThread() unlocked, about to join...\n");
     pthread_join(ctx->td->thread, &threadRet);
     kfree(ctx->td); 
     ctx->td = 0; 
     DEBUG_CRAZY("deviceThread exited after %lu cycles.\n", (unsigned long)threadRet);
-  }
-}
-
-static int createL22Lock(struct LinuxContext *ctx)
-{
-  if (!ctx) return -EINVAL;
-  ctx->lock = (struct L22Lock *)kmalloc(sizeof(*ctx->lock), GFP_KERNEL);
-  if (!ctx->lock) return -ENOMEM;
-  return pthread_mutex_init(&ctx->lock->mutex, 0);
-}
-
-static void destroyL22Lock(struct LinuxContext *ctx)
-{  
-  if (ctx->lock) {
-    pthread_mutex_destroy(&ctx->lock->mutex);
-    kfree(ctx->lock);
-    ctx->lock = 0;
   }
 }
 
@@ -758,36 +732,40 @@ L22LINKAGE void L22Close(L22Dev_t d)
   (void)d; /* do nothing.. */
 }
 
-L22LINKAGE struct RTLinux_Lock_t *rtlinux_lock_create(void)
+struct RTLinux_Lock_t
 {
-  pthread_mutex_t *ret = kmalloc(sizeof(pthread_mutex_t), GFP_KERNEL);
-  DEBUG_MSG("rtlinux_lock_create() called\n");
-  if (ret && pthread_mutex_init(ret, 0) ) {
-    /* some error.. */
-    kfree(ret);
-    ret = 0;
-  }
-  if (!ret)
-    ERROR("rtlinux_lock_create() failed to create a mutex!\n");
-  return (struct RTLinux_Lock_t *)ret;
-}
-
-L22LINKAGE void rtlinux_lock_destroy(struct RTLinux_Lock_t *l)
-{
-  DEBUG_MSG("rtlinux_lock_destroy() called\n");
-  if (!l) return;
-  pthread_mutex_destroy((pthread_mutex_t *)l);
-  kfree(l);
-}
+    spinlock_t sl;
+    unsigned long flags;
+};
 
 L22LINKAGE void rtlinux_lock(struct RTLinux_Lock_t *l)
 {
   if (!l) return;
-  pthread_mutex_lock((pthread_mutex_t *)l);
+  l->flags = rt_spin_lock_irqsave(&l->sl);
 }
 
 L22LINKAGE void rtlinux_unlock(struct RTLinux_Lock_t *l)
 {
   if (!l) return;
-  pthread_mutex_unlock((pthread_mutex_t *)l);
+  rt_spin_unlock_irqrestore(l->flags, &l->sl);
+}
+
+L22LINKAGE struct RTLinux_Lock_t *rtlinux_lock_create(void)
+{
+  struct RTLinux_Lock_t *lock;
+  lock = (struct RTLinux_Lock_t *)kmalloc(sizeof(*lock), GFP_KERNEL);
+  if (!lock) return 0;
+  spin_lock_init(&lock->sl);
+  lock->flags = 0;
+  return lock;
+}
+
+L22LINKAGE void rtlinux_lock_destroy(struct RTLinux_Lock_t *lock)
+{  
+  if (lock) {
+    if (!spin_trylock(&lock->sl)) 
+        ERROR("Destroying a spinlock for while the lock is being held! ARGH!\n");
+    memset(lock, 0, sizeof(*lock));
+    kfree(lock);
+  }
 }

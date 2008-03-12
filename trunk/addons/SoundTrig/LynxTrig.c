@@ -128,7 +128,8 @@ enum {
   ALLOC_MBUFF_CMD,
   FREE_MBUFF_CMD,
   DETACH_MBUFF_CMD,
-  ATTACH_MBUFF_CMD
+  ATTACH_MBUFF_CMD,
+  SEMPOST_CMD
 };
 static void *doCmdInRTThread(int cmd, void *arg);
 static void *doCmdInSoftThread(int cmd, void *arg);
@@ -377,7 +378,11 @@ typedef struct ShmList
     unsigned long size;
 } ShmList;
 static struct list_head shmList = LIST_HEAD_INIT(shmList);
-static pthread_mutex_t shmListMut;
+static struct ShmListLock 
+{
+    rt_spinlock_t sl;
+    unsigned long flags;
+} shmListLock;
 /** Call in any context -- rt or not -- auto-allocates shm in rt-safe manner and returns a pointer to it*/
 static void *ShmListNew(const char *name, unsigned long size);
 /** Call in any context -- rt or not -- see if a particular shm is in our list */
@@ -386,6 +391,9 @@ static void *ShmListFind(const char *name, unsigned long size);
 static void ShmListDel(void *mem);
 /** Call from module_exit -- cleans up any orphaned shms. */
 static void ShmListCleanup(void);
+/** Since I learned it's unsafe to call pthread_mutex_lock etc from linux context, we need this scheme */
+static void ShmListLock(void);
+static void ShmListUnlock(void);
         
 /*-----------------------------------------------------------------------------*/
 
@@ -394,7 +402,7 @@ int init (void)
   int retval = -ENOMEM;
   
   pthread_mutex_init(&dispatch_Mut, 0); /* do this regardles.. */
-  pthread_mutex_init(&shmListMut, 0); /* do this regardles.. */
+  rt_spin_lock_init(&shmListLock.sl);
     
 #ifdef RTAI
   DEBUG("linux prio: %x\n", rt_get_prio(rt_whoami()));
@@ -515,7 +523,7 @@ void cleanup (void)
   cleanupSems();
   cleanupSTs();
 
-  pthread_mutex_destroy(&shmListMut); 
+  rt_spin_lock_destroy(&shmListLock.sl);
   pthread_mutex_trylock(&dispatch_Mut);
   pthread_mutex_unlock(&dispatch_Mut);
   pthread_mutex_destroy(&dispatch_Mut);
@@ -883,7 +891,7 @@ static void dispatchEvent(CardID_t c, int event_id)
 
 /** Called from the function pointer in the shm, by another rt-task,
     in rt-context, to do the 'software' virtual triggering.  
-    (RatExpFSM.c knows how to call this, for example). */
+    (fsm.c knows how to call this, for example). */
 static int virtualTriggerFunction(CardID_t card, int trig)
 {
   int ret = 0;
@@ -1513,6 +1521,13 @@ static void *doEventCmd(void *arg)
   return (void *)1;
 }
 
+static void *doSemPostCmd(void *arg)
+{
+    sem_t *s = (sem_t *)arg;
+    sem_post(s);
+    return (void *)1;
+}
+
 static void *doCmdInRTThread(int cmd, void *arg)
 {
   void *(*func)(void *) = 0;
@@ -1522,6 +1537,7 @@ static void *doCmdInRTThread(int cmd, void *arg)
   case INITIALIZE: func = doResetCmd; break;
   case STOP_CMD: func = doStopCmd; break;
   case PLAY_CMD: func = doPlayCmd; break;
+  case SEMPOST_CMD: func = doSemPostCmd; break;
   default:
     ERROR("*** Internal Error *** Invalid command passed to doCmdInRTThread: %d!\n", cmd);
     return 0;
@@ -1596,8 +1612,11 @@ static void mrSoftTask(void *arg)
     struct MrSoftTaskArg *taskArg = (struct MrSoftTaskArg *)arg;
     DEBUG("mrSoftTask(%p)\n", arg);
     taskArg->ret = taskArg->func(taskArg->arg);
-    DEBUG("mrSoftTask - returning %p\n", taskArg->ret);
-    sem_post(taskArg->sem);
+    DEBUG("mrSoftTask - returning %p, posting to sem now..\n", taskArg->ret);
+    /* NB: according to paolo I can't call sem_post() from Linux context so I have to do this from
+        an rt-thread.  Ugh. */
+    doCmdInRTThread(SEMPOST_CMD, (void *)taskArg->sem);
+/*        sem_post(taskArg->sem);*/
     DEBUG("mrSoftTask gunna return\n");
 }
 
@@ -1646,6 +1665,16 @@ static void *doDetachMbuffCmd(void *arg)
     return 0;
 }
 
+static void ShmListLock(void)
+{
+    shmListLock.flags = rt_spin_lock_irqsave(&shmListLock.sl);
+}
+
+static void ShmListUnlock(void)
+{
+    rt_spin_unlock_irqrestore(shmListLock.flags, &shmListLock.sl);
+}
+
 static void *ShmListNew(const char *name, unsigned long size)
 {
     struct ShmList *entry = doCmdInSoftThread(ALLOC_KMEM_CMD, (void *)sizeof(*entry));
@@ -1665,48 +1694,50 @@ static void *ShmListNew(const char *name, unsigned long size)
     strncpy(entry->name, name, SNDNAME_SZ);
     entry->name[SNDNAME_SZ-1] = 0;
     entry->size = size;
-    pthread_mutex_lock(&shmListMut);
+    ShmListLock();
     list_add(&entry->list, &shmList);
-    pthread_mutex_unlock(&shmListMut);
+    ShmListUnlock();
     return entry->mem;
 }
-static void ShmListDel_nolock(void *mem)
+static void ShmListDel_havelock(void *mem)
 {
-    struct list_head *pos;
-    list_for_each(pos, &shmList) {
+    struct list_head *pos, *next;
+    list_for_each_safe(pos, next, &shmList) {
         struct ShmList *entry = (struct ShmList *)pos;
         if (entry->mem == mem) {
             AllocArg arg;
             arg.name = entry->name;
             arg.ptr = entry->mem;
             list_del(pos);
+            ShmListUnlock();
             doCmdInSoftThread(FREE_MBUFF_CMD, &arg);
             doCmdInSoftThread(FREE_KMEM_CMD, (void *)entry);
+            ShmListLock();
             break;
         }
     }
 }
 static void ShmListDel(void *mem)
 {
-    pthread_mutex_lock(&shmListMut);
-    ShmListDel_nolock(mem);
-    pthread_mutex_unlock(&shmListMut);
+    ShmListLock();
+    ShmListDel_havelock(mem);
+    ShmListUnlock();
 }
 static void ShmListCleanup(void)
 {
     struct list_head *pos, *next;
-    pthread_mutex_lock(&shmListMut);
+    // NB: don't lock here it will hang system.. ShmListLock();
     list_for_each_safe(pos, next, &shmList) {
         ShmList *entry = (ShmList *)pos;
-        ShmListDel_nolock(entry->mem);
+        ShmListDel(entry->mem);
     }
-    pthread_mutex_unlock(&shmListMut);
+    //ShmListUnlock();
 }
 static void *ShmListFind(const char *name, unsigned long size)
 {
     struct list_head *pos;
     void *found = 0;
-    pthread_mutex_lock(&shmListMut);
+    ShmListLock();
     list_for_each(pos, &shmList) {
         ShmList *entry = (ShmList *)pos;
         if (!strcmp(entry->name, name)) {
@@ -1716,7 +1747,7 @@ static void *ShmListFind(const char *name, unsigned long size)
             break;
         }
     }
-    pthread_mutex_unlock(&shmListMut);
+    ShmListUnlock();
     return found;
 }
 
