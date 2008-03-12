@@ -2418,6 +2418,7 @@ static void handleFifos(FSMID_t f)
       break;
         
     case FORCEOUTPUT:
+      rs[f].do_chans_cont_mask = 0;
       if (rs[f].do_chans_cont_mask) {
             unsigned forced_mask = rs[f].forced_outputs_mask;
             /* Clear previous forced outputs  */
