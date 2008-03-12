@@ -405,6 +405,15 @@ int init (void)
   rt_spin_lock_init(&shmListLock.sl);
     
 #ifdef RTAI
+  if (!rt_is_hard_timer_running()) {
+    rt_set_oneshot_mode();
+    start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
+  }
+  /* Must mark linux as using FPU because of C code startup? */
+  rt_linux_use_fpu(1);
+#endif
+
+#ifdef RTAI
   DEBUG("linux prio: %x\n", rt_get_prio(rt_whoami()));
 #endif
   if (    (retval = initSTs())
@@ -420,14 +429,6 @@ int init (void)
       cleanup();  
       return -ABS(retval);
     }
-#ifdef RTAI
-  if (!rt_is_hard_timer_running()) {
-    rt_set_oneshot_mode();
-    start_rt_timer(0); /* 0 period means what? its ok for oneshot? */
-  }
-  /* Must mark linux as using FPU because of C code startup? */
-  rt_linux_use_fpu(1);
-#endif
   
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,29)
  
