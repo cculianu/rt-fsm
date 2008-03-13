@@ -135,7 +135,7 @@ static volatile Shm *shm = 0;
 static volatile struct FSMExtTrigShm *extTrigShm = 0; /* For external triggering (sound, etc..) */
 static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch. */
 
-#define JITTER_TOLERANCE_NS 76000
+#define JITTER_TOLERANCE_NS 60000
 #define MAX_HISTORY 65536 /* The maximum number of state transitions we remember -- note that the struct StateTransition is currently 16 bytes so the memory we consume (in bytes) is this number times 16! */
 #define DEFAULT_TASK_RATE 6000
 #define DEFAULT_AI_SAMPLING_RATE 10000
@@ -143,6 +143,8 @@ static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch
 #define DEFAULT_TRIGGER_MS 1
 #define DEFAULT_AI "synch"
 #define MAX_AI_CHANS (sizeof(unsigned)*8)
+#define MAX_AO_CHANS MAX_AI_CHANS
+#define MAX_DIO_CHANS MAX_AI_CHANS
 #define MAX(a,b) ( a > b ? a : b )
 #define MIN(a,b) ( a < b ? a : b )
 static char COMEDI_DEVICE_FILE[] = "/dev/comediXXXXXXXXXXXXXXX";
@@ -264,7 +266,16 @@ static char didInitRunStates = 0;
 /* some latency and cycle time statistics */
 int64 lat_min = 0x7fffffffffffffffLL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0, 
       cyc_min = 0x7fffffffffffffffLL, cyc_max = ~0ULL, cyc_avg = 0, cyc_cur = 0;
-
+/* some AI/AO/DIO channel stats */
+volatile unsigned long 
+              ai_thresh_hi_ct[MAX_AI_CHANS],
+              ai_thresh_lo_ct[MAX_AI_CHANS],
+              ao_write_ct[MAX_AO_CHANS],
+              di_thresh_hi_ct[MAX_DIO_CHANS],
+              di_thresh_lo_ct[MAX_DIO_CHANS],
+              do_write_hi_ct[MAX_DIO_CHANS],
+              do_write_lo_ct[MAX_DIO_CHANS];
+              
 #define BILLION 1000000000
 #define MILLION 1000000
 uint64 task_period_ns = BILLION;
@@ -441,6 +452,7 @@ static void commitDIOWrites(void);
 static void grabAllDIO(void);
 static void grabAI(void); /* AI version of above.. */
 static int readAI(unsigned chan); /**< reads comedi, caches channel if need be, does converstion to volts, etc.  returns true on success or false on error */
+static int writeAO(unsigned chan, lsampl_t samp); /**< writes samp to our AO subdevice.  This is a thin wrapper around comedi_data_write that also tallyies some stats.. returns true on success */
 static int bypassDOut(unsigned f, unsigned mask);
 static void doDAQ(void); /* does the data acquisition for remaining channels that grabAI didn't get.  See STARTDAQ fifo cmd. */
 static unsigned long processSchedWaves(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
@@ -479,7 +491,7 @@ static inline void putDebugFifo(unsigned value);
 static void printStats(void);
 static void buddyTaskHandler(void *arg);
 static void buddyTaskComediHandler(void *arg);
-static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup);
+static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime_t task_period_ns);
 static void tallyCycleTime(hrtime_t t0, hrtime_t tf);
 static char *cycleStr(void);
 /*-----------------------------------------------------------------------------*/
@@ -1377,7 +1389,10 @@ static int doSanityChecksStartup(void)
     WARNING("AI settling time of %d too small!  Setting it to 1 microsecond.\n",            ai_settling_time);
     ai_settling_time = 1;
   }
-
+  /* Ergh.. this should be a compile-time thing.. */
+  if (MAX_DIO_CHANS < sizeof(unsigned)*8) {
+      ERROR("MAX_DIO_CHANS=%u is too small!  Please recompile and set it to at least the number of bits in an unsigned (%u)!\n", (unsigned)MAX_DIO_CHANS, (unsigned)sizeof(unsigned)*8);
+  }
   return ret;
 }
 
@@ -1430,6 +1445,7 @@ static int myseq_open(struct inode *i, struct file *f)
 static int myseq_show (struct seq_file *m, void *dummy)
 { 
   FSMID_t f;
+  unsigned i, ct;
   char buf[13][22];
   int bufidx = 12;
 #define BUFFMTS(s) ({ ++bufidx; bufidx %= 12; int64_to_cstr_r(buf[bufidx], sizeof(buf[bufidx]), s); buf[bufidx]; })
@@ -1451,8 +1467,97 @@ static int myseq_show (struct seq_file *m, void *dummy)
              BUFFMTS(lat_cur), BUFFMTS(lat_avg), BUFFMTS(lat_min), BUFFMTS(lat_max),
              BUFFMTS(cyc_cur), BUFFMTS(cyc_avg), BUFFMTS(cyc_min), BUFFMTS(cyc_max));
 
+  seq_printf(m,
+             "Data Read/Write Stats\n"
+             "---------------------\n");
+  seq_printf(m,
+             "AI Threshold Crossing (+) Counts: ");   
+  for (i = 0, ct = 0; i < NUM_AI_CHANS; ++i) {
+      if (ai_thresh_hi_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "AI%02u: %04lu ", i, ai_thresh_hi_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+  
+  seq_printf(m,
+             "AI Threshold Crossing (-) Counts: ");   
+  for (i = 0, ct = 0; i < NUM_AI_CHANS; ++i) {
+      if (ai_thresh_lo_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "AI%02u: %04lu ", i, ai_thresh_lo_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+  
+  seq_printf(m,
+             "DI Threshold Crossing (+) Counts: ");   
+  for (i = 0, ct = 0; i < NUM_DIO_CHANS; ++i) {
+      if (di_thresh_hi_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "DI%02u: %04lu ", i, di_thresh_hi_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+  
+  seq_printf(m,
+             "DI Threshold Crossing (-) Counts: ");   
+  for (i = 0, ct = 0; i < NUM_DIO_CHANS; ++i) {
+      if (di_thresh_lo_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "DI%02u: %04lu ", i, di_thresh_lo_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+  
+  seq_printf(m,
+             "AO Write Counts: ");   
+  for (i = 0, ct = 0; i < NUM_AO_CHANS; ++i) {
+      if (ao_write_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "AO%02u: %04lu ", i, ao_write_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+             
+  seq_printf(m,
+             "DO Write Logical 1 Counts: ");   
+  for (i = 0, ct = 0; i < NUM_DIO_CHANS; ++i) {
+      if (do_write_hi_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "DO%02u: %04lu ", i, do_write_hi_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+  
+  seq_printf(m,
+             "DO Write Logical 0 Counts: ");   
+  for (i = 0, ct = 0; i < NUM_DIO_CHANS; ++i) {
+      if (do_write_lo_ct[i]) {
+        if (!(ct%5)) seq_printf(m, "\n\t"); /* newline every 5th chan */
+        seq_printf(m, "DO%02u: %04lu ", i, do_write_lo_ct[i]);
+        ++ct;
+      }
+  }
+  if(ct) seq_printf(m, "\n");
+  else seq_printf(m, "(None Yet..)\n");
+  
+  seq_printf(m, "\n");
+
   if (AI_MODE == ASYNCH_MODE) {
-    seq_printf(m,
+    seq_printf(m, 
                "AI Asynch Info\n"
                "--------------\n"
                "NumSkips: %lu\t"  "NumScansSkipped: %lu\t"  "NumAIOverflows: %lu\n\n",
@@ -1629,7 +1734,7 @@ static void *doFSM (void *arg)
     ++cycle;
     
     /* see if we woke up jittery/late.. */
-    tallyJitterStats(cycleT0, timespec_to_nano(&next_task_wakeup));
+    tallyJitterStats(cycleT0, timespec_to_nano(&next_task_wakeup), task_period_ns);
     
     for (f = 0; f < NUM_STATE_MACHINES; ++f) {
       if (lastTriggers && triggersExpired(f)) 
@@ -2082,21 +2187,27 @@ static unsigned long detectInputEvents(FSMID_t f)
 {
   unsigned i, bits, bits_prev, try_use_embc_thresh = 0;
   unsigned long events = 0;
+  volatile unsigned long *thresh_hi_ct = 0, *thresh_lo_ct = 0;
   
   switch(IN_CHAN_TYPE(f)) { 
   case DIO_TYPE: /* DIO input */
     bits = dio_bits;
     bits_prev = dio_bits_prev;
+    thresh_hi_ct = di_thresh_hi_ct;
+    thresh_lo_ct = di_thresh_lo_ct;
     try_use_embc_thresh = 0;
     break;
   case AI_TYPE: /* AI input */
     bits = ai_bits;
     bits_prev = ai_bits_prev;
+    thresh_hi_ct = ai_thresh_hi_ct;
+    thresh_lo_ct = ai_thresh_lo_ct;
     try_use_embc_thresh = 1;
     break;
   default:  
-    /* Should not be reached, here to suppress warnings. */
-    bits = bits_prev = 0; 
+    /* Should not be reached, here to suppress warnings and avoid possible NULL ptr? */
+    ERROR_INT("Illegal IN_CHAN_TYPE for fsm %u -- THIS SHOULD NEVER HAPPEN!!\n", (unsigned)f);
+    return 0;
     break;
   }
   
@@ -2117,16 +2228,22 @@ static unsigned long detectInputEvents(FSMID_t f)
         else if (ISNEGATIVE(ret)) bit = 0;
         else bit = last_bit; /* NEUTRAL condition */
     }
-    
     /* Edge-up transitions */ 
-    if (event_id_edge_up > -1 && bit && !last_bit) /* before we were below, now we are above,  therefore yes, it is an blah-IN */
+    if (event_id_edge_up > -1 && bit && !last_bit) {
+      /* before we were below, now we are above,  therefore yes, it is an blah-IN */
       events |= 0x1 << event_id_edge_up; 
+       ++thresh_hi_ct[i]; /* tally this thresh crossing 
+                         -- writes to either globals: ai_thresh_hi_ct or di_thresh_lo_ct */
+    }
+
     
     /* Edge-down transitions */ 
     if (event_id_edge_down > -1 /* input event is actually routed somewhere */
         && last_bit /* Last time we were above */
-        && !bit ) /* Now we are below, therefore yes, it is event*/
+        && !bit ) {/* Now we are below, therefore yes, it is event*/
       events |= 0x1 << event_id_edge_down; /* Return the event id */		   
+      ++thresh_lo_ct[i]; /* tally this thresh crossing, either writes to ai_thresh_lo_ct or di_thresh_lo_ct*/
+    }
   }
   return events; 
 }
@@ -2543,33 +2660,45 @@ static inline void dataWrite(unsigned chan, unsigned bit)
     ERROR_INT("Got write request for a channel (%u) that is not in the do_chans_in_use_mask (%x)!  FIXME!\n", chan, do_chans_in_use_mask);
     return;
   }
+  
   pending_output_mask |= bitpos;
-  if (bit) /* set bit.. */
+  if (bit) { /* set bit.. */
     pending_output_bits |= bitpos;
-  else /* clear bit.. */
+  } else {/* clear bit.. */
     pending_output_bits &= ~bitpos;
+  }
 }
 
 static void commitDIOWrites(void)
 {
   hrtime_t dio_ts = 0, dio_te = 0;
   FSMID_t f;
-  unsigned dbg_output_bits;
+  static unsigned output_bits = 0, prev_output_bits = 0;
   
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
     /* Override with the 'forced' bits. */
     pending_output_mask |= rs[f].forced_outputs_mask;
     pending_output_bits |= rs[f].forced_outputs_mask;
   }
-  dbg_output_bits = pending_output_bits&pending_output_mask;
+  output_bits = pending_output_bits&pending_output_mask;
    
   if (debug > 2)  dio_ts = gethrtime();
-  if (dev) comedi_dio_bitfield(dev, subdev, pending_output_mask, &pending_output_bits);
+  if (dev && pending_output_mask) comedi_dio_bitfield(dev, subdev, pending_output_mask, &pending_output_bits);
   if (debug > 2)  dio_te = gethrtime();
     
   if(debug > 2)
-    DEBUG("WRITES: dio_out mask: %x bits: %x for cycle %s took %u ns\n", pending_output_mask, dbg_output_bits, uint64_to_cstr(cycle), (unsigned)(dio_te - dio_ts));
+    DEBUG("WRITES: dio_out mask: %x bits: %x for cycle %s took %u ns\n", pending_output_mask, output_bits, uint64_to_cstr(cycle), (unsigned)(dio_te - dio_ts));
 
+  /** Tally stats do_write_*_ct stats.. only tallied if bit changed */
+  while (pending_output_mask) {
+      unsigned bit = __ffs(pending_output_mask), mask = 0x1<<bit, val = output_bits&mask, prev_val = prev_output_bits&mask;
+      if ( val != prev_val ) { /* test if bit changed.. */
+          if (val) { ++do_write_hi_ct[bit]; prev_output_bits |= mask; }
+          else     { ++do_write_lo_ct[bit]; prev_output_bits &= ~mask; }
+      }
+      pending_output_mask &= ~mask; /* clear bit */
+  }
+  
   pending_output_bits = 0;
   pending_output_mask = 0;
 }
@@ -2675,6 +2804,15 @@ static int readAI(unsigned chan)
     }
 
     return 1;
+}
+/** writes samp to our AO subdevice.  This is a thin wrapper around comedi_data_write that also tallyies some stats.. */
+static int writeAO(unsigned chan, lsampl_t samp)
+{ 
+    int ret;
+    if (chan >= NUM_AO_CHANS) return 0;
+    ret = comedi_data_write(dev_ao, subdev_ao, chan, ao_range, 0, samp);
+    if (ret > 0 && chan < MAX_AO_CHANS) ++ao_write_ct[chan];
+    return ret > 0;
 }
 
 static void doDAQ(void)
@@ -2960,10 +3098,8 @@ static unsigned long processSchedWavesAO(FSMID_t f)
     if (w->cur >= w->nsamples && w->loop) w->cur = 0;
     if (w->cur < w->nsamples) {
       int evt_col = w->evt_cols[w->cur];
-      if (dev_ao && w->aoline < NUM_AO_CHANS) {
-        lsampl_t samp = w->samples[w->cur];
-        comedi_data_write(dev_ao, subdev_ao, w->aoline, ao_range, 0, samp);
-      }
+      lsampl_t samp = w->samples[w->cur];
+      writeAO(w->aoline, samp); /* NB this function does checking to make sure data write is sane */
       if (evt_col > -1 && evt_col <= NUM_IN_EVT_COLS(f))
         wave_events |= 0x1 << evt_col;
       w->cur++;
@@ -3050,9 +3186,9 @@ static void scheduleWaveAO(FSMID_t f, unsigned wave_id, int op)
         return;  
     }
     rs[f].active_ao_wave_mask &= ~(0x1<<wave_id); /* clear the bit, disable */
-    if (dev_ao && w->nsamples && w->aoline < NUM_AO_CHANS)
+    if (w->nsamples)
       /* write 0 on wave stop */
-      comedi_data_write(dev_ao, subdev_ao, w->aoline, ao_range, 0, ao_0V_sample);
+        writeAO(w->aoline, ao_0V_sample);
     w->cur = 0;
   }
 }
@@ -3391,8 +3527,7 @@ static double emblib_readAI(unsigned chan)
 }
 static int emblib_writeAO(unsigned chan, double volts)
 {
-    int ret = comedi_data_write(dev_ao, subdev_ao, chan, ao_range, 0, VOLTS_TO_SAMPLE_AO(volts)); 
-    return ret == 1;
+    return writeAO(chan, VOLTS_TO_SAMPLE_AO(volts));
 }
 static int emblib_readDIO(unsigned chan)
 {
@@ -3538,7 +3673,7 @@ static void  doSetupThatNeededFloatingPoint(void)
   
   for (i = 0; i < nchans; ++i) 
     /* initialize all AO chans to 0V */
-    comedi_data_write(dev_ao, subdev_ao, i, ao_range, 0, ao_0V_sample); 
+    writeAO(i, ao_0V_sample);
   
   ai_range_min_v = ((double)ai_krange.min) * 1e-6;
   ai_range_max_v = ((double)ai_krange.max) * 1e-6;
@@ -3547,15 +3682,17 @@ static void  doSetupThatNeededFloatingPoint(void)
       ai_samples_volts[i] = 0.0;
 }
 
-static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup)
+static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime_t task_period_ns)
 {
    hrtime_t quot;
    const int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
    
    lat_cur = real_wakeup - ideal_wakeup; 
    
-   /* see if we woke up jittery/late.. */
-    if ( ABS(lat_cur) > JITTER_TOLERANCE_NS ) {
+   /* see if we woke up jittery/late.. if latency is > JITTER_TOLERANCE_NS *and* it's > 10% our task cycle.
+      The second requirement is to avoid stupid reporting when the task cycle is like really large, 
+      like on the order of ms*/
+    if ( ABS(lat_cur) > JITTER_TOLERANCE_NS && ABS(lat_cur)*10 >= task_period_ns) {
       ++fsm_wakeup_jittered_ct;
       WARNING("Jittery wakeup! Magnitude: %s ns (cycle #%s)\n", int64_to_cstr(lat_cur), cycleStr());
     }
