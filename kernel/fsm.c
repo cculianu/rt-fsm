@@ -441,6 +441,7 @@ static void commitDIOWrites(void);
 static void grabAllDIO(void);
 static void grabAI(void); /* AI version of above.. */
 static int readAI(unsigned chan); /**< reads comedi, caches channel if need be, does converstion to volts, etc.  returns true on success or false on error */
+static int bypassDOut(unsigned f, unsigned mask);
 static void doDAQ(void); /* does the data acquisition for remaining channels that grabAI didn't get.  See STARTDAQ fifo cmd. */
 static unsigned long processSchedWaves(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
 static unsigned long processSchedWavesAO(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
@@ -1934,6 +1935,26 @@ static int gotoState(FSMID_t f, unsigned state, int event_id)
   return 0; /* Not reached.. */
 }
 
+static int bypassDOut(unsigned f, unsigned mask)
+{
+    unsigned prev_forced_mask = rs[f].forced_outputs_mask;
+    int ret = 0;
+    
+    /* Clear previous forced outputs  */
+    while (prev_forced_mask) {
+        unsigned chan = __ffs(prev_forced_mask);
+        prev_forced_mask &= ~(0x1<<chan);
+        dataWrite(chan, 0);
+        ret = 1;
+    }
+    rs[f].forced_outputs_mask = 0;
+    if (rs[f].do_chans_cont_mask) {
+        rs[f].forced_outputs_mask = (mask << __ffs(rs[f].do_chans_cont_mask)) & rs[f].do_chans_cont_mask;
+        ret = 1;
+    }
+    return ret;
+}
+
 static void doNRTOutput(FSMID_t f, unsigned type, unsigned col, int trig, const char *host, unsigned short port, const void *data, unsigned datalen)
 {
     static struct NRTOutput nrt_out;
@@ -2419,7 +2440,7 @@ static void handleFifos(FSMID_t f)
       break;
         
     case FORCEOUTPUT:
-      emblib_bypassDOut(f, msg->u.forced_outputs);
+      bypassDOut(f, msg->u.forced_outputs);
       do_reply = 1;
       break;
 
@@ -3392,19 +3413,7 @@ static int emblib_writeDIO(unsigned chan, unsigned val)
 }
 static int emblib_bypassDOut(unsigned f, unsigned mask)
 {
-    rs[f].forced_outputs_mask = 0;
-    if (rs[f].do_chans_cont_mask) {
-        unsigned forced_mask = rs[f].forced_outputs_mask;
-        /* Clear previous forced outputs  */
-        while (forced_mask) {
-            unsigned chan = __ffs(forced_mask);
-            forced_mask &= ~(0x1<<chan);
-            dataWrite(chan, 0);
-        }
-        rs[f].forced_outputs_mask = (mask << __ffs(rs[f].do_chans_cont_mask)) & rs[f].do_chans_cont_mask;
-        return 1;
-    }
-    return 0;
+    return bypassDOut(f, mask);
 }
 
 static int emblib_gotoState(uint fsm, unsigned state, int eventid)
