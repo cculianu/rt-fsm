@@ -3746,18 +3746,18 @@ static void tallyCycleTime(hrtime_t cycleT0, hrtime_t cycleTf)
 
 static void do_dio_bitfield(unsigned chan_mask_in, unsigned *bits_in)
 {
-    unsigned chan_mask, bits, i, chans_done = 0;
+    unsigned chan_mask, bits, i, chans_done = 0, n_chans;
     int ret;
     
     for (i = 0; i < NUM_DIO_SUBDEVS && chans_done < NUM_DIO_CHANS; ++i) {
-        unsigned n_chans =  n_chans_dio[i];
+        n_chans =  n_chans_dio[i];
         chan_mask = (chan_mask_in>>chans_done) & ((0x1<<n_chans)-1);
         bits = (*bits_in >> chans_done) & ((0x1<<n_chans)-1);
         DEBUG_CRAZY("comedi_dio_bitfield(dev, %u, %x, %x) = ", subdev[i], chan_mask, bits);
         ret = comedi_dio_bitfield(dev, subdev[i], chan_mask, &bits);
         if (debug > 2) rt_printk("%d\n", ret);
         *bits_in &= ~((0x1<<n_chans)-1) << chans_done; /* clear output bits */
-        *bits_in &= (bits & ((0x1<<n_chans)-1)) << chans_done; /* set them from comedi_dio_bitfield cmd */
+        *bits_in |= (bits & ((0x1<<n_chans)-1)) << chans_done; /* set them from comedi_dio_bitfield cmd */
         chans_done += n_chans;
     }
 }
