@@ -80,6 +80,8 @@ static __inline__ int __ffs(int x) { return ffs(x)-1; }
 #define ERROR(x...) rt_printk(KERN_ERR MODULE_NAME": ERROR - " x)
 #define ERROR_INT(x... ) rt_printk(KERN_CRIT MODULE_NAME": INTERNAL ERROR - " x)
 #define DEBUG(x... ) do { if (debug) rt_printk(KERN_DEBUG MODULE_NAME": DEBUG - " x); } while (0)
+#define DEBUG_VERB(x... ) do { if (debug > 1) rt_printk(KERN_DEBUG MODULE_NAME": DEBUG VERB - " x); } while (0)
+#define DEBUG_CRAZY(x...) do { if (debug > 2) rt_printk(KERN_DEBUG MODULE_NAME": DEBUG CRAZY - " x); } while (0)
 
 #undef RESET /* make *sure* RTAI's stupid RESET define is gone! */
 
@@ -145,6 +147,7 @@ static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch
 #define MAX_AI_CHANS (sizeof(unsigned)*8)
 #define MAX_AO_CHANS MAX_AI_CHANS
 #define MAX_DIO_CHANS MAX_AI_CHANS
+#define MAX_DIO_SUBDEVS 4
 #define MAX(a,b) ( a > b ? a : b )
 #define MIN(a,b) ( a < b ? a : b )
 static char COMEDI_DEVICE_FILE[] = "/dev/comediXXXXXXXXXXXXXXX";
@@ -187,7 +190,8 @@ MODULE_PARM_DESC(ai, "This can either be \"synch\" or \"asynch\" to determine wh
 #define AFTER_LAST_IN_CHAN(f) (FIRST_IN_CHAN(f)+NUM_IN_CHANS(f))
 #define NUM_AI_CHANS ((const unsigned)n_chans_ai_subdev)
 #define NUM_AO_CHANS ((const unsigned)n_chans_ao_subdev)
-#define NUM_DIO_CHANS ((const unsigned)n_chans_dio_subdev)
+#define NUM_DIO_CHANS ((const unsigned)n_chans_dio_total)
+#define NUM_DIO_SUBDEVS ((const unsigned)n_dio_subdevs)
 #define READY_FOR_TRIAL_JUMPSTATE(f) (rs[(f)].states->ready_for_trial_jumpstate)
 #define NUM_INPUT_EVENTS(f)  (rs[(f)].states->routing.num_evt_cols)
 #define NUM_IN_EVT_CHANS(f) (NUM_IN_CHANS(f))
@@ -233,7 +237,7 @@ static struct SoftTask *buddyTask[NUM_STATE_MACHINES] = {0}, /* non-RT kernel-si
                        *buddyTaskComedi = 0;
 static pthread_t rt_task_handle;
 static comedi_t *dev = 0, *dev_ai = 0, *dev_ao = 0;
-static unsigned subdev = 0, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0;
+static unsigned subdev[MAX_DIO_SUBDEVS] = {0}, subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_dio[MAX_DIO_SUBDEVS] = {0}, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0, n_dio_subdevs = 0, n_chans_dio_total = 0;
 
 static unsigned long fsm_cycle_long_ct = 0, fsm_wakeup_jittered_ct = 0, fsm_cycles_skipped = 0;
 static unsigned long ai_n_overflows = 0;
@@ -442,6 +446,8 @@ static int doSanityChecksStartup(void); /**< Checks mod params are sane. */
 static int doSanityChecksRuntime(FSMID_t); /**< Checks FSM input/output params */
 static void doSetupThatNeededFloatingPoint(void);
 
+static void do_dio_bitfield(unsigned, unsigned *);
+static int  do_dio_config(unsigned chan, int mode);
 static void doOutput(FSMID_t);
 static void clearAllOutputLines(FSMID_t);
 static inline void clearTriggerLines(FSMID_t);
@@ -569,7 +575,9 @@ void cleanup (void)
   buddyTaskComedi = 0;
 
   if (dev) {
-    comedi_unlock(dev, subdev);
+    unsigned sd;
+    for (sd = 0; sd < NUM_DIO_SUBDEVS; ++sd)
+        comedi_unlock(dev, subdev[sd]);
     comedi_close(dev);
     dev = 0;
   }
@@ -795,23 +803,31 @@ static int initComedi(void)
       return -EINVAL/*comedi_errno()*/;
     }
 
-    sd = comedi_find_subdevice_by_type(dev, COMEDI_SUBD_DIO, 0);    
-    if (sd < 0 || (n_chans = comedi_get_n_channels(dev, sd)) <= 0) {
+    for (sd = -1, n_dio_subdevs = 0; n_dio_subdevs < MAX_DIO_SUBDEVS; ++n_dio_subdevs) {
+        sd = comedi_find_subdevice_by_type(dev, COMEDI_SUBD_DIO, sd+1);    
+        if (sd >= 0 
+            && (n_chans = comedi_get_n_channels(dev, sd)) > 0
+            && n_chans + n_chans_dio_total <= MAX_DIO_CHANS) {
+            n_chans_dio[n_dio_subdevs] = n_chans;
+            subdev[n_dio_subdevs] = sd;
+            n_chans_dio_total += n_chans;
+        } else
+            break; /* so that n_dio_subdevs doesn't get incremented */
+    }
+    if (NUM_DIO_SUBDEVS == 0) {
       WARNING("No DIO subdevice found for %s.\n", COMEDI_DEVICE_FILE);
       comedi_close(dev);
-      n_chans = 0;
       dev = 0;
-      sd = -1;
-
       /*return -ENODEV;*/
     }
 
-    subdev = sd;
-    n_chans_dio_subdev = n_chans;
-    if (dev) comedi_lock(dev, subdev);
+    if (dev) {
+        for (sd = 0; sd < (int)NUM_DIO_SUBDEVS; ++sd)
+            comedi_lock(dev, subdev[sd]);
+    }
   }
 
-  DEBUG("COMEDI: n_chans DIO /dev/comedi%d = %u\n", minordev, n_chans);  
+  DEBUG("COMEDI: n_chans DIO /dev/comedi%d = %u in %u subdevs\n", minordev, NUM_DIO_CHANS, NUM_DIO_SUBDEVS);  
 
   reconfigureIO();
 
@@ -885,7 +901,7 @@ static void reconfigureIO(void)
       old_mode = (i < FSM_MAX_IN_CHANS) ? &old_modes[i] : 0;
       if (old_mode && *old_mode == mode) continue; /* don't redundantly configure.. */
       ++reconf_ct;
-      if ( !dev || comedi_dio_config(dev, subdev, i, mode) != 1 )
+      if ( !dev || do_dio_config(i, mode) != 1 )
         WARNING("comedi_dio_config returned error for channel %u mode %d\n", i, (int)mode);
       
       DEBUG("COMEDI: comedi_dio_config %u %d\n", i, (int)mode);
@@ -1108,7 +1124,7 @@ static inline unsigned long transferCircBuffer(void *dest,
     unsigned long n = bytes;
     if ( offset + n > bufsize) { 
       /* buffer wrap-around condition.. */
-      if (debug > 1) DEBUG("transferCircBuffer: buffer wrapped around!\n");
+      DEBUG_VERB("transferCircBuffer: buffer wrapped around!\n");
       n = bufsize - offset;
     }
     if (!n) {
@@ -1116,7 +1132,7 @@ static inline unsigned long transferCircBuffer(void *dest,
       continue;
     }
     memcpy(d + nread, s + offset, n);
-    if (debug > 1) DEBUG("transferCircBuffer: copied %lu bytes!\n", n);
+    DEBUG_VERB("transferCircBuffer: copied %lu bytes!\n", n);
     bytes -= n;
     offset += n;
     nread += n;
@@ -1153,8 +1169,7 @@ static int comediCallback(unsigned int mask, void *ignored)
     return 0;
   }
   if (mask & COMEDI_CB_BLOCK) {
-    if (debug > 2) 
-        DEBUG("comediCallback: got COMEDI_CB_BLOCK at abs. time %s.\n", timeBuf);
+        DEBUG_CRAZY("comediCallback: got COMEDI_CB_BLOCK at abs. time %s.\n", timeBuf);
   }
   if (mask & COMEDI_CB_EOS) {
     /* This is what we want.. EOS. Now copy scans from the comedi driver 
@@ -1168,11 +1183,10 @@ static int comediCallback(unsigned int mask, void *ignored)
                           % ai_asynch_buffer_size;
     char *buf = (char *)ai_asynch_buf;
 
-    if (debug > 2) 
-      DEBUG("comediCallback: got COMEDI_CB_EOS at abs. time %s, with %d bytes (offset: %d) of data.\n", timeBuf, numBytes, offset);
+    DEBUG_CRAZY("comediCallback: got COMEDI_CB_EOS at abs. time %s, with %d bytes (offset: %d) of data.\n", timeBuf, numBytes, offset);
     
     if (numScans > 1) {
-      if (debug > 2) DEBUG("COMEDI_CB_EOS with more than one scan's data:  Expected %d, got %d.\n", oneScanBytes, numBytes);
+      DEBUG_CRAZY("COMEDI_CB_EOS with more than one scan's data:  Expected %d, got %d.\n", oneScanBytes, numBytes);
       cb_eos_skips++;
       cb_eos_skipped_scans += numScans-1;
     } else if (numScans <= 0) {
@@ -1798,7 +1812,7 @@ static void *doFSM (void *arg)
               char buf[22];
               strncpy(buf, uint64_to_cstr(rs[f].current_ts), 21);
               buf[21] = 0;
-              DEBUG("timer expired in state %u t_us: %u timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
+              DEBUG_VERB("timer expired in state %u t_us: %u timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
             }
             
           }
@@ -1812,9 +1826,7 @@ static void *doFSM (void *arg)
              as part of the forced_event stuff in this function above.  */
           events_bits |= detectInputEvents(f);   
           
-          if (debug >= 2) {
-            DEBUG("FSM %u Got input events mask %08x\n", f, events_bits);
-          }
+          DEBUG_VERB("FSM %u Got input events mask %08x\n", f, events_bits);
           
           /* Process the scheduled waves by checking if any of their components
              expired.  For scheduled waves that result in an input event
@@ -1822,18 +1834,14 @@ static void *doFSM (void *arg)
              as a bitfield array.  */
           events_bits |= processSchedWaves(f);
           
-          if (debug >= 2) {
-            DEBUG("FSM %u After processSchedWaves(), got input events mask %08x\n", f, events_bits);
-          }
+          DEBUG_VERB("FSM %u After processSchedWaves(), got input events mask %08x\n", f, events_bits);
           
           /* Process the scheduled AO waves -- do analog output for
              samples this cycle.  If there's an event id for the samples
              outputted, will get a mask of event ids.  */
           events_bits |= processSchedWavesAO(f);
           
-          if (debug >= 2) {
-            DEBUG("FSM %u After processSchedWavesAO(), got input events mask %08x\n", f, events_bits);
-          }
+          DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08x\n", f, events_bits);
           
         }
         
@@ -1967,7 +1975,7 @@ static inline void logItemPush(FSMID_t f, const char *n, double v)
 
 static int gotoState(FSMID_t f, unsigned state, int event_id)
 {
-  if (debug > 1) DEBUG("gotoState %u %u %d s: %u\n", f, state, event_id, rs[f].current_state);
+  DEBUG_VERB("gotoState %u %u %d s: %u\n", f, state, event_id, rs[f].current_state);
 
   if (state >= NUM_ROWS(f)) {
     ERROR_INT("FSM %u state id %d is >= NUM_ROWS %d!\n", f, (int)state, (int)NUM_ROWS(f));
@@ -2683,11 +2691,10 @@ static void commitDIOWrites(void)
   output_bits = pending_output_bits&pending_output_mask;
    
   if (debug > 2)  dio_ts = gethrtime();
-  if (dev && pending_output_mask) comedi_dio_bitfield(dev, subdev, pending_output_mask, &pending_output_bits);
+  if (dev && pending_output_mask) do_dio_bitfield(pending_output_mask, &pending_output_bits);
   if (debug > 2)  dio_te = gethrtime();
     
-  if(debug > 2)
-    DEBUG("WRITES: dio_out mask: %x bits: %x for cycle %s took %u ns\n", pending_output_mask, output_bits, uint64_to_cstr(cycle), (unsigned)(dio_te - dio_ts));
+  DEBUG_CRAZY("WRITES: dio_out mask: %x bits: %x for cycle %s took %u ns\n", pending_output_mask, output_bits, uint64_to_cstr(cycle), (unsigned)(dio_te - dio_ts));
 
   /** Tally stats do_write_*_ct stats.. only tallied if bit changed */
   while (pending_output_mask) {
@@ -2708,11 +2715,11 @@ static void grabAllDIO(void)
   /* Remember previous bits */
   dio_bits_prev = dio_bits;
   /* Grab all the input channels at once */
-  if (dev) comedi_dio_bitfield(dev, subdev, 0, (unsigned int *)&dio_bits);
+  if (dev) do_dio_bitfield(0, &dio_bits);
   dio_bits = dio_bits & di_chans_in_use_mask;
   /* Debugging comedi reads.. */
   if (dio_bits && ullmod(cycle, task_rate) == 0 && debug > 1)
-    DEBUG("READS 0x%x\n", dio_bits);
+    DEBUG_VERB("READS 0x%x\n", dio_bits);
 }
 
 static void grabAI(void)
@@ -2996,13 +3003,13 @@ static inline long Micro2Sec(long long micro, unsigned long *remainder)
 
 static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig)
 {
-  if (debug > 1) DEBUG("Virtual Trigger %d unset for target %u\n", trig, which); 
+  DEBUG_VERB("Virtual Trigger %d unset for target %u\n", trig, which); 
   FSM_EXT_UNTRIG(extTrigShm, which, trig); 
 }
 
 static inline void SET_EXT_TRIG(unsigned which, unsigned trig)
 {
-  if (debug > 1) DEBUG("Virtual Trigger %d set for target %u\n", trig, which); 
+  DEBUG_VERB("Virtual Trigger %d set for target %u\n", trig, which); 
   FSM_EXT_TRIG(extTrigShm, which, trig); 
 }
 
@@ -3733,4 +3740,41 @@ static void tallyCycleTime(hrtime_t cycleT0, hrtime_t cycleTf)
     quot += cyc_cur;
     do_div(quot, n);
     cyc_avg = quot;
+}
+
+
+
+static void do_dio_bitfield(unsigned chan_mask_in, unsigned *bits_in)
+{
+    unsigned chan_mask, bits, i, chans_done = 0;
+    int ret;
+    
+    for (i = 0; i < NUM_DIO_SUBDEVS && chans_done < NUM_DIO_CHANS; ++i) {
+        unsigned n_chans =  n_chans_dio[i];
+        chan_mask = (chan_mask_in>>chans_done) & ((0x1<<n_chans)-1);
+        bits = (*bits_in >> chans_done) & ((0x1<<n_chans)-1);
+        DEBUG_CRAZY("comedi_dio_bitfield(dev, %u, %x, %x) = ", subdev[i], chan_mask, bits);
+        ret = comedi_dio_bitfield(dev, subdev[i], chan_mask, &bits);
+        if (debug > 2) rt_printk("%d\n", ret);
+        *bits_in &= ~((0x1<<n_chans)-1) << chans_done; /* clear output bits */
+        *bits_in &= (bits & ((0x1<<n_chans)-1)) << chans_done; /* set them from comedi_dio_bitfield cmd */
+        chans_done += n_chans;
+    }
+}
+
+static int do_dio_config(unsigned chan, int mode)
+{
+    unsigned i;
+    
+    for (i = 0; i < NUM_DIO_SUBDEVS; ++i) {
+        if (chan < n_chans_dio[i]) {
+            int ret;
+            DEBUG_CRAZY("comedi_dio_config(dev, %u, %x, %x) = ", subdev[i], chan, mode);
+            ret = comedi_dio_config(dev, subdev[i], chan, mode);
+            if (debug > 2) rt_printk("%d\n", ret);
+            return ret;
+        }
+        chan -= n_chans_dio[i];
+    }
+    return 0;
 }
