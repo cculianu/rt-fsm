@@ -250,6 +250,22 @@
 %   extern int forceJumpToState(unsigned state, int event_id_for_history);
 %  
 %   /*------------------------
+%    C Library Functions
+%    ------------------------*/
+% extern void *memset(void *, int c, unsigned long);
+% extern void *memcpy(void *, const void *, unsigned long);
+% extern unsigned long strlen(const char *s);
+% extern int strcmp(const char *, const char *);
+% extern int strncmp(const char *, const char *, unsigned long);
+% extern int strcasecmp(const char *, const char *);
+% extern int strncasecmp(const char *, const char *, unsigned long);
+% extern char *strchr(const char *, int);
+% extern char *strnchr(const char *, unsigned long, int);
+% extern char *strstr(const char *, const char *);
+% extern char *strcat(char *, const char *);
+% extern char *strncat(char *, const char *, unsigned long);
+%
+%   /*------------------------
 %    LOW LEVEL I/O FUNCTONS 
 %    ------------------------*/
 %  
@@ -344,13 +360,39 @@
 %
 %   // logs a single value
 %   extern void logValue(const char *varname, double val);
+%
 %   // logs an entire array of num_elems size.  Each element of the array creates a separate timestamp, name, value record in the log.
 %   extern void logArray(const char *varname, const double *array, uint num_elems);
+%
+%   /// get the number of items currently in the log, or 0 if empty
+%   extern unsigned logGetSize(void);
+% 
+%   #define EMBC_LOG_NAME_SZ 33
+%   struct EmbCLogItem
+%   {
+%       double ts; /**< timestamp in seconds */
+%       char name[EMBC_LOG_NAME_SZ];
+%       double value;
+%   };
+% 
+%   typedef struct EmbCLogItem EmbCLogItem;
+%
+%   /// retrieve a specific item from the variable log.  May return a bogus item if 'pos' is >= logGetSize().
+%   extern const EmbCLogItem *logGetAt(unsigned pos);
+%
+%   /// get the most recently logged item
+%   extern const EmbCLogItem *logTop(void);
+% 
+%   /// searches for an item named 'name', but only searches the last 'lastNToSearch' log items.  Returns a dummy  with an empty name and 0 value if not found!!
+%   extern const EmbCLogItem *logFindLastN(const char *name, unsigned lastNToSearch);
+%
+%   /// searches the entire log for a specific item named 'name'.  Returns a dummy if not found!!
+%   extern const EmbCLogItem *logFind(const char *name);
 %
 %   // prints a message (most likely to the kernel log buffer)
 %   extern int printf(const char *format, ...);
 %
-%   // print formatted to a string 
+%   // print formatted to a string buffer
 %   extern int snprintf(char *buf, unsigned long bufsz, const char *format, ...);
 %
 %
