@@ -509,6 +509,9 @@ static double emblib_rand(void);
 static double emblib_randNormalized(void);
 static void emblib_logValue(unsigned, const char *, double);
 static void emblib_logArray(unsigned, const char *, const double *, unsigned n);
+static unsigned emblib_logGetSize(unsigned);
+static const EmbCLogItem * emblib_logGetAt(unsigned, unsigned);
+static const EmbCLogItem * emblib_logFind(unsigned, const char *, unsigned);
 static double emblib_readAI(unsigned);
 static int emblib_writeAO(unsigned,double);
 static int emblib_readDIO(unsigned);
@@ -3412,6 +3415,9 @@ static void fsmLinkProgram(FSMID_t f, struct EmbC *embc)
   embc->randNormalized = &emblib_randNormalized;
   embc->logValue = &emblib_logValue;
   embc->logArray = &emblib_logArray;
+  embc->logGetAt = &emblib_logGetAt;
+  embc->logFind = &emblib_logFind;
+  embc->logGetSize = &emblib_logGetSize;
   embc->readAI = &emblib_readAI;
   embc->writeAO = &emblib_writeAO;
   embc->readDIO = &emblib_readDIO;
@@ -3522,6 +3528,31 @@ static void emblib_logArray(unsigned f, const char *nam, const double *v, unsign
       ++i;
     }
   }
+}
+static unsigned emblib_logGetSize(unsigned f)
+{
+    if (f < NUM_STATE_MACHINES)
+        return NUM_LOG_ITEMS(f);
+    return 0;
+}
+static const EmbCLogItem * emblib_logGetAt(unsigned f, unsigned pos)
+{
+    static EmbCLogItem dummy = { .ts = 0., .name = {0}, .value = 0. };
+    if (f < NUM_STATE_MACHINES)
+        return (EmbCLogItem *)logItemAt(f, pos);
+    return &dummy;
+}
+static const EmbCLogItem * emblib_logFind(unsigned f, const char *name, unsigned N)
+{
+    int i;
+    const EmbCLogItem *item;
+    static EmbCLogItem dummy = { .ts = 0., .name = {0}, .value = 0. };
+    if (N > emblib_logGetSize(f)) N = emblib_logGetSize(f);
+    if (N > MAX_HISTORY) N = MAX_HISTORY;
+    for (i = emblib_logGetSize(f)-1; N && i > -1; --i, --N)
+        if ( (item = emblib_logGetAt(f, i)) && !strcasecmp(name, item->name) )
+            return item;
+    return &dummy;
 }
 
 static double emblib_readAI(unsigned chan)

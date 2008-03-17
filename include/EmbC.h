@@ -31,6 +31,16 @@ struct EmbCTransition
 
 typedef struct EmbCTransition EmbCTransition;
 
+#define EMBC_LOG_NAME_SZ 33
+struct EmbCLogItem
+{
+    double ts; /**< timestamp in seconds */
+    char name[EMBC_LOG_NAME_SZ];
+    double value;
+};
+
+typedef struct EmbCLogItem EmbCLogItem;
+
 struct EmbC
 {
   /* Filled-in by rt-process */
@@ -54,6 +64,11 @@ struct EmbC
   void (*logValue)(uint fsm, const char *varname, double val);
   // logs an entire array of num_elems size.  Each element of the array creates a separate timestamp, name, value record in the log.
   void (*logArray)(uint fsm, const char *varname, const double *array, uint num_elems);
+  // get the number of items in the log
+  uint (*logGetSize)(uint fsm);
+  // get a specific item from the log, or a dummy item if not found
+  const EmbCLogItem * (*logGetAt)(uint fsm, uint pos);
+  const EmbCLogItem * (*logFind)(uint fsm, const char *name, uint N);
 
   /* Read an AI channel.  Note calls to this function are cheap because results get cached.. */
   double (*readAI)(unsigned channel_id);
@@ -159,6 +174,16 @@ static inline double randNormalized(void) {  return __embc->randNormalized(); }
 static inline void logValue(const char *vn, double vv) {   __embc->logValue(*__embc->fsm, vn, vv); }
 
 static inline void logArray(const char *vn, const double *vv, uint num) {   __embc->logArray(*__embc->fsm, vn, vv, num); }
+/// get the number of items currently in the log, or 0 if empty
+static inline unsigned logGetSize(void) { return __embc->logGetSize(*__embc->fsm); }
+/// retrieve a specific item from the variable log.  May return a bogus item if 'pos' is >= logGetSize().
+static inline const EmbCLogItem *logGetAt(unsigned pos) { return __embc->logGetAt(*__embc->fsm, pos); }
+/// get the most recently logged item
+static inline const EmbCLogItem *logTop(void) { return __embc->logGetAt(*__embc->fsm, logGetSize()-1); }
+/// searches for an item named 'name', but only searches the last 'lastNToSearch' log items.  Returns a dummy  with an empty name and 0 value if not found!!
+static inline const EmbCLogItem *logFindLastN(const char *name, unsigned lastNToSearch) { return __embc->logFind(*__embc->fsm, name, lastNToSearch); }
+/// searches the entire log for a specific item named 'name'.  Returns a dummy if not found!!
+static inline const EmbCLogItem *logFind(const char *name) { return logFindLastN(name, logGetSize()); }
 
 /*------------------------------
   MISC C-Library-like-functions
@@ -169,6 +194,16 @@ static inline void logArray(const char *vn, const double *vv, uint num) {   __em
 extern void *memset(void *, int c, unsigned long);
 extern void *memcpy(void *, const void *, unsigned long);
 extern unsigned long strlen(const char *s);
+extern int strcmp(const char *, const char *);
+extern int strncmp(const char *, const char *, unsigned long);
+extern int strcasecmp(const char *, const char *);
+extern int strncasecmp(const char *, const char *, unsigned long);
+extern char *strchr(const char *, int);
+extern char *strnchr(const char *, unsigned long, int);
+extern char *strstr(const char *, const char *);
+extern char *strcat(char *, const char *);
+extern char *strncat(char *, const char *, unsigned long);
+
 
 /*------------------------
   MATH LIBRARY SUPPORT
