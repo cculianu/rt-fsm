@@ -105,18 +105,22 @@ function [sm] = SetStateMatrix(varargin)
   % end up with multiple sched_waves per matrix row, or 1 sched_wave taking
   % up more than 1 matrix row.  The server-side will just pop these out in
   % FIFO order to build its own sched_waves data structure.  It just knows
-  % there are 7 columns per scheduled wave.
+  % there are 8 columns per scheduled wave.
   [m_s, n_s] = size(sm.sched_waves);
   new_m = m + ceil(m_s * (n_s / n));
   row = m+1;
   col = 1;
   row_s = 1;
   col_s = 1;
+  sw_needssound = 0;
   for i = 1:((new_m - m) * n)
       if (row_s > m_s)
           mat(row, col) = 0; % we already consumed sm.sched_wave, so just pad with zeros until row finishes
       else
           mat(row, col) = sm.sched_waves(row_s, col_s);          
+          if (col_s == 5 & sm.sched_waves(row_s, col_s) > 0) % check this sched wave to see if it triggers sounds
+              sw_needssound = 1;
+          end;
       end;
       col = col + 1;
       col_s = col_s + 1;
@@ -135,7 +139,7 @@ function [sm] = SetStateMatrix(varargin)
            ' concatenating sched_waves to the end of the state' ...
            ' matrix!! DEBUG ME!']); 
   end;
-  
+  hassound = 0;
   % format and urlencode the output_spec_str..  it is of format:
   % \1.type\2.data\1.type\2.data... where everything is
   % urlencoded (so \1 becomes %01, \2 becomes %02, etc)
@@ -148,6 +152,8 @@ function [sm] = SetStateMatrix(varargin)
         if (s.data(length(s.data)) ~= sprintf('\n')),
           s.data = [ s.data sprintf('\n') ];
         end;
+     case { 'sound', 'ext' }
+         hassound = 1;
     end;
     output_spec_str = [ ...
         output_spec_str sprintf('\1') s.type sprintf('\2') s.data ...
@@ -155,6 +161,13 @@ function [sm] = SetStateMatrix(varargin)
   end;
   output_spec_str = UrlEncode(sm, output_spec_str);
   
+  if (sw_needssound & ~hassound),
+      warning(sprintf(['The scheduled waves for this FSM specify a sound to trigger,\n'...
+                       'however, this FSM doesn''t actually have any associated sound\n'...
+                       'card because the output routing doesn''t contain a spec of type\n'...
+                       '''sound'' or type ''ext''!  To fix this, please specify a sound\n'...
+                       'output routing for this FSM.']));
+  end;
   [m,n] = size(mat);
   % format for SET STATE MATRIX command is 
   % SET STATE MATRIX rows cols num_in_events num_sched_waves in_chan_type ready_for_trial_jumpstate IGNORED IGNORED IGNORED OUTPUT_SPEC_STR_URL_ENCODED

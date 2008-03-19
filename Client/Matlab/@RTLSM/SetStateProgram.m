@@ -596,6 +596,7 @@ function [sm] = SetStateProgram(varargin)
                      ];
   end;
   
+  hassound = 0;
   % format and urlencode the output_spec_str..  it is of format:
   % \1.type\2.data\1.type\2.data... where everything is
   % urlencoded (so \1 becomes %01, \2 becomes %02, etc)
@@ -608,6 +609,8 @@ function [sm] = SetStateProgram(varargin)
         if (s.data(length(s.data)) ~= sprintf('\n')),
           s.data = [ s.data sprintf('\n') ];
         end;
+     case { 'ext', 'sound' }
+        hassound = 1;            
     end;
     output_spec_str = [ ...
         output_spec_str sprintf('\1') s.type sprintf('\2') s.data ...
@@ -627,9 +630,17 @@ function [sm] = SetStateProgram(varargin)
   exitfuncs_str = FormatNumStringAssociativeArray(sm, exitfuncs);
   entrycodes_str = FormatNumStringAssociativeArray(sm, entrycode);
   exitcodes_str = FormatNumStringAssociativeArray(sm, exitcode);
-  sched_wave_spec_str = FormatSchedWaves(sm);
+  [ sched_wave_spec_str, sw_needssound ] = FormatSchedWaves(sm);
   in_chan_type_str = FormatBlock(sm, UrlEncode(sm, sm.in_chan_type));
   matrix_str = FormatMatrix(sm, matrix);
+
+  if (sw_needssound & ~hassound),
+      warning(sprintf(['The scheduled waves for this FSM specify a sound to trigger,\n'...
+                       'however, this FSM doesn''t actually have any associated sound\n'...
+                       'card because the output routing doesn''t contain a spec of type\n'...
+                       '''sound'' or type ''ext''!  To fix this, please specify a sound\n'...
+                       'output routing for this FSM.']));
+  end;
 
 % format for SET STATE PROGRAM command is 
 %          SET STATE PROGRAM
@@ -755,14 +766,18 @@ function [ret] = FormatNumStringAssociativeArray(sm, arr)
   end;
   return;
   
-function [ret] = FormatSchedWaves(sm)
+function [ret, sw_needsound] = FormatSchedWaves(sm)
   [m, n] = size(sm.sched_waves);
   ret = '';
+  sw_needsound = 0;
   for i = 1:m,
-    for j = 1:n,
-      ret = sprintf('%s\2%d', sm.sched_wave(i,j));
-    end;
     ret = sprintf('%s\1', ret);
+    for j = 1:n,
+      if (j == 5 & sm.sched_waves(i,j) > 0), % the 5th column is sound trig, if it's nonzero this schedswave spec uses sound!  Caller is interested in this information in order to issue a proper warning
+          sw_needsound = 1;
+      end;            
+      ret = sprintf('%s\2%d', ret, sm.sched_waves(i,j));
+    end;
   end;
   ret = FormatBlock(sm, UrlEncode(sm, ret));
   return;

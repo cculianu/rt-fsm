@@ -65,18 +65,16 @@ std::vector<std::string> splitString(const std::string &str,
   if (!str.length() || !delim.length()) return ret;
   std::string::size_type pos, pos2;
   for ( pos = 0, pos2 = 0; pos < str.length() && pos != std::string::npos; pos = pos2 ) {
-    if (pos) pos = pos + delim.length();
-    if (pos > str.length()) break;
     pos2 = str.find(delim, pos);
     if (pos2 == std::string::npos) pos2 = str.length();
     std::string s = str.substr(pos, pos2-pos);
     if (trimws) s = trimWS(s);
-    if (skip_empties && !s.length()) continue;
-    ret.push_back(s);
+    if (!skip_empties || s.length())
+        ret.push_back(s);
+    pos2 += delim.length(); // move past delim. token
   }
   return ret;  
 }
-
 
 std::string TimeText ()
 {
@@ -96,6 +94,7 @@ std::string trimWS(const std::string & s)
   std::string::const_iterator pos1, pos2;
   pos1 = std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun(::isspace)));
   pos2 = std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun(::isspace))).base();
+  if (pos1 > pos2) return ""; // completely empty string
   return std::string(pos1, pos2);
 }
 
