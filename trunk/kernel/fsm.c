@@ -221,13 +221,16 @@ enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define FSM_MATRIX_GET(fsm, r, c) ( (fsm)->embc && (fsm)->embc->get_at ? (fsm)->embc->get_at(r, c) : 0 )
 #define INPUT_ROUTING(f,x) (rs[(f)].states->routing.input_routing[(x)])
 #define SW_INPUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? -1 : rs[(f)].states->routing.sched_wave_input[(x)] )
-#define SW_OUTPUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? -1 : rs[(f)].states->routing.sched_wave_output[(x)] )
+#define SW_DOUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? -1 : rs[(f)].states->routing.sched_wave_dout[(x)] )
+#define SW_EXTOUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? 0 : rs[(f)].states->routing.sched_wave_extout[(x)] )
 #define STATE_TIMEOUT_US(_fsm, state) (FSM_MATRIX_GET((_fsm), (state), TIMEOUT_TIME_COL(_fsm)))
 #define STATE_TIMEOUT_STATE(_fsm, state) (FSM_MATRIX_GET((_fsm), (state), TIMEOUT_STATE_COL(_fsm)))
 #define STATE_OUTPUT(_fsm, state, i) (FSM_MATRIX_GET((_fsm), (state), (i)+FIRST_OUT_COL(_fsm)))
 #define STATE_COL(_fsm, state, col) (FSM_MATRIX_GET((_fsm), (state), (col)))
 #define SAMPLE_TO_VOLTS(sample) (((double)(sample)/(double)maxdata_ai) * (ai_range_max_v - ai_range_min_v) + ai_range_min_v)
 #define VOLTS_TO_SAMPLE_AO(v) ((lsampl_t)( (((double)(v))-ao_range_min_v)/(ao_range_max_v-ao_range_min_v) * (double)maxdata_ao ))
+#define DEFAULT_EXT_TRIG_OBJ_NUM(f) (FSM_PTR((f))->default_ext_trig_obj_num)
+
 static struct proc_dir_entry *proc_ent = 0;
 static atomic_t rt_task_stop = ATOMIC_INIT(0); /* Internal variable to stop the RT 
                                                   thread. */
@@ -468,6 +471,7 @@ static void scheduleWaveDIO(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveAO(FSMID_t, unsigned wave_id, int op);
 static void stopActiveWaves(FSMID_t); /* called when FSM starts a new trial */
 static void updateHasSchedWaves(FSMID_t);
+static void updateDefaultExtObjNum(FSMID_t);
 
 #ifndef RTAI
 /* just like clock_gethrtime but instead it used timespecs */
@@ -1702,6 +1706,28 @@ static int myseq_show (struct seq_file *m, void *dummy)
           for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
             if (ss->states->sched_waves[i].enabled) {
               seq_printf(m, "DIO Sched. Wave %d  (%s)\n", i, ss->active_wave_mask & 0x1<<i ? "playing" : "idle");
+              seq_printf(m, "\tPreample: %uus  Sustain: %uus  Refraction: %uus\n", ss->states->sched_waves[i].preamble_us, ss->states->sched_waves[i].sustain_us, ss->states->sched_waves[i].refraction_us);
+              seq_printf(m, "\tRouting:  InpEvtCols +/-: ");
+              if (ss->states->routing.sched_wave_input[i*2] > -1)
+                seq_printf(m, "%d", ss->states->routing.sched_wave_input[i*2]);
+              else
+                seq_printf(m, "x");
+              seq_printf(m, "/");
+              if (ss->states->routing.sched_wave_input[i*2+1] > -1)
+                seq_printf(m, "%d", ss->states->routing.sched_wave_input[i*2+1]);
+              else
+                seq_printf(m, "x");
+              seq_printf(m, "  DO Line: ");
+              if (ss->states->routing.sched_wave_dout[i] > -1)
+                  seq_printf(m, "%d", ss->states->routing.sched_wave_dout[i]);
+              else
+                  seq_printf(m, "(None)");
+              seq_printf(m, "  Sound: ");
+              if (ss->states->routing.sched_wave_extout[i])
+                  seq_printf(m, "%u", ss->states->routing.sched_wave_extout[i]);
+              else
+                  seq_printf(m, "(None)");
+              seq_printf(m, "\n");
             }
           }
         }
@@ -2361,7 +2387,7 @@ static void handleFifos(FSMID_t f)
 
     case AOWAVE:
       /* need up upadte rs.states->has_sched_waves flag as that affects 
-       * whether we check the last column of the FSM for sched wave triggers. */
+       * other logic on whether we check certain data structures for data. */
       updateHasSchedWaves(f);
       /* we just finished processing/allocating an AO wave, reply to 
          userspace now */
@@ -3059,11 +3085,15 @@ static unsigned long processSchedWaves(FSMID_t f)
                                          it's routed as an input event wave
                                          for edge-up transitions. */
           }
-          id = SW_OUTPUT_ROUTING(f, wave);
-
+          
+          id = SW_DOUT_ROUTING(f, wave);
           if ( id > -1 ) 
             dataWrite(id, 1); /* if it's routed to do output, do the output. */
 
+          id = SW_EXTOUT_ROUTING(f, wave);
+          if ( id > 0 ) /* if it's routed to do ext trigs */
+            doExtTrigOutput(DEFAULT_EXT_TRIG_OBJ_NUM(f), id); /* trigger sound, etc */
+              
           w->edge_up_ts = 0; /* mark this component done */
     }
     if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts) {
@@ -3076,10 +3106,14 @@ static unsigned long processSchedWaves(FSMID_t f)
                                          it's routed as an input event wave
                                          for edge-up transitions. */
           }
-          id = SW_OUTPUT_ROUTING(f, wave);
-
+          
+          id = SW_DOUT_ROUTING(f, wave);
           if ( id > -1 ) 
             dataWrite(id, 0); /* if it's routed to do output, do the output. */
+
+          id = SW_EXTOUT_ROUTING(f, wave);
+          if ( id > 0 ) /* if it's routed to do ext trigs */
+            doExtTrigOutput(DEFAULT_EXT_TRIG_OBJ_NUM(f), -id); /* untrigger sound, etc */
 
           w->edge_down_ts = 0; /* mark this wave component done */
     } 
@@ -3212,7 +3246,7 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
     if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts) {
           /* The wave was in the middle of a high, so set the line back low
              (if there actually is a line). */
-          int id = SW_OUTPUT_ROUTING(f, wave);
+          int id = SW_DOUT_ROUTING(f, wave);
 
           if (id > -1) 
             dataWrite(id, 0); /* if it's routed to do output, set it low. */
@@ -3394,6 +3428,21 @@ static void updateHasSchedWaves(FSMID_t f)
 	for (i = 0; i < NUM_OUT_COLS(f); ++i)
       yesno = yesno || (OUTPUT_ROUTING(f,i)->type == OSPEC_SCHED_WAVE);  	
 	FSM_PTR(f)->has_sched_waves = yesno;
+}
+
+static void updateDefaultExtObjNum(FSMID_t f)
+{
+    unsigned i;
+    
+    FSM_PTR(f)->default_ext_trig_obj_num = -1;
+    
+    for (i = 0; i < NUM_OUT_COLS(f); ++i) {
+        struct OutputSpec *spec = OUTPUT_ROUTING(f,i);
+        if ( spec->type == OSPEC_EXT ) {
+            FSM_PTR(f)->default_ext_trig_obj_num = spec->object_num;
+            break;
+        }
+    }
 }
 
 static void fsmLinkProgram(FSMID_t f, struct EmbC *embc)
@@ -3656,6 +3705,7 @@ static void swapFSMs(FSMID_t f)
   rs[f].states = OTHER_FSM_PTR(f); /* swap in the new fsm.. */
   /*LOG_MSG("Cycle: %lu  Got new FSM\n", (unsigned long)cycle);*/
   updateHasSchedWaves(f); /* just updates rs.states->has_sched_waves flag*/
+  updateDefaultExtObjNum(f); /* just updates rs.states->default_ext_obj_num */
   reconfigureIO(); /* to have new routing take effect.. */
   rs[f].valid = 1; /* Unlock FSM.. */
   rs[f].pending_fsm_swap = 0; 

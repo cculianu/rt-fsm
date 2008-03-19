@@ -140,7 +140,7 @@ namespace
   volatile struct Shm *shm = 0;
   int listen_fd = -1; /* Our listen socket.. */
   unsigned short listenPort = 3333;
-  const unsigned MinimumClientVersion = 220080308;
+  const unsigned MinimumClientVersion = 220080319;
   typedef std::map<ConnectionThread *, ConnectionThread *> ConnectedThreadsList;
 
   bool debug = false; // set with -d command-line switch to enable debug mode.
@@ -558,6 +558,7 @@ struct SchedWaveSpec : public SchedWave
   int in_evt_col;
   int out_evt_col;
   int dio_line;
+  int ext_trig;
 };
 
 static void doServer(void)
@@ -1378,7 +1379,8 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
       Log() << "Alarm/Sched Wave specification has invalid DIO line: " << w.dio_line <<"! Error!" << std::endl; 
       return false;      
     }
-    msg.u.fsm.routing.sched_wave_output[w.id] = w.dio_line;
+    msg.u.fsm.routing.sched_wave_dout[w.id] = w.dio_line;
+    msg.u.fsm.routing.sched_wave_extout[w.id] = w.ext_trig;
     // now copy the struct SchedWave to the shm msg
     msg.u.fsm.sched_waves[w.id] = w;
     msg.u.fsm.sched_waves[w.id].enabled = true;
@@ -1670,7 +1672,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   }
 
   // compute scheduled waves cells used
-  int swCells = numSchedWaves * 7; // each sched wave uses 7 cells.
+  int swCells = numSchedWaves * 8; // each sched wave uses 8 cells.
   int swRows = (swCells / m.cols()) + (swCells % m.cols() ? 1 : 0);
   int swFirstRow = (int)nRows - swRows;
   int inpRow = swFirstRow - 1;
@@ -1742,7 +1744,11 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
       Log() << "Alarm/Sched Wave specification has invalid DIO line: " << dio_line <<"! Error!" << std::endl; 
       return false;      
     }
-    msg.u.fsm.routing.sched_wave_output[id] = dio_line;
+    msg.u.fsm.routing.sched_wave_dout[id] = dio_line;
+    NEXT_COL();
+    int ext_out = (int)m.at(row, col);
+    if (ext_out < 0) ext_out = 0;
+    msg.u.fsm.routing.sched_wave_extout[id] = ext_out;
     NEXT_COL();
     w.preamble_us = static_cast<unsigned>(m.at(row,col)*1e6);
     NEXT_COL();
@@ -2260,7 +2266,7 @@ std::vector<SchedWaveSpec>
 ConnectionThread::parseSchedWaveSpecStr(const std::string & str)
 {
 
-  // format of sched wave string is \1ID\2IN_EVT_COL\2OUT_EVT_COL\2DIO_LINE\2PREAMBLE_SECS\2SUSTAIN_SECS\2REFRACTION_SECS\2... so split on \1 and within that, on \2
+  // format of sched wave string is \1ID\2IN_EVT_COL\2OUT_EVT_COL\2DIO_LINE\2SOUND_TRIG\2PREAMBLE_SECS\2SUSTAIN_SECS\2REFRACTION_SECS\2... so split on \1 and within that, on \2
 
   std::vector<SchedWaveSpec> ret;
   std::set<int> ids_seen;
@@ -2269,7 +2275,7 @@ ConnectionThread::parseSchedWaveSpecStr(const std::string & str)
   std::vector<std::string>::const_iterator it;
   for (it = waveSpecStrs.begin(); it != waveSpecStrs.end(); ++it) {
     flds = splitString(*it, "\2");
-    if (flds.size() != 7) {
+    if (flds.size() != 8) {
       Log() << "Parse error for sched waves spec \"" << *it << "\" (ignoring! Argh!)\n"; 
       continue;      
     }
@@ -2280,6 +2286,7 @@ ConnectionThread::parseSchedWaveSpecStr(const std::string & str)
     if (ok) spec.in_evt_col = FromString<int>(flds[i++], &ok);
     if (ok) spec.out_evt_col = FromString<int>(flds[i++], &ok);
     if (ok) spec.dio_line = FromString<int>(flds[i++], &ok);
+    if (ok) spec.ext_trig = FromString<int>(flds[i++], &ok);
     if (ok) spec.preamble_us = static_cast<unsigned>(FromString<double>(flds[i++], &ok) * 1e6);
     if (ok) spec.sustain_us = static_cast<unsigned>(FromString<double>(flds[i++], &ok) * 1e6);
     if (ok) spec.refraction_us = static_cast<unsigned>(FromString<double>(flds[i++], &ok) * 1e6);

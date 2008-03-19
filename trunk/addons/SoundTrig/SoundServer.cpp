@@ -1080,7 +1080,10 @@ void UserSM::trigger_nolock(unsigned card, int trig)
             }
         }
     } else {
-        Warning() << "Kernel told us to play sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";
+        if (trig > 0)
+            Warning() << "Kernel told us to play sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";
+        else
+            Warning() << "Kernel told us to stop sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";            
     }
 }
 

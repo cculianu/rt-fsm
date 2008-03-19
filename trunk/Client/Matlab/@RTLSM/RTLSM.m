@@ -25,7 +25,7 @@
 %                state matrix.
 %
 function [sm] = RTLSM(host,port,which_sm)
-  sm.MIN_SERVER_VERSION = 220080308; % update this on protocol change
+  sm.MIN_SERVER_VERSION = 220080319; % update this on protocol change
   sm.host = 'localhost';
   sm.port = 3333;
   sm.fsm_id = 0;

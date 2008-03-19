@@ -19,9 +19,9 @@
 % sm = SetScheduledWaves(sm, sched_matrix)
 %
 %                Specifies the scheduled waves matrix for a state machine.  
-%                This is an M by 7 matrix of the following format
+%                This is an M by 8 matrix of the following format
 %                per row:
-%                ID IN_EVENT_COL OUT_EVENT_COL DIO_LINE PREAMBLE SUSTAIN REFRACTION
+%                ID IN_EVENT_COL OUT_EVENT_COL DIO_LINE SOUND_TRIG PREAMBLE SUSTAIN REFRACTION
 %                Note that this function doesn't actually modify the 
 %                SchedWaves of the FSM immediately.  Instead, a new 
 %                SetStateMatrix call needs to be issued for the effects of 
@@ -30,14 +30,14 @@
 % Detailed Explanation of DIO Line Scheduled Wave
 % -----------------------------------------------
 %
-% The sched matrix is an M by 7 matrix of the following format:
+% The sched matrix is an M by 8 matrix of the following format:
 %
-% ID IN_EVENT_COL OUT_EVENT_COL DIO_LINE PREAMBLE SUSTAIN REFRACTION
+% ID IN_EVENT_COL OUT_EVENT_COL DIO_LINE SOUND_TRIG PREAMBLE SUSTAIN REFRACTION
 %
 % Note that this function doesn't acrually modify the SchedWaves of the 
-% FSM.  Instead, a new SetStateMatrix call needs to be issued 
-% for the effects of this function to actually take effect in the external
-% RTLinux FSM.
+% FSM.  Instead, a new SetStateMatrix (or SetStateProgram) 
+% call needs to be issued for the effects of this function to actually take 
+% effect in the external RTLinux FSM.
 %
 % As for the matrix this function expected, column has the following 
 % definition:
@@ -66,6 +66,9 @@
 %      The DIO line on which to echo the output of this waveform.  Note
 %      that not all waves need have a real DIO line associated with them.
 %      Set this value to -1 to not use a DIO line.
+% SOUND_TRIG -
+%      The sound id to trigger when 'sustain' occurs, and then to untrigger
+%      when 'refraction' occurs.  0 for none.
 % PREAMBLE (seconds) -
 %      The amount of time to wait (in seconds) from the time the scheduled
 %      wave is triggered in the state matrix SCHED_WAVE column to the time
@@ -164,6 +167,13 @@
 % you would need to issue -(2^1+2^2+2^3+2^5) in your state matrix
 % scheduled waves output column.
 %
+% Triggering sounds from DIO scheduled waves requires the @RTLSM to have
+% a 'sound' or 'ext' output routing spec (see SetOutputRouting).  
+% If it doesn't, the FSM doesn't know which sound card to trigger to, so 
+% nothing is triggered.  Also, more than 1 sound output routing spec 
+% leads to undefined behavior (as in this case the sound card to trigger
+% is ambiguous).
+%
 % The DIO SetScheduledWaves indexes I/O lines at 0 and state event columns
 % at 0 while its analog counterpart indexes I/O lines at 1 and the same
 % state event columns at 1.  This is inconsitent. Let me know which one
@@ -191,7 +201,7 @@ function [sm] = SetScheduledWaves(varargin)
     
 function [sm] = SetScheduledWavesDIO(sm, sched_matrix)
     [m,n] = size(sched_matrix);
-    if (n ~= 7 || m < 1), error('Argment 2 to SetScheduledWaves needs to be an m x 7 matrix!'); end;
+    if (n ~= 8 || m < 1), error('Argment 2 to SetScheduledWaves needs to be an m x 8 matrix!'); end;
     id_ctr = zeros(32);
 % check for dupes
     saved = sm.sched_waves;

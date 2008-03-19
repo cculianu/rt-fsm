@@ -123,6 +123,10 @@ struct FSMSpec
 
   /** Cached flag for scheduled waves. */
   unsigned has_sched_waves;
+  
+  /** Cached 'default' ext trig object num.. used by sched waves to figure out which ext trig object num
+      to trigger if sched_wave_extout > 0 for the sched wave.. */
+  int default_ext_trig_obj_num;
 
   /** Struct to describe routing mappings from input/output channel id's
       to physical channel id's.  */
@@ -140,7 +144,9 @@ struct FSMSpec
         or -1 for none */
     int sched_wave_input[FSM_MAX_SCHED_WAVES*2];
     /** Map of sched_wave_id -> output channel id or -1 for none */
-    int sched_wave_output[FSM_MAX_SCHED_WAVES];
+    int sched_wave_dout[FSM_MAX_SCHED_WAVES];
+    /** Map of sched_wave_id -> ext (sound) to trigger/untrigger or 0 for none */
+    unsigned sched_wave_extout[FSM_MAX_SCHED_WAVES];
 
     unsigned num_out_cols; /**< Always <= FSM_MAX_OUT_EVENTS -- defines valid
                                 elements in below array                   */
@@ -430,7 +436,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf0010117)) /*< Magic no. for shm... 'fool0117'  */
+#define FSM_SHM_MAGIC ((int)(0xf0010118)) /*< Magic no. for shm... 'fool0118'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }
