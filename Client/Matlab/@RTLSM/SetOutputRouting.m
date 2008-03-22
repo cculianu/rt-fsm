@@ -197,9 +197,15 @@ function [fsm] = SetOutputRouting(fsm, routing)
           error(sprintf(['%s .data field seems to be improperly formatted'], ...
                         s.type));
         end;
-        first = floor(rng(1));
-        last = floor(rng(2));
-        if ( first < 0 || first >= last || last > 31),
+        if (length(rng) == 1),
+            first = floor(rng);
+            last = floor(rng);
+            routing{i}.data = sprintf('%d-%d', first, last); % reformat it since server expects string of the form A-B
+        else
+            first = floor(rng(1));
+            last = floor(rng(2));
+        end;
+        if ( first < 0 || first > last || last > 31),
           error(sprintf(['%s .data field needs two non-negative integers ' ...
                          'with the first being less than the second and ' ...
                          ' the second being less than 32!'], s.type));

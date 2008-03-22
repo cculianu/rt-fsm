@@ -1729,7 +1729,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
           for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
             if (ss->states->sched_waves[i].enabled) {
               seq_printf(m, "DIO Sched. Wave %d  (%s)\n", i, ss->active_wave_mask & 0x1<<i ? "playing" : "idle");
-              seq_printf(m, "\tPreample: %uus  Sustain: %uus  Refraction: %uus\n", ss->states->sched_waves[i].preamble_us, ss->states->sched_waves[i].sustain_us, ss->states->sched_waves[i].refraction_us);
+              seq_printf(m, "\tPreamble: %uus  Sustain: %uus  Refraction: %uus\n", ss->states->sched_waves[i].preamble_us, ss->states->sched_waves[i].sustain_us, ss->states->sched_waves[i].refraction_us);
               seq_printf(m, "\tRouting:  InpEvtCols +/-: ");
               if (ss->states->routing.sched_wave_input[i*2] > -1)
                 seq_printf(m, "%d", ss->states->routing.sched_wave_input[i*2]);
@@ -3283,18 +3283,27 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
 {  
   while (rs[f].active_wave_mask) { 
     unsigned wave = __ffs(rs[f].active_wave_mask);
+    int do_chan = -1;
     struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave];
     rs[f].active_wave_mask &= ~(1<<wave); /* clear bit */
     if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts) {
           /* The wave was in the middle of a high, so set the line back low
              (if there actually is a line). */
-          int id = SW_DOUT_ROUTING(f, wave);
+          int id = do_chan = SW_DOUT_ROUTING(f, wave);
 
-          if (id > -1) {
-            UNLOCK_DO_CHAN(id); /* 'unlock' or release the DO channel */
-            dataWrite(id, 0); /* if it's routed to do output, set it low. */
-          }
+          if (id > -1) 
+            dataWrite_NoLocks(id, 0); /* if it's routed to do output, set line back to low. */
+          
+          id = SW_EXTOUT_ROUTING(f, wave);
+          
+          if (id > 0) /* if it's routed to play sounds, untrigger sound */
+              doExtTrigOutput(DEFAULT_EXT_TRIG_OBJ_NUM(f), -id);
+              
     }
+    if (do_chan > -1 && w->end_ts && w->end_ts <= rs[f].current_ts)
+    /* now, we must unlock the channel if the sched wave was using it*/
+        UNLOCK_DO_CHAN(do_chan); /* 'unlock' or release the DO channel */
+
     memset(w, 0, sizeof(*w));  
   }
   while (rs[f].active_ao_wave_mask) {
