@@ -1,6 +1,6 @@
 Install Guide for Realtime FSM
 by Calin Culianu <calin@ajvar.org>
-Last Updated: Mar. 11, 2008
+Last Updated: Mar. 22, 2008
 
 These instructions tell you how to setup a system to run this software.  This
 includes brief instructions for setting up RTAI 3.6, Linux 2.6.23, and compiling
@@ -24,6 +24,9 @@ RECOMMENDED (meaning, well tested)
 - Tested with NI DAQ cards
 - Comedilib 0.8.1
 - Comedi 0.7.76
+
+OPTIONAL
+- A Lynx22 board if you want sound triggering in hard realtime
 
 
 STEP 1: OBTAIN RTAI 3.6
@@ -296,7 +299,53 @@ communicate with the server and send it state machines.
 
 NB: When the system is running, you can query /proc/RealtimeFSM to see runtime
 stats such as latency, jitter, etc.
-  
+
+
+OPTIONAL REALTIME SOUND TRIGGERING
+
+You have the option of using this software to do realtime sound triggering 
+(realtime sound machine, as it's called).  This option actually itself has two 
+variants:
+
+- Hard realtime sound triggering with a Lynx22 soundcard
+- Soft realtime sound triggering with any soundcard that Linux supports
+
+SOFT REALTIME SOUND
+
+To use soft realtime sound triggering, make sure the drivers for your soundcard 
+are loaded into the kernel and that sound works.  This is a somewhat 
+distribution-dependent thing but on Fedora Core 8, in most cases, sound drivers
+are already loaded for you by the boot scripts and sound should 'just work'.
+
+Once you are sure sound works, load the sound triggering module and sound 
+server as follows:
+
+# insmod ./UserspaceExtTrig.ko
+# ./SoundServer
+
+Soft realtime sound triggering typically has a latency of 100ms and a jitter
+of +/- 10ms.
+
+HARD REALTIME SOUND
+
+This method is more precise (5 ms latency and very low jitter) than soft 
+realtime triggering, but it requires the more expensive Lynx22 board from Lynx
+Studio Technologies, Inc.
+
+To use this variant of sound triggering, make sure the Lynx22 board is 
+installed in your computer and load the two kernel modules and sound server as 
+follows:
+
+# insmod ./LynxTWO_RT.ko
+# insmod ./LynxTrig_RT.ko
+# ./SoundServer
+
+
+Regardless of which sound triggering mechanism you choose (soft or hard 
+realtime), you use it from the state machine by way of the output routing 
+of type 'sound' in the FSM output routing spec.  (See the matlab help for 
+'SetOutputRouting' in the @RTLSM class for details).
+
+
 
 Email me: <calin@ajvar.org> or <cculianu@yahoo.com> with any questions!
-
