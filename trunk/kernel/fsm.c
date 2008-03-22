@@ -230,6 +230,17 @@ enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define SAMPLE_TO_VOLTS(sample) (((double)(sample)/(double)maxdata_ai) * (ai_range_max_v - ai_range_min_v) + ai_range_min_v)
 #define VOLTS_TO_SAMPLE_AO(v) ((lsampl_t)( (((double)(v))-ao_range_min_v)/(ao_range_max_v-ao_range_min_v) * (double)maxdata_ao ))
 #define DEFAULT_EXT_TRIG_OBJ_NUM(f) (FSM_PTR((f))->default_ext_trig_obj_num)
+/* Channel locking stuff -- locked chans are used by the scheduled waves to 
+   prevent normal SM states from overwriting DIO lines that scheduled waves 
+   are currently writing to -- this is a bit of a hack since ideally we want
+   a real ownership pattern here, but for now, we'll just say that everything else
+   that writes to DO lines uses dataWrite() (which checks the lock) and scheduled waves
+   use dataWrite_NoLock().  The scheduled waves then have to make sure to clear
+   their locked channels, if any. */
+#define LOCK_DO_CHAN(chan) do { do_chans_locked_mask |= 1U<<chan; } while (0)
+#define UNLOCK_DO_CHAN(chan) do { do_chans_locked_mask &= ~(1U<<chan); } while (0)
+#define UNLOCK_DO_ALL() do { do_chans_locked_mask = 0; } while (0)
+#define IS_DO_CHAN_LOCKED(chan) (do_chans_locked_mask&(1<<chan))
 
 static struct proc_dir_entry *proc_ent = 0;
 static atomic_t rt_task_stop = ATOMIC_INIT(0); /* Internal variable to stop the RT 
@@ -264,7 +275,7 @@ double ai_range_min_v, ai_range_max_v, ao_range_min_v, ao_range_max_v; /* scaled
 unsigned long ai_asynch_buffer_size = 0; /* Size of driver's DMA circ. buf. */
 unsigned ai_range = 0, ai_mode = UNKNOWN_MODE, ao_range = 0;
 lsampl_t ao_0V_sample = 0; /* When we want to write 0V to AO, we write this. */
-unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0, ai_chans_seen_this_scan_mask = 0; 
+unsigned ai_chans_in_use_mask = 0, di_chans_in_use_mask = 0, do_chans_in_use_mask = 0, do_chans_locked_mask = 0, ai_chans_seen_this_scan_mask = 0; 
 unsigned int lastTriggers; /* Remember the trigger lines -- these 
                               get shut to 0 after 1 cycle                */
 uint64 cycle = 0; /* the current cycle */
@@ -456,7 +467,8 @@ static void clearAllOutputLines(FSMID_t);
 static inline void clearTriggerLines(FSMID_t);
 static void dispatchEvent(FSMID_t, unsigned event_id);
 static void handleFifos(FSMID_t);
-static inline void dataWrite(unsigned chan, unsigned bit);
+static void dataWrite(unsigned chan, unsigned bit);
+static void dataWrite_NoLocks(unsigned chan, unsigned bit);
 static void commitDIOWrites(void);
 static void grabAllDIO(void);
 static void grabAI(void); /* AI version of above.. */
@@ -892,8 +904,19 @@ static void reconfigureIO(void)
         rs[f].do_chans_trig_mask |= ((0x1<<(spec->to+1 - spec->from))-1) << spec->from;
         break;
       }
-      do_chans_in_use_mask |= rs[f].do_chans_cont_mask|rs[f].do_chans_trig_mask;
     }
+    /* now take into account sched waves channels since they also can use DOUT lines sometimes
+       depending on their configuration.. */
+    if (FSM_PTR(f)->has_sched_waves) {
+        for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
+            int ch = FSM_PTR(f)->routing.sched_wave_dout[i];
+            if ( ch > -1 && FSM_PTR(f)->sched_waves[i].enabled ) /* does it have a  DOUT and is it enabled? */
+                /* if so, earmark it as an active DOUT chan */
+                do_chans_in_use_mask |= 0x1 << ch;
+        }
+    }
+    do_chans_in_use_mask |= rs[f].do_chans_cont_mask|rs[f].do_chans_trig_mask;
+
   }
 
   DEBUG("ReconfigureIO masks: ai_chans_in_use_mask 0x%x di_chans_in_use_mask 0x%x do_chans_in_use_mask 0x%x\n", ai_chans_in_use_mask, di_chans_in_use_mask, do_chans_in_use_mask);
@@ -2086,7 +2109,7 @@ static int bypassDOut(unsigned f, unsigned mask)
     while (prev_forced_mask) {
         unsigned chan = __ffs(prev_forced_mask);
         prev_forced_mask &= ~(0x1<<chan);
-        dataWrite(chan, 0);
+        dataWrite_NoLocks(chan, 0);
         ret = 1;
     }
     rs[f].forced_outputs_mask = 0;
@@ -2427,8 +2450,8 @@ static void handleFifos(FSMID_t f)
         
     case RESET_:
       /* Just to make sure we start off fresh ... */
-      clearAllOutputLines(f);
       stopActiveWaves(f);
+      clearAllOutputLines(f);
       rs[f].valid = 0; /* lock fsm so buddy task can safely manipulate it */
       BUDDY_TASK_PEND(RESET_); /* slow operation because it clears FSM blob,
                                  pend it to non-RT buddy task. */
@@ -2690,7 +2713,7 @@ static void handleFifos(FSMID_t f)
 
 static unsigned pending_output_bits = 0, pending_output_mask = 0;
 
-static inline void dataWrite(unsigned chan, unsigned bit)
+static void dataWrite_NoLocks(unsigned chan, unsigned bit)
 {
   unsigned bitpos = 0x1 << chan;
   if (!(bitpos & do_chans_in_use_mask)) {
@@ -2704,6 +2727,12 @@ static inline void dataWrite(unsigned chan, unsigned bit)
   } else {/* clear bit.. */
     pending_output_bits &= ~bitpos;
   }
+}
+
+static void dataWrite(unsigned chan, unsigned bit)
+{
+    if (!IS_DO_CHAN_LOCKED(chan)) /* locked chans are used by the scheduled waves to prevent SM from overwriting DIO lines that scheduled waves are currently using*/
+        dataWrite_NoLocks(chan, bit);
 }
 
 static void commitDIOWrites(void)
@@ -2729,12 +2758,11 @@ static void commitDIOWrites(void)
   while (pending_output_mask) {
       unsigned bit = __ffs(pending_output_mask), mask = 0x1<<bit, val = output_bits&mask, prev_val = prev_output_bits&mask;
       if ( val != prev_val ) { /* test if bit changed.. */
-          if (val) { ++do_write_hi_ct[bit]; prev_output_bits |= mask; }
-          else     { ++do_write_lo_ct[bit]; prev_output_bits &= ~mask; }
+          if (val)  { ++do_write_hi_ct[bit]; prev_output_bits |= mask; }
+          else      { ++do_write_lo_ct[bit]; prev_output_bits &= ~mask; }
       }
       pending_output_mask &= ~mask; /* clear bit */
   }
-  
   pending_output_bits = 0;
   pending_output_mask = 0;
 }
@@ -3088,7 +3116,8 @@ static unsigned long processSchedWaves(FSMID_t f)
           
           id = SW_DOUT_ROUTING(f, wave);
           if ( id > -1 ) 
-            dataWrite(id, 1); /* if it's routed to do output, do the output. */
+            dataWrite_NoLocks(id, 1); /* if it's routed to do digital output, set line high. */
+          
 
           id = SW_EXTOUT_ROUTING(f, wave);
           if ( id > 0 ) /* if it's routed to do ext trigs */
@@ -3109,7 +3138,7 @@ static unsigned long processSchedWaves(FSMID_t f)
           
           id = SW_DOUT_ROUTING(f, wave);
           if ( id > -1 ) 
-            dataWrite(id, 0); /* if it's routed to do output, do the output. */
+            dataWrite_NoLocks(id, 0); /* if it's routed to do digital output, set line low. */
 
           id = SW_EXTOUT_ROUTING(f, wave);
           if ( id > 0 ) /* if it's routed to do ext trigs */
@@ -3118,9 +3147,14 @@ static unsigned long processSchedWaves(FSMID_t f)
           w->edge_down_ts = 0; /* mark this wave component done */
     } 
     if (w->end_ts && w->end_ts <= rs[f].current_ts) {
+          int chan = SW_DOUT_ROUTING(f, wave);
+          
           /* Refractory period ended and/or wave is deactivated */
           rs[f].active_wave_mask &= ~(0x1<<wave); /* deactivate the wave */
           w->end_ts = 0; /* mark this wave component done */
+          if (chan > -1) /* if it's routed to do digital output,
+                            unlock the DOUT channel so the FSM can use it again */
+              UNLOCK_DO_CHAN(chan);
     }
   }
   return wave_events;
@@ -3170,10 +3204,13 @@ static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
 {
   struct ActiveWave *w;
   const struct SchedWave *s;
+  int do_chan;
 
   if (wave_id >= FSM_MAX_SCHED_WAVES  /* it's an invalid id */
       || !FSM_PTR(f)->sched_waves[wave_id].enabled /* wave def is not valid */ )
     return; /* silently ignore invalid wave.. */
+  
+  do_chan = SW_DOUT_ROUTING(f, wave_id);
   
   if (op > 0) {
     /* start/trigger a scheduled wave */
@@ -3191,7 +3228,10 @@ static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
     w->edge_down_ts = w->edge_up_ts + (int64)s->sustain_us*1000LL;
     w->end_ts = w->edge_down_ts + (int64)s->refraction_us*1000LL;
     rs[f].active_wave_mask |= 0x1<<wave_id; /* set the bit, enable */
-
+    if (do_chan > -1)
+        LOCK_DO_CHAN(do_chan); /* lock the digital out chan so the FSM's own 
+                                  output column doesn't conflict with it */
+    
   } else {
     /* Prematurely stop/cancel an already-running scheduled wave.. */
 
@@ -3201,6 +3241,8 @@ static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
         return;  
     }
     rs[f].active_wave_mask &= ~(0x1<<wave_id); /* clear the bit, disable */
+    if (do_chan > -1)
+        UNLOCK_DO_CHAN(do_chan);
   }
 }
 
@@ -3248,8 +3290,10 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
              (if there actually is a line). */
           int id = SW_DOUT_ROUTING(f, wave);
 
-          if (id > -1) 
+          if (id > -1) {
+            UNLOCK_DO_CHAN(id); /* 'unlock' or release the DO channel */
             dataWrite(id, 0); /* if it's routed to do output, set it low. */
+          }
     }
     memset(w, 0, sizeof(*w));  
   }
@@ -3628,7 +3672,7 @@ static int emblib_writeDIO(unsigned chan, unsigned val)
 {
     unsigned bitpos = 0x1<<chan;
     if ( bitpos & do_chans_in_use_mask ) {
-        dataWrite(chan, val);
+        dataWrite_NoLocks(chan, val);
         return 1;
     }
     return 0;
