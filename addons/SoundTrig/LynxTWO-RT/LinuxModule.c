@@ -418,6 +418,8 @@ static int do_probe(struct pci_dev *dev, const struct pci_device_id *id)
   ctx->dma.poolDMA = pci_pool_create(MODULE_NAME, ctx->dev, DMABufferSize, sizeof(int), 0);
   if (!ctx->dma.poolDMA) return -ENOMEM;
 
+  atomic_inc(&num_contexts); /* possible calls to do_remove below decrease this so we increment it here.. */
+
   /* PCI devices need to be enabled before they can be used.. */
   if ( (status = pci_enable_device(ctx->dev)) != 0 ) {
       ERROR("pci_enable_device returned %d\n", status);
@@ -448,7 +450,6 @@ static int do_probe(struct pci_dev *dev, const struct pci_device_id *id)
   }
 
   LOG_MSG("Found L22 device %s, activated.\n", pci_name(ctx->dev));
-  atomic_inc(&num_contexts);
   return 0;
 }
 

@@ -541,7 +541,7 @@ static int initL22Devs(void)
   arr_bytes = sizeof(*l22dev)*n_l22dev;
   l22dev = kmalloc(arr_bytes, GFP_KERNEL);
   if (!l22dev) { 
-    ERROR("Could not allocate memory for an internal buffer!\n"); 
+    ERROR("Could not allocate %u bytes for an internal buffer!\n", arr_bytes); 
     n_l22dev = 0; 
     return -ENOMEM; 
   }
