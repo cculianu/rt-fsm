@@ -11,13 +11,13 @@ SRC_CXX = \
 	  Hal4114.cpp     HalDevice.cpp      HalMixer.cpp      HalSampleClock.cpp \
           Hal8420.cpp     HalEEPROM.cpp      HalPlayMix.cpp    HalTimecode.cpp \
           HalAdapter.cpp  HalLStream.cpp     HalRecordMix.cpp  HalWaveDMADevice.cpp \
-          HalDMA.cpp      HalMIDIDevice.cpp  HalRegister.cpp   HalWaveDevice.cpp
+          HalDMA.cpp      HalMIDIDevice.cpp  HalRegister.cpp   HalStatusCodes.cpp HalWaveDevice.cpp
 MOD_OBJS = \
 	  LinuxGlue.o \
           Hal4114.o     HalDevice.o      HalMixer.o      HalSampleClock.o \
           Hal8420.o     HalEEPROM.o      HalPlayMix.o    HalTimecode.o \
           HalAdapter.o  HalLStream.o     HalRecordMix.o  HalWaveDMADevice.o \
-          HalDMA.o      HalMIDIDevice.o  HalRegister.o   HalWaveDevice.o 
+          HalDMA.o      HalMIDIDevice.o  HalRegister.o   HalStatusCodes.o HalWaveDevice.o 
           
 ifneq ($(MACH),x86_64)
 # regular x86?

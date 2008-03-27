@@ -99,6 +99,7 @@ addons/SoundTrig/LynxTWO-RT/LynxTWO/HalRegister.cpp
 addons/SoundTrig/LynxTWO-RT/LynxTWO/HalRegister.h
 addons/SoundTrig/LynxTWO-RT/LynxTWO/HalSampleClock.cpp
 addons/SoundTrig/LynxTWO-RT/LynxTWO/HalSampleClock.h
+addons/SoundTrig/LynxTWO-RT/LynxTWO/HalStatusCodes.cpp
 addons/SoundTrig/LynxTWO-RT/LynxTWO/HalStatusCodes.h
 addons/SoundTrig/LynxTWO-RT/LynxTWO/HalTimecode.cpp
 addons/SoundTrig/LynxTWO-RT/LynxTWO/HalTimecode.h

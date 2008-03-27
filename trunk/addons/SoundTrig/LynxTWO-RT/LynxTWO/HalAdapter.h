@@ -66,7 +66,7 @@ enum
 class CHalAdapter
 {
 public:
-	CHalAdapter( PHALDRIVERINFO pDrvInfo, ULONG ulAdapterNumber = 0 );		// constructor
+	CHalAdapter( PHALDRIVERINFO pDrvInfo, ULONG ulAdapterNumber = 0, const char *name = 0 );		// constructor
 	~CHalAdapter();								// destructor
 
 	USHORT	Find();								// finds the next available adapter
@@ -143,6 +143,7 @@ public:
 	PHALLSTREAM		GetLStream()			{	return( &m_LStream );		}
 
 	ULONG			GetAdapterNumber()		{	return( m_ulAdapterNumber );		}
+    const char *    GetAdapterName()        {   return m_szName; }
 
 	ULONG			GetNumWaveDevices()		{	return( NUM_WAVE_DEVICES );			}
 	ULONG			GetNumWaveInDevices()	{	return( NUM_WAVE_RECORD_DEVICES );	}
@@ -275,6 +276,7 @@ private:
 	BOOLEAN				m_bDACDeEmphasis;
 	ULONG				m_ulMTCSource;
 	BOOLEAN				m_bLStreamSyncStart;
+    const char *        m_szName;
 };
 
 #endif // _HALADAPTER_H

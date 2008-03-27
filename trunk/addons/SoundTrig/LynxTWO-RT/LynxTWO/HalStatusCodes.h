@@ -3,7 +3,7 @@
 /////////////////////////////////////////////////////////////////////////////
 //	Status Codes
 /////////////////////////////////////////////////////////////////////////////
-enum
+enum HalStatusCodes
 {
 	HSTATUS_OK=0,
 	HSTATUS_CANNOT_FIND_ADAPTER,
@@ -34,5 +34,7 @@ enum
 	HSTATUS_MIDI2_SERVICE_REQUIRED,	// ADAT MIDI SYNCIN
 	NUM_HSTATUS_CODES
 };
+
+extern const char *HalStatusString(unsigned hal_status_code);
 
 #endif

@@ -44,7 +44,7 @@
 //#endif
 
 /////////////////////////////////////////////////////////////////////////////
-CHalAdapter::CHalAdapter( PHALDRIVERINFO pHalDriverInfo, ULONG ulAdapterNumber )
+CHalAdapter::CHalAdapter( PHALDRIVERINFO pHalDriverInfo, ULONG ulAdapterNumber, const char *nam )
 // Constructor - Cannot touch the hardware here...
 /////////////////////////////////////////////////////////////////////////////
 {
@@ -109,6 +109,7 @@ CHalAdapter::CHalAdapter( PHALDRIVERINFO pHalDriverInfo, ULONG ulAdapterNumber )
 	m_bHas40MHzXtal			= FALSE;
 	m_bHasMultiChannel		= FALSE;
 	m_bHasWideWireOut		= FALSE;
+    m_szName = nam ? nam : "Unnamed";
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -191,6 +192,29 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	m_pRegisters	= (PLYNXTWOREGISTERS)m_PCIConfig.Base[ PCI_REGISTERS_INDEX ].ulAddress;
 	m_pAudioBuffers	= (PLYNXTWOAUDIOBUFFERS)m_PCIConfig.Base[ AUDIO_DATA_INDEX ].ulAddress;
 	
+	// Fill in the PDBLOCK shadow registers
+	m_usDeviceID			= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.DeviceID );	// shouldn't change
+	m_usPCBRev				= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.PCBRev );
+	m_usFirmwareRev			= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.FWRevID );
+	m_usFirmwareDate		= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.FWDate );
+	m_usMinSoftwareAPIRev	= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.MinSWAPIRev );
+
+	// PCICTL & MISTAT are used in this function, PCICTL is set to 0 upon exit
+	if( EEPROMGetSerialNumber( &m_ulSerialNumber, (PVOID)m_pRegisters ) )
+	{
+		m_ulSerialNumber = 0xFFFFFFFF;
+	}
+	else
+	{
+		// validate the serial number
+		if( L2SN_GET_MODEL( m_ulSerialNumber ) != m_usDeviceID )
+		{
+			m_ulSerialNumber = 0xFFFFFFFF;
+		}
+	}
+    
+    LOG_MSG("Adapter %s / PCBRev %hu / FirmwareRev %hu / FirmwareDate %hu / MinSoftwareAPIRev %hu / SerialNumber %u\n", GetAdapterName(), m_usPCBRev, m_usFirmwareRev, m_usFirmwareDate, m_usMinSoftwareAPIRev, m_ulSerialNumber == 0xffffffff ? 0 : m_ulSerialNumber);
+
 #ifndef DOS
 	//DPF(("Test the SRAM\n"));
 	/////////////////////////////////////////////////////////////////////////
@@ -218,7 +242,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 			ulData = READ_REGISTER_ULONG( pAddr + i );
 			if( ulData != ulTestData )
 			{
-				DPF(("Bad Adapter Ram at %08x [%08x] Read [%08x] XOR [%08x]\n", i, ulTestData, ulData, ulData^ulTestData ));
+				ERROR("Bad Adapter Ram at %08x [%08x] Read [%08x] XOR [%08x]\n", i, ulTestData, ulData, ulData^ulTestData );
 				m_HalDriverInfo.pUnmap( m_HalDriverInfo.pContext, &m_PCIConfig );
 				return( HSTATUS_BAD_ADAPTER_RAM );
 			}
@@ -239,7 +263,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	usStatus = (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.LY );
 	if( usStatus != 0x4C59 )	// 0x4C='L' 0x59='Y'
 	{
-		DPF(("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08x\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.LY ) ));
+		ERROR("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08x\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.LY ) );
 		m_HalDriverInfo.pUnmap( m_HalDriverInfo.pContext, &m_PCIConfig );
 		return( HSTATUS_INCORRECT_FIRMWARE );
 	}
@@ -247,7 +271,7 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	usStatus = (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.NX );
 	if( usStatus != 0x4E58 )	// 0x4E='N' 0x58='X'
 	{
-		DPF(("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08x\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.NX ) ));
+		ERROR("BAR0 does not have valid PDBLOCK (Memory Window Invalid?)! %08x\n", READ_REGISTER_ULONG( &m_pRegisters->PDBlock.NX ) );
 		m_HalDriverInfo.pUnmap( m_HalDriverInfo.pContext, &m_PCIConfig );
 		return( HSTATUS_INCORRECT_FIRMWARE );
 	}
@@ -271,29 +295,6 @@ USHORT	CHalAdapter::Open( BOOLEAN bResume )
 	
 	m_RegPCICTL.Init( &m_pRegisters->PCICTL, REG_WRITEONLY );	// value defaults to 0, not written to hardware at this point
 	m_RegSTRMCTL.Init( &m_pRegisters->STRMCTL, REG_WRITEONLY );
-
-	// Fill in the PDBLOCK shadow registers
-	m_usDeviceID			= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.DeviceID );	// shouldn't change
-	m_usPCBRev				= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.PCBRev );
-	m_usFirmwareRev			= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.FWRevID );
-	m_usFirmwareDate		= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.FWDate );
-	m_usMinSoftwareAPIRev	= (USHORT)READ_REGISTER_ULONG( &m_pRegisters->PDBlock.MinSWAPIRev );
-
-	// PCICTL & MISTAT are used in this function, PCICTL is set to 0 upon exit
-	if( EEPROMGetSerialNumber( &m_ulSerialNumber, (PVOID)m_pRegisters ) )
-	{
-		m_ulSerialNumber = 0xFFFFFFFF;
-	}
-	else
-	{
-		// validate the serial number
-		if( L2SN_GET_MODEL( m_ulSerialNumber ) != m_usDeviceID )
-		{
-			m_ulSerialNumber = 0xFFFFFFFF;
-		}
-	}
-    
-    DEBUG_MSG("adapter version info: PCBRev: %hu  FirmwareRev: %hu  FirmwareDate: %hu  MinSoftwareAPIRev: %hu  SerialNumber: %u\n", m_usPCBRev, m_usFirmwareRev, m_usFirmwareDate, m_usMinSoftwareAPIRev, m_ulSerialNumber);
     
 	/////////////////////////////////////////////////////////////////////////
 	// do any serial number specific work

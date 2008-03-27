@@ -98,6 +98,11 @@ L22LINKAGE int linux_find_pcidev(LinuxContext * ctx, unsigned short vendorID, un
   return ctx->dev == 0; /*(ctx->dev = pci_find_device(vendorID, deviceID, NULL)) == 0;*/
 }
 
+L22LINKAGE const char *linux_pci_name(LinuxContext *ctx)
+{
+    return pci_name(ctx->dev);
+}
+
 L22LINKAGE int linux_allocate_dma_mem(LinuxContext *ctx, void **pVirt, unsigned long *pPhys, unsigned long size)
 {
   struct pci_pool *pool = ctx->dma.poolDMA;
