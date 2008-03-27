@@ -195,7 +195,7 @@ extern "C" {
     driverInfo->pDiv64 = LinuxGlue::Div64;
     driverInfo->pContext = reinterpret_cast<PVOID>(ctx);
     PHALADAPTER adapter; // alias for ctx->priv->adapter...
-    adapter = ctx->priv->adapter = new CHalAdapter(driverInfo, ctx->adapter_num);
+    adapter = ctx->priv->adapter = new CHalAdapter(driverInfo, ctx->adapter_num, linux_pci_name(ctx));
     if (!adapter) {
       LynxCleanup(ctx);
       return HSTATUS_INSUFFICIENT_RESOURCES;
@@ -203,7 +203,7 @@ extern "C" {
     
     unsigned short retval = adapter->Open(false);
     if (retval != HSTATUS_OK) {
-      ERROR("LinuxGlue::LynxStartup CHalAdapter::Open() returned error: %hu!\n", retval);
+      ERROR("LinuxGlue::LynxStartup CHalAdapter::Open() for adapter %s returned error: %s!\n", linux_pci_name(ctx), HalStatusString(retval));
       LynxCleanup(ctx);
       return retval;
     }

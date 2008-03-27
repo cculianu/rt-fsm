@@ -71,6 +71,8 @@ extern "C" {
   /* code to find a pci device */
   L22LINKAGE extern int linux_find_pcidev(LinuxContext * pContext, unsigned short vendorID, unsigned short deviceID);
   
+  L22LINKAGE extern const char *linux_pci_name(LinuxContext *pContext);
+  
   L22LINKAGE extern int linux_allocate_dma_mem(LinuxContext *pContext, void **pVirt, unsigned long *pPhys, unsigned long size);
   L22LINKAGE extern int linux_free_dma_mem(LinuxContext *pContext, void *virt, unsigned long phys, unsigned long size);
 
