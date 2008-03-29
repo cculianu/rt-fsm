@@ -134,7 +134,12 @@ bool OWavFile::create(const char *filename, unsigned n_chans, unsigned bits_per_
 
 namespace 
 {
-  inline double round(double d) { return double(unsigned(d+0.5)); }
+  inline double rnd(double d) 
+  { 
+      if (d < 0.) 
+          return double(unsigned(d-0.5)); // round away from 0 for negative
+      return double(unsigned(d+0.5)); // round away from 0 for positive
+  }
 }
 
 // NB: when writing data, channels should be interleaved as in sample0{chan0,chan1},sample1{chan0,chan1} etc..
@@ -150,7 +155,7 @@ bool OWavFile::write(const double *data, unsigned size, unsigned srate, double s
   unsigned nwrit = 0, nframes = size/p->nchans;
   for (double i = 0; i < nframes; i += factor, ++nwrit) {
     for (unsigned chan = 0; chan < p->nchans; ++chan) {
-      unsigned idx = unsigned(round(i))*p->nchans+chan;
+      unsigned idx = unsigned(rnd(i))*p->nchans+chan;
       uint32 samp = uint32((data[idx]-scale_min)/(scale_max-scale_min) * double(~0U)); // 32-bit unsigned sample
       if (p->bitspersample != 8) {
         // argh, deal with signed PCM
@@ -190,7 +195,7 @@ bool OWavFile::write(const void *v,
   unsigned nwrit = 0, nframes = size/p->nchans;
   for (double i = 0; i < nframes; i += factor, ++nwrit) {
     for (unsigned chan = 0; chan < p->nchans; ++chan) {
-      unsigned idx = unsigned(round(i))*p->nchans+chan;
+      unsigned idx = unsigned(rnd(i))*p->nchans+chan;
       uint32 samp;
       double datum;
       switch (bits) {
