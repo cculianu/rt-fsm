@@ -238,9 +238,9 @@ namespace
   {   
     if (isBigEndian()) {
       int8 * p = (int8 *)&x;
-      p[0] |= p[1]; // swap the two bytes
-      p[1] |= p[0];
-      p[0] |= p[1];      
+      p[0] ^= p[1]; // swap the two bytes
+      p[1] ^= p[0];
+      p[0] ^= p[1];      
     }
     return x;
   }
@@ -248,13 +248,13 @@ namespace
   {
     if (isBigEndian()) {
       int8 * p = (int8 *)&x;
-      p[0] |= p[3]; // swap the two end bytes
-      p[3] |= p[0];
-      p[0] |= p[3];      
+      p[0] ^= p[3]; // swap the two end bytes
+      p[3] ^= p[0];
+      p[0] ^= p[3];      
 
-      p[1] |= p[2]; // swap the two middle bytes
-      p[2] |= p[1];
-      p[1] |= p[2];      
+      p[1] ^= p[2]; // swap the two middle bytes
+      p[2] ^= p[1];
+      p[1] ^= p[2];      
     }
     return x;    
   }
