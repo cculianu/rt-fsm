@@ -1089,6 +1089,26 @@ void *ConnectionThread::threadFunc(void)
                     cmd_error = false;
                 }
             }
+        } else if (line.find("GET AIMODE") == 0) { // GET AIMODE
+            msg.id = GETAIMODE;
+            sendToRT(msg);
+            if (msg.u.ai_mode_is_asynch)
+                sockSend("asynch\n");
+            else
+                sockSend("synch\n");
+            cmd_error = false;
+        } else if (line.find("SET AIMODE") == 0) { // SET AIMODE
+            std::istringstream s(line.substr(10));
+            std::string mode;
+            s >> mode;
+            std::transform(mode.begin(), mode.end(), mode.begin(), tolower);
+            msg.id = SETAIMODE;
+            if (mode == "asynch")
+                msg.u.ai_mode_is_asynch = 1, cmd_error = false;
+            else if (mode == "synch")
+                msg.u.ai_mode_is_asynch = 0, cmd_error = false;
+            if (!cmd_error)
+                sendToRT(msg);
         } // end if to compare line to cmds
     } // end if client_ver
     if (cmd_error) {

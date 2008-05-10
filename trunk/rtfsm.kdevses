@@ -1,127 +1,136 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
 <!DOCTYPE KDevPrjSession>
 <KDevPrjSession>
- <DocsAndViews NumberOfDocuments="40" >
-  <Doc0 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LinuxModule.c" >
-   <View0 Encoding="ISO 8859-1" line="50" Type="Source" />
+ <DocsAndViews NumberOfDocuments="43" >
+  <Doc0 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/fsm.c" >
+   <View0 Encoding="ISO 8859-1" line="131" Type="Source" />
   </Doc0>
-  <Doc1 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LinuxInterface.h" >
-   <View0 Encoding="ISO 8859-1" line="18" Type="Source" />
+  <Doc1 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/EmbC.h" >
+   <View0 Encoding="ISO 8859-1" line="183" Type="Source" />
   </Doc1>
-  <Doc2 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO-RT.h" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  <Doc2 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/FSMServer.cpp" >
+   <View0 Encoding="ISO 8859-1" line="1118" Type="Source" />
   </Doc2>
-  <Doc3 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalEnv.h" >
-   <View0 Encoding="ISO 8859-1" line="1025" Type="Source" />
+  <Doc3 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/runtime/embc_mod_wrapper.c" >
+   <View0 Encoding="ISO 8859-1" line="43" Type="Source" />
   </Doc3>
-  <Doc4 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp" >
-   <View0 Encoding="ISO 8859-1" line="65" Type="Source" />
+  <Doc4 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/Version.h" >
+   <View0 Encoding="ISO 8859-1" line="7" Type="Source" />
   </Doc4>
-  <Doc5 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/HalTest/AdapterPage.cpp" >
-   <View0 Encoding="ISO 8859-1" line="364" Type="Source" />
+  <Doc5 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/extra_mathfuncs.h" >
+   <View0 Encoding="ISO 8859-1" line="14" Type="Source" />
   </Doc5>
-  <Doc6 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalMixer.h" >
-   <View0 Encoding="ISO 8859-1" line="16" Type="Source" />
+  <Doc6 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/FSM.h" >
+   <View0 Encoding="ISO 8859-1" line="145" Type="Source" />
   </Doc6>
-  <Doc7 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.h" >
-   <View0 Encoding="ISO 8859-1" line="30" Type="Source" />
+  <Doc7 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/SetStateProgram.m" >
+   <View0 Encoding="ISO 8859-1" line="298" Type="Source" />
   </Doc7>
-  <Doc8 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Hal.h" >
-   <View0 Encoding="ISO 8859-1" line="90" Type="Source" />
+  <Doc8 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/float_vsnprintf.c" >
+   <View0 Encoding="ISO 8859-1" line="498" Type="Source" />
   </Doc8>
-  <Doc9 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/HalTest/Callback.cpp" >
-   <View0 Encoding="ISO 8859-1" line="47" Type="Source" />
+  <Doc9 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/scanproc.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc9>
-  <Doc10 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/HalTest/TestPage.cpp" >
-   <View0 Encoding="ISO 8859-1" line="484" Type="Source" />
+  <Doc10 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/SoundServer.cpp" >
+   <View0 Encoding="ISO 8859-1" line="1085" Type="Source" />
   </Doc10>
-  <Doc11 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/HalTest/HalTest.h" >
-   <View0 Encoding="ISO 8859-1" line="10" Type="Source" />
+  <Doc11 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/scanproc.c" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc11>
-  <Doc12 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.cpp" >
-   <View0 Encoding="ISO 8859-1" line="189" Type="Source" />
+  <Doc12 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/rtos_utility.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc12>
-  <Doc13 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/LynxTWO.h" >
-   <View0 Encoding="ISO 8859-1" line="47" Type="Source" />
+  <Doc13 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/rtos_utility.cpp" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc13>
-  <Doc14 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalSampleClock.cpp" >
-   <View0 Encoding="ISO 8859-1" line="400" Type="Source" />
+  <Doc14 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/rtos_shared_memory.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc14>
-  <Doc15 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalSampleClock.h" >
-   <View0 Encoding="ISO 8859-1" line="68" Type="Source" />
+  <Doc15 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/Mutex.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc15>
-  <Doc16 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalMixer.cpp" >
-   <View0 Encoding="ISO 8859-1" line="1254" Type="Source" />
+  <Doc16 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/COPYING" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc16>
-  <Doc17 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Hal8420.h" >
-   <View0 Encoding="ISO 8859-1" line="350" Type="Source" />
+  <Doc17 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/README" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc17>
-  <Doc18 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Hal8420.cpp" >
-   <View0 Encoding="ISO 8859-1" line="46" Type="Source" />
+  <Doc18 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/INSTALL" >
+   <View0 Encoding="ISO 8859-1" line="328" Type="Source" />
   </Doc18>
-  <Doc19 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalDMA.cpp" >
-   <View0 Encoding="ISO 8859-1" line="157" Type="Source" />
+  <Doc19 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/ChanMapper.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc19>
-  <Doc20 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalDMA.h" >
-   <View0 Encoding="ISO 8859-1" line="68" Type="Source" />
+  <Doc20 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/ChanMapper.c" >
+   <View0 Encoding="ISO 8859-1" line="11" Type="Source" />
   </Doc20>
-  <Doc21 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.h" >
+  <Doc21 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/deflate_helper.c" >
    <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc21>
-  <Doc22 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalDevice.h" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  <Doc22 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LinuxModule.c" >
+   <View0 Encoding="ISO 8859-1" line="103" Type="Source" />
   </Doc22>
-  <Doc23 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/HalTest/Fader.cpp" >
-   <View0 Encoding="ISO 8859-1" line="373" Type="Source" />
-  </Doc23>
-  <Doc24 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/HalTest/HalTestDlg.cpp" >
-   <View0 Encoding="ISO 8859-1" line="281" Type="Source" />
-  </Doc24>
-  <Doc25 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalLStream.h" >
+  <Doc23 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO-RT.h" >
    <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  </Doc23>
+  <Doc24 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LinuxInterface.h" >
+   <View0 Encoding="ISO 8859-1" line="13" Type="Source" />
+  </Doc24>
+  <Doc25 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp" >
+   <View0 Encoding="ISO 8859-1" line="205" Type="Source" />
   </Doc25>
-  <Doc26 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalLStream.cpp" >
-   <View0 Encoding="ISO 8859-1" line="363" Type="Source" />
+  <Doc26 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/LynxTWO.h" >
+   <View0 Encoding="ISO 8859-1" line="856" Type="Source" />
   </Doc26>
-  <Doc27 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalWaveDevice.cpp" >
-   <View0 Encoding="ISO 8859-1" line="882" Type="Source" />
+  <Doc27 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc27>
-  <Doc28 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalEEPROM.cpp" >
-   <View0 Encoding="ISO 8859-1" line="1083" Type="Source" />
+  <Doc28 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/rtos_compat.h" >
+   <View0 Encoding="ISO 8859-1" line="64" Type="Source" />
   </Doc28>
-  <Doc29 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Hal4114.cpp" >
-   <View0 Encoding="ISO 8859-1" line="450" Type="Source" />
+  <Doc29 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTrig.c" >
+   <View0 Encoding="ISO 8859-1" line="406" Type="Source" />
   </Doc29>
-  <Doc30 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/Include/StdAfx.h" >
+  <Doc30 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/softtask.c" >
    <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc30>
-  <Doc31 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Makefile" >
-   <View0 Encoding="ISO 8859-1" line="26" Type="Source" />
+  <Doc31 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/Util.cpp" >
+   <View0 Encoding="ISO 8859-1" line="77" Type="Source" />
   </Doc31>
-  <Doc32 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/Makefile" >
+  <Doc32 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Makefile" >
    <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc32>
-  <Doc33 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/Makefile" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  <Doc33 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalStatusCodes.h" >
+   <View0 Encoding="ISO 8859-1" line="21" Type="Source" />
   </Doc33>
-  <Doc34 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/Include/DrvDebug.h" >
-   <View0 Encoding="ISO 8859-1" line="151" Type="Source" />
+  <Doc34 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalStatusCodes.cpp" >
+   <View0 Encoding="ISO 8859-1" line="64" Type="Source" />
   </Doc34>
-  <Doc35 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalWaveDMADevice.cpp" >
-   <View0 Encoding="ISO 8859-1" line="235" Type="Source" />
+  <Doc35 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Makefile" >
+   <View0 Encoding="ISO 8859-1" line="18" Type="Source" />
   </Doc35>
-  <Doc36 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalDevice.cpp" >
-   <View0 Encoding="ISO 8859-1" line="70" Type="Source" />
+  <Doc36 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.cpp" >
+   <View0 Encoding="ISO 8859-1" line="215" Type="Source" />
   </Doc36>
-  <Doc37 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalRegister.h" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  <Doc37 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalEnv.h" >
+   <View0 Encoding="ISO 8859-1" line="292" Type="Source" />
   </Doc37>
-  <Doc38 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalRegister.cpp" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  <Doc38 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/Hal.h" >
+   <View0 Encoding="ISO 8859-1" line="37" Type="Source" />
   </Doc38>
-  <Doc39 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/fsm.c" >
-   <View0 Encoding="ISO 8859-1" line="1853" Type="Source" />
+  <Doc39 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/Include/DrvDebug.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc39>
+  <Doc40 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.h" >
+   <View0 Encoding="ISO 8859-1" line="197" Type="Source" />
+  </Doc40>
+  <Doc41 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO/HalTimecode.h" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  </Doc41>
+  <Doc42 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/WavFile.cpp" >
+   <View0 Encoding="ISO 8859-1" line="219" Type="Source" />
+  </Doc42>
  </DocsAndViews>
  <pluginList>
   <kdevdebugger>

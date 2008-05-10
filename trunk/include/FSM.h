@@ -251,6 +251,8 @@ enum ShmMsgID
     LOGITEMCOUNT, /* get the log item count */
     GETERROR, /* get the alst fsm error -- use this to see if
                  an FSMSpec was accepted and if not, what was wrong with it */
+    SETAIMODE, /* reset acquisition mode to either asynch or synch */
+    GETAIMODE, /* query the current acquisition mode */
     LAST_SHM_MSG_ID
 };
 
@@ -333,6 +335,9 @@ struct ShmMsg {
       /* For id == GETERROR -- descriptive text of last FSM error, 
          or empty string if no errors  */
       char error[FSM_ERROR_BUF_SIZE];
+      
+      /* For id == SETAIMODE and GETAIMODE */
+      unsigned ai_mode_is_asynch;
 
     } u;
   };
