@@ -108,6 +108,7 @@ static void reconfigureIO(void); /* helper that reconfigures DIO channels
 static int initAISubdev(void); /* Helper for initComedi() */
 static int initAOSubdev(void); /* Helper for initComedi() */
 static int setupComediCmd(void);
+static void restartAIAcquisition(long flags);
 static void cleanupAOWaves(volatile struct FSMSpec *);
 struct AOWaveINTERNAL;
 static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, int bufnum);
@@ -141,7 +142,7 @@ static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch
 #define MAX_HISTORY 65536 /* The maximum number of state transitions we remember -- note that the struct StateTransition is currently 16 bytes so the memory we consume (in bytes) is this number times 16! */
 #define DEFAULT_TASK_RATE 6000
 #define DEFAULT_AI_SAMPLING_RATE 10000
-#define DEFAULT_AI_SETTLING_TIME 5
+#define DEFAULT_AI_SETTLING_TIME 4
 #define DEFAULT_TRIGGER_MS 1
 #define DEFAULT_AI "synch"
 #define MAX_AI_CHANS (sizeof(unsigned)*8)
@@ -257,7 +258,8 @@ static unsigned long fsm_cycle_long_ct = 0, fsm_wakeup_jittered_ct = 0, fsm_cycl
 static unsigned long ai_n_overflows = 0;
 
 /* Comedi CB stats */
-static unsigned long cb_eos_skips = 0, cb_eos_skipped_scans = 0;
+static unsigned long cb_eos_skips = 0, cb_eos_skipped_scans = 0, cb_eos_num_scans = 0;
+static int64 cb_eos_cyc_max = ~0ULL, cb_eos_cyc_min = 0x7fffffffffffffffLL, cb_eos_cyc_avg = 0, cb_eos_cyc_ct = 0;
 
 /* Remembered state of all DIO channels.  Bitfield array is indexed
    by DIO channel-id. */
@@ -514,6 +516,7 @@ static void printStats(void);
 static void buddyTaskHandler(void *arg);
 static void buddyTaskComediHandler(void *arg);
 static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime_t task_period_ns);
+static void tallyCbEosCycStats(hrtime_t cyc_time);
 static void tallyCycleTime(hrtime_t t0, hrtime_t tf);
 static char *cycleStr(void);
 /*-----------------------------------------------------------------------------*/
@@ -605,8 +608,7 @@ void cleanup (void)
     comedi_cancel(dev_ai, subdev_ai);
     comedi_unlock(dev_ai, subdev_ai);
     /* Cleanup any comedi_cmd */
-    if ( AI_MODE == ASYNCH_MODE )
-      comedi_register_callback(dev_ai, subdev_ai, 0, 0, 0);
+    comedi_register_callback(dev_ai, subdev_ai, 0, 0, 0);
     comedi_close(dev_ai);
     dev_ai = 0;
   }
@@ -1162,7 +1164,7 @@ static inline unsigned long transferCircBuffer(void *dest,
       continue;
     }
     memcpy(d + nread, s + offset, n);
-    DEBUG_VERB("transferCircBuffer: copied %lu bytes!\n", n);
+    DEBUG_CRAZY("transferCircBuffer: copied %lu bytes!\n", n);
     bytes -= n;
     offset += n;
     nread += n;
@@ -1170,12 +1172,22 @@ static inline unsigned long transferCircBuffer(void *dest,
   return offset;
 }
 
+static void restartAIAcquisition(long flags)
+{
+    comedi_cancel(dev_ai, subdev_ai);
+    if (AI_MODE == ASYNCH_MODE)
+        /* slow operation to restart the comedi command, so just pend it
+           to non-rt buddy task which runs in process context and can take its 
+           sweet-assed time.. */
+        softTaskPend(buddyTaskComedi, (void *)flags);
+}
+
 /** Called by comedi during asynch IO to tell us a scan ended. */
 static int comediCallback(unsigned int mask, void *ignored)
 {
   char timeBuf[22] = {0};
   (void)ignored;
-
+  
   if (debug > 1) {
     /* used in debug sections below.. */
     uint64_to_cstr_r(timeBuf, sizeof(timeBuf), gethrtime()); 
@@ -1191,17 +1203,15 @@ static int comediCallback(unsigned int mask, void *ignored)
   if (mask & COMEDI_CB_OVERFLOW) {
     ++ai_n_overflows;
     WARNING("comediCallback: got COMEDI_CB_OVERFLOW! Attempting to restart acquisition!\n");
-    comedi_cancel(dev_ai, subdev_ai);
-    /* slow operation to restart the comedi command, so just pend it
-       to non-rt buddy task which runs in process context and can take its 
-       sweet-assed time.. */
-    softTaskPend(buddyTaskComedi, 0); 
+    restartAIAcquisition(1);
     return 0;
   }
   if (mask & COMEDI_CB_BLOCK) {
         DEBUG_CRAZY("comediCallback: got COMEDI_CB_BLOCK at abs. time %s.\n", timeBuf);
   }
   if (mask & COMEDI_CB_EOS) {
+    static hrtime_t timeLast = 0;
+    hrtime_t timeNow = gethrtime();
     /* This is what we want.. EOS. Now copy scans from the comedi driver 
        buffer: ai_asynch_buf, to our local data structure for feeding to 
        RT... */
@@ -1228,7 +1238,10 @@ static int comediCallback(unsigned int mask, void *ignored)
       }        
       return -EINVAL;
     }
-
+    
+    cb_eos_num_scans += numScans;
+    if (timeLast) tallyCbEosCycStats(timeNow-timeLast);
+    timeLast = timeNow;
     /* NB: We *need* to pull exactly one scan.. not more!  It didn't
        occur to me initially that this callback sometimes gets called
        late, when the board already has put some samples of the next
@@ -1249,9 +1262,9 @@ static int comediCallback(unsigned int mask, void *ignored)
           invariant that the buffer always starts on a scan boundary. 
     */
     { 
-      unsigned long flags;
+      /*unsigned long flags;
       
-      rt_critical(flags); /* Lock machine, disable interrupts.. to avoid
+      rt_critical(flags); / * Lock machine, disable interrupts.. to avoid
                               race conditions with RT since we write to 
                               ai_samples. */
 
@@ -1265,7 +1278,7 @@ static int comediCallback(unsigned int mask, void *ignored)
 
       /* consume all full scans up to present... */
       comedi_mark_buffer_read(dev_ai, subdev_ai, numScans * oneScanBytes);
-      rt_end_critical(flags); /* Unlock machine, reenable interrupts... */
+      /*rt_end_critical(flags); / * Unlock machine, reenable interrupts... */
 
       /* puts chan0 to the debug fifo iff in debug mode */
       putDebugFifo(ai_samples[0]); 
@@ -1286,7 +1299,10 @@ static int setupComediCmd(void)
   /* Clear sample buffers.. */
   memset(ai_samples, 0, sizeof(ai_samples));
 
-  /* First, setup our callback func. */
+  /* First, clear old callback just in case */
+  comedi_register_callback(dev_ai, subdev_ai, 0, 0, 0);
+  
+  /* Next, setup our callback func. */
   err = comedi_register_callback(dev_ai, subdev_ai,  COMEDI_CB_EOA|COMEDI_CB_ERROR|COMEDI_CB_OVERFLOW|COMEDI_CB_EOS/*|COMEDI_CB_BLOCK*/, comediCallback, 0);
 
   if ( err ) {
@@ -1329,7 +1345,6 @@ static int setupComediCmd(void)
     ERROR("Comedi command could not be started, comedi_command_test returned: %d!\n", err);
     return err;
   }
-
   /* obtain a pointer to the command buffer */
   err = comedi_map(dev_ai, subdev_ai, (void *)&ai_asynch_buf);
   if (err) {
@@ -1604,8 +1619,10 @@ static int myseq_show (struct seq_file *m, void *dummy)
     seq_printf(m, 
                "AI Asynch Info\n"
                "--------------\n"
-               "NumSkips: %lu\t"  "NumScansSkipped: %lu\t"  "NumAIOverflows: %lu\n\n",
-               cb_eos_skips, cb_eos_skipped_scans, ai_n_overflows);    
+               "CycTimeMax: %lu  CycTimeMin: %lu  CycTimeAvg: %lu\n"
+               "NunScans: %lu  " "NumSkips: %lu  "  "NumScansSkipped: %lu  "  "NumAIOverflows: %lu\n\n",
+               (unsigned long)cb_eos_cyc_max, (unsigned long)cb_eos_cyc_min, (unsigned long)cb_eos_cyc_avg,
+               cb_eos_num_scans, cb_eos_skips, cb_eos_skipped_scans, ai_n_overflows);    
   }
 
   for (f = 0; f < NUM_STATE_MACHINES; ++f) {
@@ -2561,6 +2578,17 @@ static void handleFifos(FSMID_t f)
       BUDDY_TASK_PEND(GETERROR); /* Copies rather large string, pend to nrt */
       break;
       
+    case SETAIMODE: /* reset AI mode to/from asynch/synch -- may (re)start the comedi cmd */
+      ai_mode = msg->u.ai_mode_is_asynch ? ASYNCH_MODE : SYNCH_MODE;
+      restartAIAcquisition(0);
+      do_reply = 1;
+      break;
+      
+    case GETAIMODE: /* query the current acquisition mode */
+      msg->u.ai_mode_is_asynch = AI_MODE == ASYNCH_MODE;
+      do_reply = 1;
+      break;
+            
     case GETFSMSIZE:
       if (rs[f].valid) {
         
@@ -3437,12 +3465,12 @@ static void buddyTaskHandler(void *arg)
 static void buddyTaskComediHandler(void *arg)
 {
   int err;
-  (void)arg;
-
+  long flags = (long)arg;
+  
   err = setupComediCmd();    
   if (err)
     ERROR("comediCallback: failed to restart acquisition after COMEDI_CB_OVERFLOW %d: error: %d!\n", ai_n_overflows, err);
-  else
+  else if (flags)
     LOG_MSG("comediCallback: restarted acquisition after %d overflows.\n", ai_n_overflows);
 }
 
@@ -3843,6 +3871,19 @@ static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime
     quot += lat_cur;
     do_div(quot, n);
     lat_avg = quot;
+}
+
+static void tallyCbEosCycStats(hrtime_t cyc_time)
+{
+   hrtime_t quot;
+   const unsigned long n = ++cb_eos_cyc_ct > 100 ? 100 : ( cb_eos_cyc_ct ? cb_eos_cyc_ct : 1 );
+   
+    if (cyc_time > cb_eos_cyc_max) cb_eos_cyc_max = cyc_time;
+    if (cyc_time < cb_eos_cyc_min) cb_eos_cyc_min = cyc_time;
+    quot = cb_eos_cyc_avg * (n-1);
+    quot += cyc_time;
+    do_div(quot, n);
+    cb_eos_cyc_avg = quot;
 }
 
 static char *cycleStr(void)

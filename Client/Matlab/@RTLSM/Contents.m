@@ -457,6 +457,24 @@
 %                Get the number of variables that have been logged
 %                since the last call to Initialize().
 %
+% [mode]       = GetAIMode(sm)
+%                Retrieve the current data acquisition mode for the AI 
+%                subdevice.  Possible modes returned are:
+%                'asynch' -- asynchronous acquisition -- this is faster 
+%                            since it happens independent of the FSM, but 
+%                            is less compatible with all boards.
+%                'synch'  -- synchronous acquisition -- the default
+%                            works reliably with all boards.
+%
+% [sm]         = SetAIMode(sm, mode)
+%                Set the data acquisition mode to use for the AI 
+%                subdevice.  Possible modes to use are:
+%                'asynch' -- asynchronous acquisition -- this is faster 
+%                            since it happens independent of the FSM, but 
+%                            is less compatible with all boards.
+%                'synch'  -- synchronous acquisition -- the default
+%                            works reliably with all boards.
+%
 % ----- Control issues ----------
 %
 %
