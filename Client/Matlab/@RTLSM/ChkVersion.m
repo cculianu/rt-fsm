@@ -19,7 +19,7 @@ function [ok] = ChkVersion(sm)
     end;
 
     % Now, tell the server about our version!
-    DoSimpleCmd(sm, sprintf('CLIENTVERSION %u', sm.MIN_SERVER_VERSION));
+    DoSimpleCmd(sm, sprintf('CLIENTVERSION %u', sm.CLIENT_VERSION));
 
     
 return;
