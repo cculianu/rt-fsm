@@ -15,6 +15,9 @@ typedef std::map<int, NetClient *> NetClientMap;
 #define strcmpi strcasecmp
 #endif
 
+// url encode a string
+static long UrlEncode(char *dest, const char *src);
+
 static NetClientMap clientMap;
 static int handleId = 0; // keeps getting incremented..
 
@@ -312,13 +315,83 @@ void destroyClient(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   RETURN(1);
 }
 
-struct CommandFunctions
+void formatMatrix(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+/*    if (nlhs < 1) {
+        mexWarnMsgTxt("formatMatrix did not get an output argument, so not doing any real work.  Specify an output argument to do real work.");
+        RETURN_NULL();
+    }*/
+    if (nrhs != 1 || !mxIsCell(*prhs) || !mxGetNumberOfDimensions(*prhs)) 
+        mexErrMsgTxt("formatMatrix: needs one input argument of type cell");
+    const int m = mxGetM(*prhs), n = mxGetN(*prhs);
+    int i,j;
+    static long outbuf_len = 1024*1024; // preallocate 1MB
+    char *outbuf = (char *)mxCalloc(outbuf_len, sizeof(char)), *outbufPtr = outbuf; // preallocate 1MB for output
+    if (!outbuf)
+        mexErrMsgTxt("formatMatrix: failed to allocate 1MB for output txt");
+    for (i = 0; i < m; ++i) {
+        for (j = 0; j < n; ++j) {
+            int subs[2] = { i, j };
+            char buf[4096];
+            mxArray *cell = mxGetCell(*prhs, mxCalcSingleSubscript(*prhs, 2, subs));
+            if (!cell) {
+                mxFree(outbuf);
+                mexErrMsgTxt("formatMatrix: A cell element in the cell array could not be retrieved!");
+            }
+            void *data = mxGetData(cell);
+            if (!data) { // can happen on empty array
+                mxFree(outbuf);
+                mexErrMsgTxt("formatMatrix: A cell element in the cell array is empty/null -- all elements need to contain data!");
+            }
+            switch(mxGetClassID(cell)) {
+                case mxCHAR_CLASS: 
+                    mxGetString(cell, buf, sizeof(buf));
+                    buf[sizeof(buf)-1] = 0;
+                    break;
+                case mxINT8_CLASS:   sprintf(buf, "%hhd", *(char *)mxGetData(cell)); break; 
+                case mxUINT8_CLASS:  sprintf(buf, "%hhu", *(unsigned char *)mxGetData(cell)); break; 
+                case mxINT16_CLASS:  sprintf(buf, "%hd", *(short *)mxGetData(cell)); break; 
+                case mxUINT16_CLASS: sprintf(buf, "%hu", *(unsigned short *)mxGetData(cell)); break; 
+                case mxINT32_CLASS:  sprintf(buf, "%d", *(int *)mxGetData(cell)); break; 
+                case mxUINT32_CLASS: sprintf(buf, "%u", *(unsigned int *)mxGetData(cell)); break; 
+                case mxSINGLE_CLASS: sprintf(buf, "%g", *(float *)mxGetData(cell)); break; 
+                case mxDOUBLE_CLASS: sprintf(buf, "%g", *(double *)mxGetData(cell)); break; 
+                default:
+                    mxFree(outbuf);
+                    mexErrMsgTxt("formatMatrix: Unknown cell type encountered!");
+            }
+            long lenSoFar = outbufPtr - outbuf;
+            if (lenSoFar + (strlen(buf)*3+4) >= outbuf_len) {
+                // reallocate if ran out of space
+                void * tmp = mxRealloc(outbuf, outbuf_len*=2);
+                if (!tmp) {
+                    mxFree(outbuf);
+                    mexErrMsgTxt("formatMatrix: Out of space in output text buffer and failed to allocate more!");
+                }
+                outbuf = (char *)tmp;
+                outbufPtr = outbuf + lenSoFar;
+            }
+            // it's 1 cell per line....
+            *outbufPtr++ = ' ';
+            *outbufPtr++ = ' ';
+            outbufPtr += UrlEncode(outbufPtr, buf);
+            *outbufPtr++ = '\n';
+        }
+    }
+   // return the text..
+   if (plhs[0])
+       mxDestroyArray(plhs[0]);
+   plhs[0] = mxCreateString(outbuf);
+   mxFree(outbuf);
+}
+
+struct CommandFunction
 {
 	const char *name;
 	void (*func)(int, mxArray **, int, const mxArray **);
 };
 
-static struct CommandFunctions functions[] = 
+static struct CommandFunction functions[] = 
 {
     { "create", createNewClient },
     { "destroy", destroyClient },
@@ -331,9 +404,10 @@ static struct CommandFunctions functions[] =
 	{ "readMatrix", readMatrix },
     { "notifyEvents", notifyEvents },
     { "stopNotifyEvents", stopNotifyEvents },
+    { "formatMatrix", formatMatrix }
 };
 
-static const int n_functions = sizeof(functions)/sizeof(struct CommandFunctions);
+static const int n_functions = sizeof(functions)/sizeof(struct CommandFunction);
 
 void mexFunction( int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[])
@@ -369,5 +443,28 @@ void mexFunction( int nlhs, mxArray *plhs[],
   }
 }
 
-
-
+/* Encode funny chars -> %xx in newly allocated storage */
+/* (preserves '/' !) */
+/* Make sure t holds at least strlen(s)*3+1 -Doug */
+/* Returns the size of the generated output string */
+long UrlEncode(char *t, const char *s) 
+{
+    unsigned char *tp = (unsigned char *)t;
+    const unsigned char *p = (const unsigned char *)s;
+    if (!t) return 0;
+    for (p = (const unsigned char *)s; *p; p++) {
+        if( (*p > 0x00 && *p < ',') ||
+            (*p > '9' && *p < 'A') ||
+            (*p > 'Z' && *p < '_') ||
+            (*p > '_' && *p < 'a') ||
+            (*p > 'z' && *p < 0xA1)) {
+            sprintf((char *)tp, "%%%02X", (char)*p);
+            tp += 3;
+        } else {
+            *tp = *p;
+            tp++;
+        }
+    }
+    *tp = 0;
+    return tp - (unsigned char *)t;
+}

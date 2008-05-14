@@ -234,7 +234,7 @@ void Socket::setTCPNDelay() const
   int ret = ::setsockopt(m_sock, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char *>(&flag), sizeof(flag));
 #else
   long flag = m_tcpNDelay;
-  int ret = ::setsockopt(m_sock, SOL_TCP, TCP_NODELAY, &flag, sizeof(flag));
+  int ret = ::setsockopt(m_sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 #endif
   if (ret != 0) throw SocketException("Could not set TCP No Delay!");
 }
@@ -246,7 +246,7 @@ void Socket::setReuseAddr() const
   int ret = ::setsockopt(m_sock, SOL_SOCKET , SO_REUSEADDR, reinterpret_cast<char *>(&flag), sizeof(flag));
 #else
   long flag = m_reuseAddr;
-  int ret = ::setsockopt(m_sock, SOL_TCP, SO_REUSEADDR, &flag, sizeof(flag));
+  int ret = ::setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
 #endif
   if (ret != 0) throw SocketException("Could not set SO_REUSEADDR!");
 }

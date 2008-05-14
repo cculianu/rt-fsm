@@ -18,7 +18,11 @@ endif
 ifeq ($(KERNELRELEASE),) 
 
 all: 
-		make -C $(KDIR) M=$(PWD) modules
+ifdef COMPILER_OVERRIDE
+		make -C '$(KDIR)' M='$(PWD)' COMPILER_OVERRIDE='$(COMPILER_OVERRIDE)' modules
+else
+		make -C '$(KDIR)' M='$(PWD)' modules
+endif
 
 install:
 	su -c "cp -v $(TARGET).ko $(DEST) && /sbin/depmod -a"
@@ -28,6 +32,11 @@ clean:
 	make -C $(KDIR) M=$(PWD) clean
 
 else	
+
+# override the CC defined by kernel makefiles to come from our COMPILER_OVERRIDE option
+ifdef COMPILER_OVERRIDE
+  CC = $(COMPILER_OVERRIDE)
+endif
 
 obj-m      := $(TARGET).o
 

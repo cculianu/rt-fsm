@@ -144,6 +144,7 @@ namespace
   typedef std::map<ConnectionThread *, ConnectionThread *> ConnectedThreadsList;
 
   bool debug = false; // set with -d command-line switch to enable debug mode.
+  std::string compiler = ""; // set with -c command-line switch to specify an alternate compiler
 
   unsigned n_threads;
   ConnectedThreadsList connectedThreads;
@@ -158,7 +159,7 @@ namespace
   bool IsKernel24() { return KernelVersion().substr(0, 4) == "2.4."; }
   bool IsKernel26() { return KernelVersion().substr(0, 4) == "2.6."; }
 
-  std::string CompilerPath() { return "tcc/tcc"; }
+  std::string CompilerPath() { return compiler.length() ? compiler : (IsKernel24() ? "tcc/tcc" : ""); }
   std::string IncludePath() { char buf[128]; return std::string(getcwd(buf, 128)) + "/include"; }
   std::string EmbCHPath() { return IncludePath() + "/EmbC.h"; }
   std::string ModWrapperPath() { return IsKernel24() ? "./embc_mod_wrapper.o" : "runtime/embc_mod_wrapper.c"; }
@@ -258,7 +259,6 @@ private:
   std::string remoteHost;
   volatile bool thread_running, thread_ran;
 
-
   struct TLog : public ::Log
   {
   public:
@@ -277,7 +277,7 @@ private:
   int sockSend(const std::string & str) ;
   int sockSend(const void *buf, size_t len, bool is_binary = false, int flags = 0);
   int sockReceiveData(void *buf, int size, bool is_binary = true);
-  std::string sockReceiveLine();
+  std::string sockReceiveLine(bool suppressLineLog = false);
   bool matrixToRT(const Matrix & m, unsigned numEvents, unsigned numSchedWaves, const std::string & inChanType, unsigned readyForTrialState,  const std::string & outputSpecStr, bool state0_fsm_swap_flg);
   bool matrixToRT(const StringMatrix & m,
                   const std::string & globals,
@@ -504,16 +504,19 @@ static void cleanup(void)
 static void handleArgs(int argc, char *argv[])
 {
   int opt;
-  while ( ( opt = getopt(argc, argv, "dl:")) != -1 ) {
+  while ( ( opt = getopt(argc, argv, "dl:c:")) != -1 ) {
     switch(opt) {
     case 'd': debug = true; break;
     case 'l': 
       listenPort = atoi(optarg);
       if (! listenPort) throw Exception ("Could not parse listen port.");
       break;
+    case 'c':
+      compiler = optarg;
+      break;
     default:
-      throw Exception(std::string("Unknown command line parameters.  Usage: ")
-                      + argv[0] + " [-l listenPort] [-d]");
+      throw Exception(std::string("Unknown command line parameters.\n\nUsage: ")
+                      + argv[0] + " [-l LISTEN_PORT] [-c COMPILER_OVERRIDE] [-d]");
       break;
     }
   }
@@ -577,6 +580,8 @@ static void doServer(void)
   inet_aton("0.0.0.0", &inaddr.sin_addr);
 
   Log() << "FSM Server version " << VersionSTR << std::endl;
+  if (compiler.length()) 
+    Log() << "EmbC compiler override: " << CompilerPath() << std::endl;
   Log() << "Listening for connections on port: " << listenPort << std::endl; 
 
   int parm = 1;
@@ -1219,7 +1224,7 @@ int ConnectionThread::sockSend(const void *buf, size_t len, bool is_binary, int 
 }
 
 // Note: trims trailing whitespace!  If string is empty, connection error!
-std::string ConnectionThread::sockReceiveLine()
+std::string ConnectionThread::sockReceiveLine(bool suppressLineLog)
 {
 #define MAX_LINE (16384) 
   char buf[MAX_LINE];
@@ -1238,7 +1243,8 @@ std::string ConnectionThread::sockReceiveLine()
   // now, trim trailing spaces
   while(slen && ::isspace(buf[slen-1])) { buf[--slen] = 0; }
   rets = buf;
-  Log() << "Got: " << rets << std::endl; 
+  if (!suppressLineLog)
+    Log() << "Got: " << rets << std::endl; 
   return rets;
 }
 
@@ -1425,71 +1431,102 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
     // build __fsm_get_at function based on the matrix m
     {
    
-      for (unsigned r = 0; r < m.rows(); ++r) {
-        for (unsigned c = 0; c < m.cols(); ++c) {
-          prog << " ulong __" << r << "_" << c << "(void) { return ({ " << m.at(r,c) << "; })";
-          // make sure the timeout column is timeout_us and not timeout_s!
-          if (c == TIMEOUT_TIME_COL(&msg.u.fsm)) prog << "* 1e6 /* timeout secs to usecs */";
-          prog << "; };\n";
-        }
-      }
-      prog << "typedef ulong (*__cell_fn_t)(void);\n"
-           << "static __cell_fn_t __states[" << m.rows() << "][" << m.cols() << "] = {\n";
-      for (unsigned r = 0; r < m.rows(); ++r) {
-        prog << " { ";
-        for (unsigned c = 0; c < m.cols(); ++c) {
-          prog << "&__" << r << "_" << c;
-          if (c+1 < m.cols()) prog << ", ";
-        }
-        prog << " }"; // end row
-        if (r+1 < m.rows()) prog << ",";
-        prog << "\n";
-      }
-      prog << "}; // end func ptr array\n\n";
-    
       prog << 
         "unsigned long __embc_fsm_get_at(ushort __r, ushort __c)\n" 
         "{\n" 
-        "if (__r < " << m.rows() << " && __c < " << m.cols() << ") return __states[__r][__c]();\n"
-        "printf(\"FSM Runtime Error: no such state,column found (%hu, %hu) at time %d.%d!\\n\", __r, __c, (int)time(), (int)((time()-(double)((int)time())) * 10000));\n"
-        "return 0;\n"
-        "}\n";
+        "  if (__r >= " << m.rows() << " || __c >= " << m.cols() << ") {\n"
+        "    printf(\"FSM Runtime Error: no such state,column found (%hu, %hu) at time %d.%d!\\n\", __r, __c, (int)time(), (int)((time()-(double)((int)time())) * 10000));\n"
+        "    return 0;\n"
+        "  }\n" // end if
+        "  switch(__r) {\n";
+      for (unsigned r = 0; r < m.rows(); ++r) {
+        std::ostringstream statebuf;
+        bool stateHasNonZero = false;
+        statebuf <<
+        "  case " << r << ":\n"
+        "    switch(__c) {\n";
+        for (unsigned c = 0; c < m.cols(); ++c) {
+          std::string thisCell = trimWS(m.at(r,c));
+          if ( thisCell.length() && thisCell != "0" ) {
+              stateHasNonZero = true;
+              statebuf << 
+        "    case " << c << ":\n"
+        "      return ({ " << thisCell << "; })";
+              // make sure the timeout column is timeout_us and not timeout_s!
+              if (c == TIMEOUT_TIME_COL(&msg.u.fsm)) statebuf << " * 1e6 /* timeout secs to usecs */";
+              statebuf << ";\n";
+          }
+        }
+        statebuf << 
+        "    default: return 0;\n" // fall-thru as optimization to reduce code-size
+        "    }\n"; // end switch(__c)
+        
+        // as an optimization, don't generate any C code if the entire state is zeros
+        // this is so we fall throught to bottom and return 0
+        if (stateHasNonZero) 
+            prog << statebuf.str(); 
+      }
+      prog <<
+        "  } // end switch(__r)\n"; // end switch(__r);
+        
+      prog <<  
+        "  return 0; /* reached sometimes if an entire state was all 0s, in which case it was ommitted from switch(__r) above.. */ "
+        "}\n"; // end function
     }
   
     // build the __fsm_do_state_entry and __finChanTypesm_do_state_exit functions.. 
-    IntStringMap::const_iterator it;
+    IntStringMap::const_iterator it_f, it_c;
     // __fsm_do_state_entry
     prog << 
       "void __embc_fsm_do_state_entry(ushort __s)\n" 
       "{\n"
-      "  switch(__s) {\n";    
+      "  if ( __s >= " << m.rows() << " ) {\n";
+    prog << 
+      "    printf(\"FSM Runtime Error: no such state found (%hu) at time %d.%d!\\n\", __s, (int)time(), (int)((time()-(double)((int)time())) * 10000));\n"
+      "  }\n\n"
+            
+      "  switch(__s) {\n";
+    
     for (unsigned s = 0; s < m.rows(); ++s) {
+      it_f = entryfmap.find(s);
+      it_c = entrycmap.find(s);
+      if (it_f == entryfmap.end() && it_c == entrycmap.end()) 
+          continue; // optimize for common case to reduce code size -- no entry function or code..
       prog << "  case " << s << ":\n";
-      if ( (it = entryfmap.find(s)) != entryfmap.end() ) 
-        prog << "  " << it->second << "();\n"; // call the entry function that was specified    
-      if ( (it = entrycmap.find(s)) != entrycmap.end() ) 
-        prog << "  {\n" << it->second << "\n}\n"; // embed the entry code that was specified
+      if ( it_f != entryfmap.end() ) 
+        prog << "  " << it_f->second << "();\n"; // call the entry function that was specified    
+      if ( it_c != entrycmap.end() ) 
+        prog << "  {\n" << it_c->second << "\n}\n"; // embed the entry code that was specified
       prog << "  break;\n";    
     }
-    prog << "  default: printf(\"FSM Runtime Error: no such state found (%hu) at time %d.%d!\\n\", __s, (int)time(), (int)((time()-(double)((int)time())) * 10000)); break; \n";
     prog << "  } // end switch\n";
     prog << "} // end function\n\n";
     // __fsm_do_state_exit
     prog << 
       "void __embc_fsm_do_state_exit(ushort __s)\n" 
       "{\n"
-      "  switch(__s) {\n";    
+      "  if ( __s >= " << m.rows() << " ) {\n";
+    prog << 
+      "    printf(\"FSM Runtime Error: no such state found (%hu) at time %d.%d!\\n\", __s, (int)time(), (int)((time()-(double)((int)time())) * 10000));\n"
+      "  }\n\n"
+            
+      "  switch(__s) {\n";
+    
     for (unsigned s = 0; s < m.rows(); ++s) {
+      it_f = exitfmap.find(s);
+      it_c = exitcmap.find(s);
+      if (it_f == exitfmap.end() && it_c == exitcmap.end()) 
+          continue; // optimize for common case to reduce code size -- no exit function or code..
       prog << "  case " << s << ":\n";
-      if ( (it = exitfmap.find(s)) != exitfmap.end() ) 
-        prog << "  " << it->second << "();\n"; // call the entry function that was specified    
-      if ( (it = exitcmap.find(s)) != exitcmap.end() ) 
-        prog << "  {\n" << it->second << "\n}\n"; // embed the entry code that was specified
+      if ( it_f != exitfmap.end() ) 
+        prog << "  " << it_f->second << "();\n"; // call the exit function that was specified    
+      if ( it_c != exitcmap.end() ) 
+        prog << "  {\n" << it_c->second << "\n}\n"; // embed the exit code that was specified
       prog << "  break;\n";    
     }
-    prog << "  default: printf(\"FSM Runtime Error: no such state found (%hu) at time %d.%d!\\n\", __s, (int)time(), (int)((time()-(double)((int)time())) * 10000)); break; \n";
     prog << "  } // end switch\n";
     prog << "} // end function\n\n";
+    
     prog << "// REQUIRED BY INTERFACE TO embc_mod_wrapper.c\n\n";
     prog << "const char *__embc_ShmName = \"" << fsm_shm_name << "\";\n";
     prog << "void (*__embc_init)(void) = ";
@@ -1565,21 +1602,24 @@ bool ConnectionThread::doCompileLoadProgram(const std::string & prog_name, const
     Log() << "Error loading the module.\n"; 
     ret = false;
   }
-  unlinkModule(prog_name);  
+  if (debug)
+    Log() << "DEBUG MODE, build dir '" << TmpPath() << prog_name << ".build' not unlinked.\n";
+  else
+    unlinkModule(prog_name);  
   return ret;
 }
                    
 bool ConnectionThread::compileProgram(const std::string & fsm_name, const std::string & program_text) const
 {
+  bool ret = false;
+  double t0 = Timer::now();
   if ( IsKernel24() ) { // Kernel 2.4 mechanism 
     std::string fname = TmpPath() + fsm_name + ".c", objname = TmpPath() + fsm_name + ".o", modname = TmpPath() + fsm_name;
     std::ofstream outfile(fname.c_str());
     outfile << program_text;
     outfile.close();
-    if ( System(CompilerPath() + " -I'" + IncludePath() + "' -c -o '" + objname + "' '" + fname + "'") ) {
-      bool status = System(LdPath() + " -r -o '" + modname + "' '" + objname + "' '" + ModWrapperPath() + "'");
-      return status;
-    }
+    if ( System(CompilerPath() + " -I'" + IncludePath() + "' -c -o '" + objname + "' '" + fname + "'") ) 
+      ret = System(LdPath() + " -r -o '" + modname + "' '" + objname + "' '" + ModWrapperPath() + "'");
   } else if ( IsKernel26() ) { // Kernel 2.6 mechanism
     std::string 
         buildDir = TmpPath() + fsm_name + ".build", 
@@ -1589,12 +1629,15 @@ bool ConnectionThread::compileProgram(const std::string & fsm_name, const std::s
       std::ofstream outfile(fname.c_str());
       outfile << program_text;
       outfile.close();
-      return System(std::string("cp -f '") + ModWrapperPath() + "' '" + buildDir + "' && cp -f '" + MakefileTemplatePath() + "' '" + buildDir + "/Makefile' && make -C '" + buildDir + "' TARGET='" + fsm_name + "' EXTRA_INCL='" + IncludePath() + "'");
+      ret = System(std::string("cp -f '") + ModWrapperPath() + "' '" + buildDir + "' && cp -f '" + MakefileTemplatePath() + "' '" + buildDir + "/Makefile' && make -C '" + buildDir + "' TARGET='" + fsm_name + "' EXTRA_INCL='" + IncludePath() + "'" + ( CompilerPath().length() ? (std::string(" COMPILER_OVERRIDE='") + CompilerPath() + "'") : "" ) );
     }
   } else {
     Log() << "ERROR: Unsupported Kernel version in ConnectionThread::compileProgram()!";
   }
-  return false;
+  if (ret) 
+      Log() << "Compile time: " << (Timer::now()-t0) << "s\n";
+  
+  return ret;
 }
 
 bool ConnectionThread::loadModule(const std::string & program_name) const
@@ -2111,10 +2154,10 @@ void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP, bool isBin) const
         }
         if (!isUDP) {
           long flag = 1;
-          setsockopt(theSock, SOL_TCP, SO_REUSEADDR, &flag, sizeof(flag));
+          setsockopt(theSock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
           flag = 1;
           // turn off nagle for less latency
-          setsockopt(theSock, SOL_TCP, TCP_NODELAY, &flag, sizeof(flag));
+          setsockopt(theSock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
         }
         struct sockaddr_in addr;
         addr.sin_family = AF_INET;
@@ -2552,7 +2595,9 @@ bool ConnectionThread::doSetStateProgram()
   std::istringstream ss(line);
   ss >> rows >> cols;
   unsigned ct;
-  for (ct = 0, block = "";  ct < rows*cols; ++ct) block += sockReceiveLine();
+  if (!debug) 
+      Log() << "(Receiving state program, one cell per line, output suppressed to prevent screen flood)\n";
+  for (ct = 0, block = "";  ct < rows*cols; ++ct) block += sockReceiveLine(!debug);
   StringMatrix m(rows, cols);
   parseStringTable(block.c_str(), m);
   return matrixToRT(m, globals, initfunc, cleanupfunc, transitionfunc, tickfunc, threshfunc, entryfuncs, exitfuncs, entrycodes, exitcodes, inChanType, inSpec, outSpec, swSpec, readyForTrialJumpState, state0FSMSwapFlg);  

@@ -470,6 +470,9 @@ function [sm] = SetStateProgram(varargin)
      case 'matrix',
       if (isnumeric(val)), val = num2cell(val); end;
       if (~iscell(val)), error('Matrix needs to be an MxN cell array'); end;
+      if (size(val,1) > 65535 | size(val,2) > 65535),
+          error('Matrix cannot exceed 65535 in either dimension!');
+      end;
       matrix = val;
      case 'globals',
       if (~ischar(val)), 
@@ -783,15 +786,16 @@ function [ret, sw_needsound] = FormatSchedWaves(sm)
   return;
   
 function [ret] = FormatMatrix(sm, matrix)
-  ret = '';
-  [m, n] = size(matrix);
-  
-  for i=1:m,
-    for j=1:n,
-      val = matrix{i,j};
-      if (~ischar(val)), val = sprintf('%d', val); end;
-      ret = sprintf('%s  %s\n', ret, UrlEncode(sm, val));
-    end;
-  end;
-  
+% NB: this is WAYYY too slow, so we need to use a MEX function..
+%   ret = '';
+%   [m, n] = size(matrix);
+%   
+%   for i=1:m,
+%     for j=1:n,
+%       val = matrix{i,j};
+%       if (~ischar(val)), val = sprintf('%d', val); end;
+%       ret = sprintf('%s  %s\n', ret, UrlEncode(sm, val));
+%     end;
+%   end;
+ ret = FSMClient('formatMatrix', matrix);
   return;
