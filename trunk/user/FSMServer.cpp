@@ -258,7 +258,11 @@ private:
   unsigned shm_num, client_ver;
   std::string remoteHost;
   volatile bool thread_running, thread_ran;
-
+    
+  static const unsigned MAX_LINE = 16384;
+  char sockbuf[MAX_LINE];
+  unsigned sockbuf_len;
+  
   struct TLog : public ::Log
   {
   public:
@@ -329,7 +333,7 @@ private:
 /* some statics for class ConnectionThread */
 int ConnectionThread::id = 0;
 
-ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; }
+ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false), sockbuf_len(0) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; sockbuf[0] = 0; }
 ConnectionThread::~ConnectionThread()
 { 
   if (sock > -1)  ::shutdown(sock, SHUT_RDWR), ::close(sock), sock = -1;
@@ -1223,26 +1227,40 @@ int ConnectionThread::sockSend(const void *buf, size_t len, bool is_binary, int 
   return ret;
 }
 
+static const char *strFind(const char *buf, long len, char c)
+{
+    for (long pos = 0; pos < len; ++pos) 
+        if (buf[pos] == c) return buf+pos;
+    return 0;
+}
+
 // Note: trims trailing whitespace!  If string is empty, connection error!
 std::string ConnectionThread::sockReceiveLine(bool suppressLineLog)
 {
-#define MAX_LINE (16384) 
-  char buf[MAX_LINE];
-  int ret, slen = 0;
+  int ret;
   std::string rets = "";
-  memset(buf, 0, MAX_LINE);
+  const char *nlpos = 0;
   // keep looping until we fill the buffer, or we get a \n
   // eg: slen < MAXLINE and (if nread then buf[slen-1] must not equal \n)
-  while ( slen < MAX_LINE && (!slen || buf[slen-1] != '\n') ) {
-    ret = ::recv(sock, buf+slen, MIN((MAX_LINE-slen), 1), 0);
+  while ( !(nlpos = strFind(sockbuf, sockbuf_len, '\n')) && sockbuf_len < (MAX_LINE-1) ) {
+    ret = ::recv(sock, sockbuf+sockbuf_len, (MAX_LINE-1)-sockbuf_len, 0);
     if (ret <= 0) break;
-    slen += ret;
+    sockbuf_len += ret;
+    sockbuf[sockbuf_len] = 0; // add NUL, nust to be paranoid
   }
-  if (slen >= MAX_LINE) slen = MAX_LINE-1;
-  if (slen) buf[slen] = 0; // add NUL
+  if (!nlpos) {
+      Log() << "WARNING! RAN OUT OF BUFFER SPACE! READING PARTIAL LINE!\n";
+      nlpos = sockbuf + sockbuf_len - 1;
+  }
+  long num = nlpos-sockbuf+1;
+  rets.assign(sockbuf, num); // assign to string
+  if (num < (long)sockbuf_len)  // now deal with cruft left over in the sockbuf.. move everything over
+    ::memmove(sockbuf, nlpos+1, sockbuf_len-num);
+  sockbuf_len -= num;
   // now, trim trailing spaces
-  while(slen && ::isspace(buf[slen-1])) { buf[--slen] = 0; }
-  rets = buf;
+  while(rets.length() && ::isspace(*rets.rbegin())) 
+      rets.erase(rets.length()-1, 1); 
+  
   if (!suppressLineLog)
     Log() << "Got: " << rets << std::endl; 
   return rets;
@@ -1251,8 +1269,16 @@ std::string ConnectionThread::sockReceiveLine(bool suppressLineLog)
 
 int ConnectionThread::sockReceiveData(void *buf, int size, bool is_binary)
 {
-  int nread = 0;
-
+  int nread = 0, n2cpy = MIN(size, ((int)sockbuf_len));
+  
+  // first flush out our line-read buffer since it may have data we were interested in
+  if (n2cpy) {
+    ::memcpy(buf, sockbuf, n2cpy);
+    ::memmove(sockbuf, sockbuf+n2cpy, sockbuf_len-n2cpy);
+    sockbuf_len -= n2cpy;
+    nread += n2cpy;
+  }
+  
   while (nread < size) {
     int ret = ::recv(sock, (char *)(buf) + nread, size - nread, 0);
     
@@ -1264,7 +1290,7 @@ int ConnectionThread::sockReceiveData(void *buf, int size, bool is_binary)
       return ret;
     } 
     nread += ret;
-    if (!is_binary) break;
+    //if (!is_binary) break;
   }
 
   if (!is_binary) {
@@ -1458,8 +1484,8 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
           }
         }
         statebuf << 
-        "    default: return 0;\n" // fall-thru as optimization to reduce code-size
-        "    }\n"; // end switch(__c)
+        "    }\n" // end switch(__c)
+        "    break;\n"; // this is needed to prevent fall-thru to next state and instead do retun 0; below..
         
         // as an optimization, don't generate any C code if the entire state is zeros
         // this is so we fall throught to bottom and return 0
@@ -1470,7 +1496,7 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
         "  } // end switch(__r)\n"; // end switch(__r);
         
       prog <<  
-        "  return 0; /* reached sometimes if an entire state was all 0s, in which case it was ommitted from switch(__r) above.. */ "
+        "  return 0; /* reached sometimes if an entire state was all 0s, or if a particular column was 0, in which case it was ommitted from switch(__r) or switch(__c) above and we fall thru to here */ "
         "}\n"; // end function
     }
   
@@ -2592,12 +2618,19 @@ bool ConnectionThread::doSetStateProgram()
   unsigned rows = 0, cols = 0;  
   // next, do the stringtable
   line = sockReceiveLine();
-  std::istringstream ss(line);
-  ss >> rows >> cols;
+  {
+    std::istringstream ss(line);
+    ss >> rows >> cols;
+  }
   unsigned ct;
   if (!debug) 
       Log() << "(Receiving state program, one cell per line, output suppressed to prevent screen flood)\n";
-  for (ct = 0, block = "";  ct < rows*cols; ++ct) block += sockReceiveLine(!debug);
+  {
+    std::ostringstream ss;
+    for (ct = 0;  ct < rows*cols; ++ct) 
+      ss << sockReceiveLine(!debug);
+    block = ss.str();
+  }
   StringMatrix m(rows, cols);
   parseStringTable(block.c_str(), m);
   return matrixToRT(m, globals, initfunc, cleanupfunc, transitionfunc, tickfunc, threshfunc, entryfuncs, exitfuncs, entrycodes, exitcodes, inChanType, inSpec, outSpec, swSpec, readyForTrialJumpState, state0FSMSwapFlg);  
