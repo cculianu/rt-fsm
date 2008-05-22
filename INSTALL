@@ -1,6 +1,19 @@
 Install Guide for Realtime FSM
 by Calin Culianu <calin@ajvar.org>
-Last Updated: Mar. 22, 2008
+Last Updated: May 22, 2008
+
+*************************** READ THIS FIRST ***********************************
+You have the option of doing an automated install using the installer script, 
+"./install.sh" *IF* you are on a Fedora Core 8 (i686 or x86_64) system.
+
+(Support for Fedora Core 9 and perhaps even other distros coming soon!)
+
+If you are not on Fedora Core 8, or if the "./install.sh" script fails for you,
+or if you just like having full manual control, follow the below MANUAL 
+installation instructions for installation.
+******************************************************************************
+
+MANUAL INSTALLATION INSTRUCTIONS
 
 These instructions tell you how to setup a system to run this software.  This
 includes brief instructions for setting up RTAI 3.6, Linux 2.6.23, and compiling
