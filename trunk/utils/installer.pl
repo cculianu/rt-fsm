@@ -228,7 +228,7 @@ sub compileKernel()
     $kerneldir =~ m/linux-(.*)/;
     $kernelver = "$1$kernelver";
     print "\n$WHITEONBLUE=======>$NORMAL$YELLOW       Compiling Kernel in $MAGENTA$kerneldir$NORMAL\n\n";
-    system("cp -f '$f' '$kerneldir' && make -C '$kerneldir' oldconfig") and die "Unable to setup .config for kernel\n";
+    system("cp -fv '$f' '$kerneldir'/.config && make -C '$kerneldir' oldconfig") and die "Unable to setup .config for kernel\n";
     system("cd '$kerneldir' && make -j2 && make -j2 modules") and die "Unable to compile kernel\n";
     return 1;
 }
