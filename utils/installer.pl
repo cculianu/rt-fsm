@@ -127,12 +127,13 @@ sub chkIsInSrcDir()
 
 sub setupWorkDir()
 {
-    if (!$isDevel) {
-        system("rm -fr '" . $workdir ."'");
-        mkdir(${workdir}) or die "Cannot create $workdir\n"; 
-    } else { # devel!
-        mkdir(${workdir}); 
-    }
+#    if (!$isDevel) {
+#        system("rm -fr '" . $workdir ."'");
+#        mkdir(${workdir}) or die "Cannot create $workdir\n"; 
+#    } else { # devel!
+#        mkdir(${workdir}); 
+#    }
+    system("mkdir -p '$workdir'") and die "Cannot create $workdir\n";
     return 1;
 }
 
