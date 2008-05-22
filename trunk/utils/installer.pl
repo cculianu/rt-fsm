@@ -312,13 +312,18 @@ sub installKernel()
     print "\n$WHITEONBLUE=======>$NORMAL$YELLOW       Generating $MAGENTA/boot/initrd-$kernelver.img$NORMAL\n\n";
     system("mkinitrd -v -f /boot/initrd-$kernelver.img $kernelver") and die "\n${RED}Error making the initrd ramdisk image!${NORMAL}\n";
     print ("\nTo boot the kernel, you need to modify grub.conf.  You can allow this script to\ndo it for you, or you can do it manually if you have a custom setup.\n\n");
-    print("${RED}Allow this script to modify /boot/grub/grub.conf ${WHITE}[y/N]$NORMAL ? ");
-    if (<STDIN> =~ /^[yY]/) {
-        editGrubConf();
-    } else {
-        print("${CYAN}Ok, manually edit grub.conf and hit enter when done!$NORMAL ");
-        <STDIN>;
-    }
+    
+    my $resp;
+    do {
+        print("${RED}Allow this script to modify /boot/grub/grub.conf ${WHITE}[y/n]$NORMAL ? ");
+        $resp = <STDIN>;
+        if ($resp =~ /^[yY]/) {
+            editGrubConf();
+        } elsif ($resp =~ /^[nN]/) {
+            print("${CYAN}Ok, manually edit grub.conf and hit enter when done!$NORMAL ");
+            <STDIN>;
+        }
+    } while ($resp !~ /^[yYnN]/);
     return 1;
 }
 
@@ -425,11 +430,15 @@ sub complainAboutFirewall()
 A firewall (iptables) is running on this system.  It is recommended you 
 disable it (despite possible security concerns) otherwise you won't be able 
 to talk to the FSMServer or SoundServer via the network.\n\n";
-        print "${RED}Allow this script to disable the firewall ${WHITE}[y/N]$NORMAL ? ";
-        if (<STDIN> =~ /^[yY]/) {
-            system("/etc/init.d/iptables stop") and die ("Unable to disable the iptables firewall\n");
-            system("chkconfig --level 2345 iptables off") and die ("Unable to disable the iptables firewall service\n");
-        }
+        my $resp;
+        do {
+            print "${RED}Allow this script to disable the firewall ${WHITE}[y/n]$NORMAL ? ";
+            $resp = <STDIN>;
+            if ($resp =~ /^[yY]/) {
+                system("/etc/init.d/iptables stop") and die ("Unable to disable the iptables firewall\n");
+                system("chkconfig --level 2345 iptables off") and die ("Unable to disable the iptables firewall service\n");
+            }
+        } while ($resp !~ /^[yYnN]/);
     }
     return 1;
 }
