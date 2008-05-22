@@ -310,7 +310,7 @@ sub installKernel()
     my $bz = $archbzImage{$arch};
     system("cd '$kerneldir' && cp -fv $bz /boot/bzImage-$kernelver && cp -fv .config /boot/config-$kernelver && cp -fv System.map /boot/System.map-$kernelver") and die "Error installing the kernel\n";
     print "\n$WHITEONBLUE=======>$NORMAL$YELLOW       Generating $MAGENTA/boot/initrd-$kernelver.img$NORMAL\n\n";
-    system("mkinitrd -v /boot/initrd-$kernelver.img $kernelver") and die "\n${RED}Error making the initrd ramdisk image!${NORMAL}\n";
+    system("mkinitrd -v -f /boot/initrd-$kernelver.img $kernelver") and die "\n${RED}Error making the initrd ramdisk image!${NORMAL}\n";
     print ("\nTo boot the kernel, you need to modify grub.conf.  You can allow this script to\ndo it for you, or you can do it manually if you have a custom setup.\n\n");
     print("${RED}Allow this script to modify /boot/grub/grub.conf ${WHITE}[y/N]$NORMAL ? ");
     if (<STDIN> =~ /^[yY]/) {
