@@ -21,6 +21,7 @@ extern "C" {
 #define FSM_MEMORY_BYTES (1024*512)
 #define FSM_PROGRAM_SIZE (FSM_MEMORY_BYTES*4/5)
 #define FSM_MATRIX_SIZE (FSM_MEMORY_BYTES/5)
+#define FSM_PLAIN_MATRIX_MAX (FSM_MEMORY_BYTES/sizeof(unsigned))
 #define FSM_MAX_SYMBOL_SIZE 32 /**< the largest possible size of the name of
                                   a variable in an FSM program */
 #define FSM_MAX_SCHED_WAVES (sizeof(unsigned)*8)
@@ -79,9 +80,15 @@ struct OutputSpec
 struct EmbC;
 struct AOWaveINTERNAL; /**< opaque here */
 
+/** For FSMSpec::Routing::in_chan_type field */
 enum { DIO_TYPE = 0, AI_TYPE, UNKNOWN_TYPE };
 
-/** A structure encapsulating the entire fsm specification. */
+/** For FSMSpec::type field */
+enum { FSM_TYPE_NONE = 0, FSM_TYPE_PLAIN = 0x22, FSM_TYPE_EMBC = 0xf3 };
+
+/** A structure encapsulating the entire fsm specification.  
+    One of these gets sent to RT from userspace per 
+    'SetStateMatrix' or 'SetStateProgram' call.  */
 struct FSMSpec
 {
   unsigned short n_rows; /* Corresponds to number of states... */
@@ -89,27 +96,46 @@ struct FSMSpec
                             4 of the fixed columns at the end plus possibly 1
                             column for the SCHED_WAVE column at the end
                             if present. */
-  char shm_name[64]; /**< The name of the FSM kernel module's shm to attach */
-  char program_z[FSM_PROGRAM_SIZE]; /**< A *zlib deflated*, 
-                                       NUL-terminated huge string of the
-                                       generated + user-specified fsm 
-                                       program */
-  unsigned program_len; /**< Number of bytes of uncompressed program 
-                                    string, uncluding NUL. */
-  unsigned program_z_len; /**< Number of bytes of compressed program data -- basically number of valid bytes in program_z. */
-  char matrix_z[FSM_MATRIX_SIZE]; /**< A *zlib deflated* string version
-                                       of the matrix only.  This is for 
-                                       reference and not used by the FSM at 
-                                       all.  
-                                       The format of this string is 
-                                       URLEncoded lines, each line 
-                                       representing  a matrix row, delimited 
-                                       by whitespace. */
-  unsigned matrix_len; /**< Number of bytes of uncompressed matrix string,
-                          including NUL. */
-  unsigned matrix_z_len; /**< Number of bytes of compressed matrix data,
-                            basically number of bytes in matrix_z. */
+  int type; /**< one of FSM_TYPE_PLAIN, FSM_TYPE_EMBC, etc */
+  
+  char name[64]; /**< The name of the FSM kernel module's shm to attach if 
+                      FSM_TYPE_EMBC, or just a descriptive name of the fsm
+                      otherwise.. */
 
+  /** which struct in the union we use depends on the 'type' field above */
+  union {
+    /** Struct only used if type is FSM_TYPE_EMBC */
+    struct {
+      char program_z[FSM_PROGRAM_SIZE]; /**< A *zlib deflated*, 
+                                            NUL-terminated huge string of the
+                                            generated + user-specified fsm 
+                                            program */
+      unsigned program_len; /**< Number of bytes of uncompressed program 
+                                 string, uncluding NUL. */
+      unsigned program_z_len; /**< Number of bytes of compressed program data 
+                                   -- basically number of valid bytes in program_z. */
+      char matrix_z[FSM_MATRIX_SIZE]; /**< A *zlib deflated* string version
+                                           of the matrix only.  This is for 
+                                           reference and not used by the FSM at 
+                                           all.  
+                                           The format of this string is 
+                                           URLEncoded lines, each line 
+                                           representing  a matrix row, delimited 
+                                           by whitespace. */
+      unsigned matrix_len; /**< Number of bytes of uncompressed matrix string,
+                                including NUL. */
+      unsigned matrix_z_len; /**< Number of bytes of compressed matrix data,
+                                  basically number of bytes in matrix_z. */
+    } program;
+    /** Struct only used if type is FSM_TYPE_PLAIN */
+    struct {
+      unsigned matrix[FSM_PLAIN_MATRIX_MAX]; /**< Raw matrix data as a linear 
+                                                  array -- FSM code knows how 
+                                                  to interpret this as a 2D 
+                                                  array based on n_rows and 
+                                                  n_cols above */
+    } plain;
+  }; 
   unsigned short ready_for_trial_jumpstate; /**< normally always 35 */
   /**< if true, uploading a new state matrix does not take effect immediately,
      but instead, the new FSM only takes effect when the old FSM
@@ -154,7 +180,9 @@ struct FSMSpec
     struct OutputSpec output_routing[FSM_MAX_OUT_EVENTS];
   } routing;
 
-  /** Used by RealtimeFSM to point to compiled code */
+  /** This is only set inside kernel: RealtimeFSM kernel module uses it to 
+      point to compiled code. However, if FSMSpec::type field is not 
+      FSM_TYPE_EMBC, this should always be NULL */
   struct EmbC *embc;
   
   /** Array of pointers to allocated scheduled waves.  A NULL ptr indicates not allocated/used */
@@ -170,6 +198,12 @@ typedef struct FSMSpec FSMSpec;
 #define TIMEOUT_STATE_COL(_fsm) (FSM_NUM_INPUT_COLS(_fsm))
 #define TIMEOUT_TIME_COL(_fsm) (TIMEOUT_STATE_COL(_fsm)+1)
 #define FIRST_OUT_COL(_fsm) (TIMEOUT_STATE_COL(_fsm)+2)
+
+/** Access the matrix array for a row or col. f is a FSMSpec *, r is row, c is column
+    Note this is RAW access and so calling code should make sure: 
+    1. this is an FSMSpec with type field FSM_TYPE_PLAIN
+    2. that r and c are within FSMSpec::n_rows and FSMSpec::n_cols! */
+#define FSM_MATRIX_AT(_f,_r,_c) ((_f)->plain.matrix[(_r)*((_f)->n_cols)+(_c)])
 
 /** NB: all timestamps are in microseconds and are relative to each other   */
 struct StateTransition 
@@ -441,7 +475,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf0010118)) /*< Magic no. for shm... 'fool0118'  */
+#define FSM_SHM_MAGIC ((int)(0xf0010119)) /*< Magic no. for shm... 'fool0119'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }
