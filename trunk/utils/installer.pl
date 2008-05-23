@@ -4,14 +4,21 @@ use strict;
 use English;
 use Cwd;
 
-my @supportedFedoras = (8); # TODO add support for fedora 9 too!
+my @supportedFedoras = (8, 9); 
 my @supportedArches = ("i686", "x86_64");
 my $fedoraRelease = undef; # set to one of @supportedFedoras below..
-my $arch = undef; # after script sanity checks, gets set to one of @supportedArches below..
-my %archRTAIPatches = ( 
-                        i686 => 'base/arch/i386/patches/hal-linux-2.6.23-i386-1.12-00.patch',
-                        x86_64 => 'base/arch/x86_64/patches/hal-linux-2.6.23-x86_64-1.4-00.patch'
-                      );
+my $arch = undef; # after script sanity checks, gets set to one of @supportedArches
+my %fedoraArchKernelPatches =
+    ( 
+       8 => {
+               i686 => '$rtaidir/base/arch/i386/patches/hal-linux-2.6.23-i386-1.12-00.patch',
+               x86_64 => '$rtaidir/base/arch/x86_64/patches/hal-linux-2.6.23-x86_64-1.4-00.patch'
+            },
+       9 => {
+               i686 => '$origwd/utils/i386-2.6.23-fc9.patch',
+               x86_64 => '$origwd/utils/x86_64-2.6.23-fc9.patch'
+            }
+    );
 my %archKernelConfigs = (
                           i686 => 'utils/config-i686-fc8',
                           x86_64 => 'utils/config-x86_64-fc8'
@@ -20,9 +27,11 @@ my %archRTAIConfigs = (
                           i686 => 'utils/rtai_config-i686-fc8',
                           x86_64 => 'utils/rtai_config-x86_64-fc8'
                         );
+my $rtaiPatch = '$origwd/utils/rtai-3.6.patch';
 my %archbzImage = ( i686 => 'arch/i386/boot/bzImage',
                     x86_64 => 'arch/x86_64/boot/bzImage' );
 my $workdir = '/tmp/rtfsm-install-dir';
+my $origwd = getcwd();
 my $kerneldir = undef;
 my $kernelver = undef;
 my $rtaidir = undef;
@@ -167,6 +176,11 @@ sub downloadRTAI()
     system("rm -fr $rtaidir");
     print "\n$WHITEONBLUE=======>$NORMAL$YELLOW       Untarring $MAGENTA$tarball$YELLOW to $MAGENTA$rtaidir\n\n$NORMAL";
     system("cd '/usr/src' && tar -xvjf '$workdir/" . $tarball . "'") and die "Failed to untar the file $tarball\n";
+    my $pf = eval "\"$rtaiPatch\"";
+    if ($pf) {
+        print "\n$WHITEONBLUE=======>$NORMAL$YELLOW       Patching RTAI using $MAGENTA$pf\n\n$NORMAL";
+        system("cd '$rtaidir' && patch -p1 < '$pf'") and die "Failed to patch RTAI!\n"
+    }
     system("ln -sf '$rtaidir' /usr/src/rtai");
     return 1;
 }
@@ -214,8 +228,8 @@ sub patchKernel()
     my $olddir = getcwd();
     print "\n$WHITEONBLUE=======>$NORMAL$YELLOW       Patching Kernel$NORMAL\n\n";
     chdir($kerneldir);
-    (my $patchfile = $archRTAIPatches{$arch}) or die "Unknown arch '$arch' $archRTAIPatches{$arch}";
-    system("patch -p1 < $rtaidir/$patchfile") and die "Patch failed.\n";
+    (my $patchfile = eval "\"$fedoraArchKernelPatches{$fedoraRelease}{$arch}\"") or die "Unknown arch/release '$arch'/'$fedoraRelease' $fedoraArchKernelPatches{$fedoraRelease}{$arch}";
+    system("patch -p1 < $patchfile") and die "Patch failed.\n";
     chdir($olddir);
     return 1;
 }
@@ -245,7 +259,7 @@ sub genGrubEntry($)
         next unless (scalar @words); # skip blank lines..
         if ($words[0] eq 'title') {
 # replace title..
-           $ret .= "title Fedora w/ kernel $kernelver (RTAI) for rtfsm\n";
+           $ret .= "title Fedora $fedoraRelease w/ kernel $kernelver (RTAI) for rtfsm\n";
         } elsif ($words[0] =~ /^kernel/) { # special handling for kernel grub conf directive
             shift @words; # pop off leading 'kernel'
             # parse kernel path..
