@@ -1,15 +1,15 @@
 Install Guide for Realtime FSM
 by Calin Culianu <calin@ajvar.org>
-Last Updated: May 22, 2008
+Last Updated: May 23, 2008
 
 *************************** READ THIS FIRST ***********************************
 You have the option of doing an automated install using the installer script, 
-"./install.sh" *IF* you are on a Fedora Core 8 (i686 or x86_64) system.
+"./install.sh" *IF* you are on a Fedora Core 8 or 9 (i686 or x86_64) system.
 
-(Support for Fedora Core 9 and perhaps even other distros coming soon!)
+(Support for other distros coming soon!)
 
-If you are not on Fedora Core 8, or if the "./install.sh" script fails for you,
-or if you just like having full manual control, follow the below MANUAL 
+If you are not on Fedora Core 8 or 9, or if the "./install.sh" script fails for 
+you, or if you just like having full manual control, follow the below MANUAL 
 installation instructions for installation.
 ******************************************************************************
 
@@ -171,12 +171,22 @@ STEP 6: COMPILE AND INSTALL RTAI
 1. Make sure you are booted into your new, RTAI-patched kernel (see STEP 4
 above)
 
-2. Do make menuconfig on RTAI
+2. You need to patch RTAI with the patch included in this source tree -- 
+   (it turns out RTAI compiles slightly wrong sometimes on some CPUs).
+   
+   To patch RTAI:
+   
+       # cd /usr/src/rtai
+       # patch -p1 < /path/to/rtfsm/utils/rtai-3.6.patch
+   
+   (Of course, replace /path/to/rtfsm with the path to this rtfsm sourcecode)
+   
+3. Do make menuconfig on RTAI
 
        # cd /usr/src/rtai 
        # make menuconfig
    
-3. Make sure the following options are set/unset:
+4. Make sure the following options are set/unset:
 
     ----> General
         (/usr/realtime) Installation directory
@@ -201,14 +211,14 @@ above)
             [*] Real-Time Driver Model over RTAI
             [*]   Shared interrupts
           
-3. Feel free to set/unset any other options.  
+5. Feel free to set/unset any other options.  
    Hit ESC-ESC, and say 'Y' to saving your config.  Then do:
    
        # make && make install
        
    This will compile RTAI and install it in /usr/realtime
    
-4. Setup RTAI kernel module symlinks, then run depmod
+6. Setup RTAI kernel module symlinks, then run depmod
 
        # cd /lib/modules/`uname -r` 
        # mkdir rtai
