@@ -208,26 +208,30 @@ MODULE_PARM_DESC(ai, "This can either be \"synch\" or \"asynch\" to determine wh
 #define AI_THRESHOLD_VOLTS_LOW ((const unsigned)3)
 enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define AI_MODE ((const unsigned)ai_mode)
-#define FSM_PTR(f) ((struct FSMSpec *)(rs[(f)].states))
-#define OTHER_FSM_PTR(f) ((struct FSMSpec *)(FSM_PTR(f) == &rs[(f)].states1 ? &rs[(f)].states2 : &rs[(f)].states1))
-#define EMBC_PTR(f) ((struct EmbC *)(FSM_PTR(f)->embc))
-#define OTHER_EMBC_PTR(f) ((struct EmbC *)(OTHER_FSM_PTR(f)->embc))
-#define EMBC_HAS_FUNC(f, func) ( EMBC_PTR(f) && EMBC_PTR(f)->func )
-#define CALL_EMBC(f, func) do { if (EMBC_HAS_FUNC(f, func)) EMBC_PTR(f)->func(); } while (0)
-#define CALL_EMBC1(f, func, p1) do { if (EMBC_HAS_FUNC(f, func)) EMBC_PTR(f)->func(p1); } while (0)
-#define CALL_EMBC_RET(f, func) ( EMBC_HAS_FUNC(f, func) ? EMBC_PTR(f)->func() : 0 )
-#define CALL_EMBC_RET1(f, func, p1) ( EMBC_HAS_FUNC(f, func) ? EMBC_PTR(f)->func(p1) : 0 )
-#define CALL_EMBC_RET2(f, func, p1, p2) ( EMBC_HAS_FUNC(f, func) ? EMBC_PTR(f)->func(p1, p2) : 0 )
-#define EMBC_MATRIX_GET(f, r, c) ((EMBC_PTR(f) && EMBC_PTR(f)->get_at) ? EMBC_PTR(f)->get_at(r, c) : 0 )
-#define FSM_MATRIX_GET(fsm, r, c) ( (fsm)->embc && (fsm)->embc->get_at ? (fsm)->embc->get_at(r, c) : 0 )
-#define INPUT_ROUTING(f,x) (rs[(f)].states->routing.input_routing[(x)])
-#define SW_INPUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? -1 : rs[(f)].states->routing.sched_wave_input[(x)] )
-#define SW_DOUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? -1 : rs[(f)].states->routing.sched_wave_dout[(x)] )
-#define SW_EXTOUT_ROUTING(f,x) ( !rs[(f)].states->has_sched_waves ? 0 : rs[(f)].states->routing.sched_wave_extout[(x)] )
-#define STATE_TIMEOUT_US(_fsm, state) (FSM_MATRIX_GET((_fsm), (state), TIMEOUT_TIME_COL(_fsm)))
-#define STATE_TIMEOUT_STATE(_fsm, state) (FSM_MATRIX_GET((_fsm), (state), TIMEOUT_STATE_COL(_fsm)))
-#define STATE_OUTPUT(_fsm, state, i) (FSM_MATRIX_GET((_fsm), (state), (i)+FIRST_OUT_COL(_fsm)))
-#define STATE_COL(_fsm, state, col) (FSM_MATRIX_GET((_fsm), (state), (col)))
+#define FSM_PTR(_f) ((struct FSMSpec *)(rs[(_f)].states))
+#define OTHER_FSM_PTR(_f) ((struct FSMSpec *)(FSM_PTR(_f) == &rs[(_f)].states1 ? &rs[(_f)].states2 : &rs[(f)].states1))
+#define EMBC_PTR(_f) ((struct EmbC *)(FSM_PTR(_f)->embc))
+#define OTHER_EMBC_PTR(_f) ((struct EmbC *)(OTHER_FSM_PTR(_f)->embc))
+#define EMBC_HAS_FUNC(_f, _func) ( EMBC_PTR(_f) && EMBC_PTR(_f)->_func )
+#define CALL_EMBC(_f, _func) do { if (EMBC_HAS_FUNC(_f, _func)) EMBC_PTR(_f)->_func(); } while (0)
+#define CALL_EMBC1(_f, _func, _p1) do { if (EMBC_HAS_FUNC(_f, _func)) EMBC_PTR(_f)->_func(_p1); } while (0)
+#define CALL_EMBC_RET(_f, _func) ( EMBC_HAS_FUNC(_f, _func) ? EMBC_PTR(_f)->_func() : 0 )
+#define CALL_EMBC_RET1(_f, _func, _p1) ( EMBC_HAS_FUNC(_f, _func) ? EMBC_PTR(_f)->_func(_p1) : 0 )
+#define CALL_EMBC_RET2(_f, _func, _p1, _p2) ( EMBC_HAS_FUNC(_f, _func) ? EMBC_PTR(_f)->_func(_p1, _p2) : 0 )
+#define EMBC_MATRIX_GET(_fsm, _r, _c) ( (_fsm)->embc && (_fsm)->embc->get_at ? (_fsm)->embc->get_at((_r), (_c)) : 0 )
+#define FSM_MATRIX_GET(_fsm, _r, _c) ( (_fsm)->type == FSM_TYPE_EMBC \
+                                    ? EMBC_MATRIX_GET(_fsm, (_r), (_c)) \
+                                    : ( (_fsm)->type == FSM_TYPE_PLAIN \
+                                        ? FSM_MATRIX_AT(_fsm, (_r), (_c)) \
+                                        : 0  )  )
+#define INPUT_ROUTING(_f,_x) (rs[(_f)].states->routing.input_routing[(_x)])
+#define SW_INPUT_ROUTING(_f,_x) ( !rs[(_f)].states->has_sched_waves ? -1 : rs[(_f)].states->routing.sched_wave_input[(_x)] )
+#define SW_DOUT_ROUTING(_f,_x) ( !rs[(_f)].states->has_sched_waves ? -1 : rs[(_f)].states->routing.sched_wave_dout[(_x)] )
+#define SW_EXTOUT_ROUTING(_f,_x) ( !rs[(_f)].states->has_sched_waves ? 0 : rs[(_f)].states->routing.sched_wave_extout[(_x)] )
+#define STATE_TIMEOUT_US(_fsm, _state) (FSM_MATRIX_GET((_fsm), (_state), TIMEOUT_TIME_COL(_fsm)))
+#define STATE_TIMEOUT_STATE(_fsm, _state) (FSM_MATRIX_GET((_fsm), (_state), TIMEOUT_STATE_COL(_fsm)))
+#define STATE_OUTPUT(_fsm, _state, _i) (FSM_MATRIX_GET((_fsm), (_state), (_i)+FIRST_OUT_COL(_fsm)))
+#define STATE_COL(_fsm, _state, _col) (FSM_MATRIX_GET((_fsm), (_state), (_col)))
 #define SAMPLE_TO_VOLTS(sample) (((double)(sample)/(double)maxdata_ai) * (ai_range_max_v - ai_range_min_v) + ai_range_min_v)
 #define VOLTS_TO_SAMPLE_AO(v) ((lsampl_t)( (((double)(v))-ao_range_min_v)/(ao_range_max_v-ao_range_min_v) * (double)maxdata_ao ))
 #define DEFAULT_EXT_TRIG_OBJ_NUM(f) (FSM_PTR((f))->default_ext_trig_obj_num)
@@ -1461,7 +1465,19 @@ static int doSanityChecksRuntime(FSMID_t f)
 /*   int n_chans = n_chans_dio_subdev + NUM_AI_CHANS, ret = 0; */
 /*   char buf[256]; */
 /*   static int not_first_time[NUM_STATE_MACHINES] = {0}; */
-  if (!FSM_PTR(f)->embc) return -EINVAL;
+  switch (FSM_PTR(f)->type) {
+  case FSM_TYPE_EMBC:
+    if (!FSM_PTR(f)->embc) return -EINVAL;
+    break;
+  case FSM_TYPE_PLAIN:
+      /* no specific stuff for plain.. just jump to code outside the switch.. */
+      break;
+  case FSM_TYPE_NONE: /* reached on error from buddyTaskHandler()  */
+      return -EINVAL;
+  default: /* this is only set on error.. */
+      ERROR_INT("Inconsistent/invalid FSMSpec::type field! ARGH!  FIXME!\n");
+      return -EINVAL;
+  }
   if (READY_FOR_TRIAL_JUMPSTATE(f) >= NUM_ROWS(f) || READY_FOR_TRIAL_JUMPSTATE(f) <= 0)  
     WARNING("ready_for_trial_jumpstate of %d need to be between 0 and %d!\n", 
             (int)READY_FOR_TRIAL_JUMPSTATE(f), (int)NUM_ROWS(f)); 
@@ -1629,47 +1645,72 @@ static int myseq_show (struct seq_file *m, void *dummy)
     if (f > 0) seq_printf(m, "\n"); /* additional newline between FSMs */
 
     seq_printf(m, 
-               "FSM %u Info\n"
-               "----------\n", f);
+               "FSM %02u Info\n"
+               "-----------\n", f);
 
     if (!rs[f].valid) {
       seq_printf(m, "FSM is not specified or is invalid.\n");
     } else {
       int structlen = sizeof(struct RunState) - sizeof(struct StateHistory);
       struct RunState *ss = (struct RunState *)vmalloc(structlen);
+      /* too slow and too prone to allocation failures.. we'll live with the race condition.. */
+      /*struct FSMSpec *fsm = (struct FSMSpec *)vmalloc(sizeof(struct FSMSpec));*/
       if (ss) {       
-        char *embCProgram;
         memcpy(ss, (struct RunState *)&rs[f], structlen);
+        /*memcpy(fsm, FSM_PTR(f), sizeof(*fsm)); \/\*we got rid of this because it was too big to alloc and copy each time.. we will live with the race condition..\*\/ */
+        
         /* setup the pointer to the real fsm correctly */
-        ss->states = FSM_PTR(f);
+        /*ss->states = fsm;*/
+        ss->states = FSM_PTR(f); /* TODO XXX FIXME HACK 
+                                    NB: THIS HAS THE POTENTIAL FOR RACE CONDITIONS/CRASHES!  
+                                    ideally we should lock the fsm, copy it, unlock it! */
         
         seq_printf(m, "Current State: %d\t"    "Transition Count:%d\t"   "C-Var. Log Items: %d\n", 
                    (int)ss->current_state,     (int)NUM_TRANSITIONS(f),  (int)NUM_LOG_ITEMS(f));      
 
         seq_printf(m, "\n"); /* extra nl */
-
-        if (ss->paused) { 
-          seq_printf(m,
-                     "FSM %u State Program - Input Processing PAUSED\n"
-                     "---------------------------------------------\n", f);
-        } else {
-          seq_printf(m,
-                     "FSM %u State Program\n"
-                     "-------------------\n", f);
+        
+        if (ss->states->type == FSM_TYPE_EMBC) {
+            char *embCProgram;
+            if (ss->paused) { 
+                seq_printf(m,
+                            "FSM %02u State Program - Input Processing PAUSED\n"
+                            "----------------------------------------------\n", f);
+            } else {
+                seq_printf(m,
+                            "FSM %02u State Program\n"
+                            "--------------------\n", f);
+            }
+            embCProgram = inflateCpy(ss->states->program.program_z, ss->states->program.program_z_len, ss->states->program.program_len, 0);
+            if (!embCProgram) {
+                seq_printf(m, " ** ERROR DECOMPRESSING PROGRAM TEXT IN MEMORY ** \n");
+            } else {
+                seq_printf(m, "%s\n", embCProgram);
+            }
+            freeDHBuf(embCProgram);
+        } else if (ss->states->type == FSM_TYPE_PLAIN) {
+            unsigned r, c;
+            if (ss->paused) { 
+                seq_printf(m,
+                            "FSM %02u State Matrix - Input Processing PAUSED\n"
+                            "---------------------------------------------\n", f);
+            } else {
+                seq_printf(m,
+                            "FSM %02u State Matrix\n"
+                            "-------------------\n", f);
+            }
+            for (r = 0; r < ss->states->n_rows; ++r) {
+                for (c = 0; c < ss->states->n_cols; ++c) {
+                    seq_printf(m, "%4u ", (unsigned)FSM_MATRIX_AT(ss->states, r, c));
+                }
+                seq_printf(m, "\n");
+            }
         }
-
-        embCProgram = inflateCpy(ss->states->program_z, ss->states->program_z_len, ss->states->program_len, 0);
-        if (!embCProgram) {
-          seq_printf(m, " ** ERROR DECOMPRESSING PROGRAM TEXT IN MEMORY ** \n");
-        } else {
-          seq_printf(m, "%s\n", embCProgram);
-        }
-        freeDHBuf(embCProgram);
 
         { /* print input routing */
           unsigned i, j;
-          seq_printf(m, "\nFSM %u Input Routing\n"
-                          "-------------------\n", f);
+          seq_printf(m, "\nFSM %02u Input Routing\n"
+                          "--------------------\n", f);
           seq_printf(m, "%s Channel IDs: ", ss->states->routing.in_chan_type == AI_TYPE ? "AI" : "DIO");
           /* argh this is an O(n^2) algorithm.. sorry :( */
           for (i = 0; i < ss->states->routing.num_evt_cols; ++i)
@@ -1685,16 +1726,16 @@ static int myseq_show (struct seq_file *m, void *dummy)
         { /* print static timer info */
           
           unsigned tstate_col = ss->states->routing.num_evt_cols;
-          seq_printf(m, "\nFSM %u Timeout Timer\n"
-                          "-------------------\n", f);
+          seq_printf(m, "\nFSM %02u Timeout Timer\n"
+                          "--------------------\n", f);
           seq_printf(m, "Columns:\n");
           seq_printf(m, "\tColumn %u: timeout jump-state\n\tColumn %u: timeout time (seconds)\n", tstate_col, tstate_col+1);
         }
 
         { /* print output routing */
           unsigned i;
-          seq_printf(m, "\nFSM %u Output Routing\n"
-                     "--------------------\n", f);
+          seq_printf(m, "\nFSM %02u Output Routing\n"
+                          "---------------------\n", f);
           seq_printf(m, "Columns:\n");
           for (i = 0; i < ss->states->routing.num_out_cols; ++i) {
             struct OutputSpec *spec = 0;
@@ -1733,8 +1774,8 @@ static int myseq_show (struct seq_file *m, void *dummy)
 
         if (ss->states->has_sched_waves) { /* Print Sched. Wave statistics */
           int i;
-          seq_printf(m, "\nFSM %u Scheduled Wave Info\n"
-                          "-------------------------\n", f);
+          seq_printf(m, "\nFSM %02u Scheduled Wave Info\n"
+                          "--------------------------\n", f);
           /* Print stats on AO Waves */
           for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
             volatile struct AOWaveINTERNAL *w = ss->states->aowaves[i];
@@ -1772,6 +1813,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
           }
         }
         vfree(ss);
+        /*vfree(fsm);*/
       } else {
         seq_printf(m, "Cannot retrieve FSM data:  Temporary failure in memory allocation.\n");
       }    
@@ -2385,7 +2427,7 @@ static void handleFifos(FSMID_t f)
     case FSM:
       rs[f].pending_fsm_swap = 0;
       rs[f].states = OTHER_FSM_PTR(f); /* temp. swap in the new fsm.. */
-      errcode = doSanityChecksRuntime(f); /* check new FSM  sanity */
+      errcode = doSanityChecksRuntime(f); /* check new FSM  sanity -- also checks if buddy task indicated error */
       rs[f].states = OTHER_FSM_PTR(f); /* temp. swap back the old fsm.. */ 
       if (errcode) {  /* sanity check failed.. */
         
@@ -2401,10 +2443,8 @@ static void handleFifos(FSMID_t f)
              last fsm.. */
           swapFSMs(f);
         else
-        /* TODO FIXME BUG XXX: need to figure out how to gracefully handle
-           pending fsm swaps and things like AOWave specs, input specs, sched-waves,
-           etc!  Right now the old FSM gets the AOWaves, sched waves, etc of the *new* fsm! */
-          /* fsm requested to cleanly wait for last FSM to exit.. */
+          /* fsm requested to cleanly wait for last FSM to exit.. 
+             so we pend the swap until a state 0 crossing of the old fsm */
           rs[f].pending_fsm_swap = 1;
       }
       do_reply = 1;
@@ -3355,32 +3395,46 @@ static void buddyTaskHandler(void *arg)
   msg = (struct ShmMsg *)&shm->msg[f];
   switch (req) {
   case FSM: {
-    struct EmbC **embc = &OTHER_FSM_PTR(f)->embc;
-    unloadDetachFSM(OTHER_FSM_PTR(f)); /* NB: may be a noop if no old fsm exists.. */
+    struct FSMSpec *fsm = OTHER_FSM_PTR(f);
+    struct EmbC **embc = &fsm->embc;
+    const char *name = fsm->name;
+    int isok = 1;
     
     /* use alternate FSM as temporary space during this interruptible copy 
        realtime task will swap the pointers when it realizes the copy
        is done and/or when it's time to swap fsms (see pending_fsm_swap stuff)  */
-    memcpy(OTHER_FSM_PTR(f), (void *)&msg->u.fsm, sizeof(*OTHER_FSM_PTR(f)));  
     
-    *embc = (struct EmbC *) mbuff_attach(OTHER_FSM_PTR(f)->shm_name, sizeof(**embc));
+    /* first, free alternate FSM */
+    unloadDetachFSM(fsm); /* NB: may be a noop if no old fsm exists
+                             or if old fsm is of type FSM_TYPE_PLAIN.. */
+    /* now copy in the fsm from usersopace */
+    memcpy(fsm, (void *)&msg->u.fsm, sizeof(*fsm));  
+    *embc = 0;/* make SURE the ptr starts off NULL, this prevents userspace from crashing us.. */
     
-    if (!*embc) {
-      ERROR("Failed to attach to FSM Shm %s!\n", OTHER_FSM_PTR(f)->shm_name);
-    } else {
-      /* set up the error handler */
-      FSMSpec *fsm = OTHER_FSM_PTR(f);
-      if (!initializeFSM(f, fsm)) {
-        ERROR("Failed to initialize the FSM %s!\n", fsm->shm_name);
-        unloadDetachFSM(fsm);
-      }
+    if (fsm->type == FSM_TYPE_EMBC) {
+        *embc = (struct EmbC *) mbuff_attach(name, sizeof(**embc));
+        
+        if (!*embc) {
+            ERROR("Failed to attach to FSM Shm %s!\n", name);
+            isok = 0;
+        } 
     }
+    /* set up the error handler */
+    if (isok && !initializeFSM(f, fsm)) {
+        ERROR("Failed to initialize the FSM %s!\n", name);
+        unloadDetachFSM(fsm);
+        isok = 0;
+    }
+    
+    if (!isok)
+    /* IMPORTANT!! setting the type to NONE indicates to realtime task there was an error.. */
+        fsm->type = FSM_TYPE_NONE; 
   }
 
     break;
   case GETFSM:
     if (!rs[f].valid) {  
-      memset((void *)&msg->u.fsm, 0, sizeof(msg->u.fsm));      
+      memset((void *)&msg->u.fsm, 0, sizeof(msg->u.fsm));
     } else {
       memcpy((void *)&msg->u.fsm, FSM_PTR(f), sizeof(msg->u.fsm));
     }
@@ -3406,7 +3460,7 @@ static void buddyTaskHandler(void *arg)
             spec = FSM_PTR(f);
         if (w->nsamples > AOWAVE_MAX_SAMPLES) w->nsamples = AOWAVE_MAX_SAMPLES;
         wint = spec->aowaves[w->id];
-        cleanupAOWave(wint, (char *)spec->shm_name, w->id);
+        cleanupAOWave(wint, (char *)spec->name, w->id);
         wint = kmalloc(sizeof(*wint), GFP_KERNEL);
         if (wint && w->nsamples) {
           int ssize = w->nsamples * sizeof(*wint->samples),
@@ -3420,10 +3474,10 @@ static void buddyTaskHandler(void *arg)
             wint->cur = 0;
             memcpy((void *)(wint->samples), w->samples, ssize);
             memcpy((void *)(wint->evt_cols), w->evt_cols, esize);
-            DEBUG("FSM %u AOWave: allocated %d bytes for AOWave %s:%u\n", f, ssize+esize+sizeof(*wint), spec->shm_name, w->id);
+            DEBUG("FSM %u AOWave: allocated %d bytes for AOWave %s:%u\n", f, ssize+esize+sizeof(*wint), spec->name, w->id);
           } else {
             ERROR_INT("FSM %u In AOWAVE Buddy Task Handler: failed to allocate memory for an AO wave! Argh!!\n", f);
-            cleanupAOWave(wint, (char *)spec->shm_name, w->id);
+            cleanupAOWave(wint, (char *)spec->name, w->id);
           }
         } else if (!wint) {
             ERROR_INT("FSM %u In AOWAVE Buddy Task Handler: failed to allocate memory for an AO wave struct! Argh!!\n", f);
@@ -3483,7 +3537,7 @@ static void cleanupAOWaves(volatile struct FSMSpec *spec)
 {
   unsigned i;
   for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
-    cleanupAOWave(spec->aowaves[i], (char *)spec->shm_name, i); /* ok if null, cleanup func just returns then */
+    cleanupAOWave(spec->aowaves[i], (char *)spec->name, i); /* ok if null, cleanup func just returns then */
     spec->aowaves[i] = 0;
   }
 }
@@ -3595,17 +3649,17 @@ static int initializeFSM(FSMID_t f, struct FSMSpec *spec)
 {
   struct EmbC *embc = spec->embc;
 
-  if (!embc) return 0;
+  if (embc) {
+    embc->lock(); /* NB: unlock called by unloadDetachFSM */
 
-  embc->lock(); /* NB: unlock called by unloadDetachFSM */
-
-  fsmLinkProgram(f, embc);
+    fsmLinkProgram(f, embc);
+  }
   
   /* clear all AO wave pointers */
   memset(spec->aowaves, 0, sizeof(spec->aowaves));
  
   /* call init here in non-realtime context.  Note that cleanup is called in non-realtime context too in unloadDetachFSM() */
-  if (embc->init) embc->init(); 
+  if (embc && embc->init) embc->init(); 
   
   return 1;
 }
@@ -3796,25 +3850,11 @@ static void swapFSMs(FSMID_t f)
 
 static void unloadDetachFSM(struct FSMSpec *fsm)
 {
-    struct EmbC **embc = &fsm->embc;
-    if (*embc) {
-      
-      if ((*embc)->cleanup) 
-          (*embc)->cleanup();
-      
-      /* now, free any allocated ao wav data */
-      cleanupAOWaves(fsm);
-      
-      /* decrease use count .. was incremented by fsmLinkProgram */
-      (*embc)->unlock(); 
-      
-      mbuff_detach(fsm->shm_name, *embc);
-      *embc = 0; /* clean up old embc ptr, if any */
-      
-      {
+    if (fsm->type == FSM_TYPE_EMBC) {
+        struct EmbC **embc = &fsm->embc;
         char *argv[] = {
           "/sbin/rmmod",
-          (char *)fsm->shm_name,
+          (char *)fsm->name,
           0
         };
         char *envp[] = {
@@ -3823,13 +3863,35 @@ static void unloadDetachFSM(struct FSMSpec *fsm)
           "PATH=/sbin:/usr/sbin:/bin:/usr/bin",
           NULL,
         };        
+        if (*embc) {
+      
+            if ((*embc)->cleanup) 
+                (*embc)->cleanup();
+      
+            /* decrease use count .. was incremented by fsmLinkProgram */
+            (*embc)->unlock(); 
+      
+            mbuff_detach(fsm->name, *embc);
+            *embc = 0; /* clean up old embc ptr, if any */
+            
+        }
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
         call_usermodehelper(argv[0], argv, envp, 1);
 #else
         call_usermodehelper(argv[0], argv, envp);
 #endif
-      }
-    }     
+    } 
+    
+    /* NB: don't make this an else of the above if.. we call this 
+       unconditionally as long as fsm->type != FSM_TYPE_NONE */
+    
+    if (fsm->type != FSM_TYPE_NONE) {
+      /* now, free any allocated ao wav data */
+      cleanupAOWaves(fsm);
+    }
+    
+    memset(fsm, 0, sizeof(*fsm)); /* clear the fsmspec just to be paranoid.. */
 }
 
 static void  doSetupThatNeededFloatingPoint(void)

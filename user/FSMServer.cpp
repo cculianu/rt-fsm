@@ -750,17 +750,31 @@ void *ConnectionThread::threadFunc(void)
         } else if (line.find("GET STATE PROGRAM") == 0) {
             msg.id = GETFSM;
             sendToRT(msg);
-            std::auto_ptr<char> program(new char[msg.u.fsm.program_len+1]);
-            memcpy(program.get(), msg.u.fsm.program_z, msg.u.fsm.program_z_len);
-            inflateInplace(program.get(), msg.u.fsm.program_z_len, msg.u.fsm.program_len);
-            program.get()[msg.u.fsm.program_len] = 0;
-            std::vector<std::string> lines = splitString(program.get(), "\n", false, false);
-            std::stringstream s;
-            s << "LINES " << lines.size() << "\n" << program.get();
-            std::string str = s.str();
-            if (str[str.length()-1] != '\n') str = str + "\n";
-            sockSend(str);
-            cmd_error = false;
+            switch (msg.u.fsm.type) {
+            case FSM_TYPE_EMBC: {
+                std::auto_ptr<char> program(new char[msg.u.fsm.program.program_len+1]);
+                memcpy(program.get(), msg.u.fsm.program.program_z, msg.u.fsm.program.program_z_len);
+                inflateInplace(program.get(), msg.u.fsm.program.program_z_len, msg.u.fsm.program.program_len);
+                program.get()[msg.u.fsm.program.program_len] = 0;
+                std::vector<std::string> lines = splitString(program.get(), "\n", false, false);
+                std::stringstream s;
+                s << "LINES " << lines.size() << "\n" << program.get();
+                std::string str = s.str();
+                if (str[str.length()-1] != '\n') str = str + "\n";
+                sockSend(str);
+                cmd_error = false;
+            }
+                break;
+            case FSM_TYPE_PLAIN: {
+                sockSend("LINES 0\n");
+                cmd_error = false;
+            }
+                break;
+            default:
+                Log() << "INVALID MATRIX TYPE! Expected one of 'FSM_TYPE_PLAIN' or 'FSM_TYPE_EMBC'\n";
+                cmd_error = true;
+                break;
+            }
         } else if (line.find("INITIALIZE") == 0) {
             sendToRT(RESET_);
             cmd_error = false;
@@ -1352,11 +1366,14 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
   }
 
   msg.id = FSM;
-  ::memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero?
+  ::memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero
   // setup matrix here..
   msg.u.fsm.n_rows = m.rows(); // note this will get set to inpRow later in this function via the alias nRows...
   msg.u.fsm.n_cols = m.cols();
 
+  // tell it this is an embedded C fsm
+  msg.u.fsm.type = FSM_TYPE_EMBC;
+  
   // set some misc. params
   msg.u.fsm.ready_for_trial_jumpstate = readyForTrialJumpState;
   msg.u.fsm.routing.num_evt_cols = inSpec.size();
@@ -1576,7 +1593,7 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
   
   //std::cerr << "---\n" << fsm_prog << "---\n"; sleep(1);// DEBUG
 
-  // compress the fsm program text, put it in msg.u.fsm.program_z
+  // compress the fsm program text, put it in msg.u.fsm.program.program_z
   unsigned sz = fsm_prog.length()+1, defSz;
   std::auto_ptr<char> defBuf(deflateCpy(fsm_prog.c_str(), sz, &defSz));
   
@@ -1588,9 +1605,9 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
     Log() << "The generated, compressed FSM program text is too large! Size is: " << defSz << " whereas size limit is: " << FSM_PROGRAM_SIZE << "!\n"; 
     return false;
   }
-  ::memcpy(msg.u.fsm.program_z, defBuf.get(), defSz);
-  msg.u.fsm.program_len = sz;
-  msg.u.fsm.program_z_len = defSz;
+  ::memcpy(msg.u.fsm.program.program_z, defBuf.get(), defSz);
+  msg.u.fsm.program.program_len = sz;
+  msg.u.fsm.program.program_z_len = defSz;
   // compress the FSM raw matrix text as a URLEncoded stringtable, put it in msg.u.fsm.matrix_z
   std::string stringtable = genStringTable(m);  
   sz = stringtable.length()+1;
@@ -1604,12 +1621,12 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
     Log() << "The generated, compressed raw matrix text is too large! Size is: " << defSz << " whereas size limit is: " << FSM_MATRIX_SIZE << "!\n"; 
     return false;
   }
-  ::memcpy(msg.u.fsm.matrix_z, defBuf.get(), defSz);
+  ::memcpy(msg.u.fsm.program.matrix_z, defBuf.get(), defSz);
   freeDHBuf(defBuf.release());
-  msg.u.fsm.matrix_len = sz;
-  msg.u.fsm.matrix_z_len = defSz;
-  ::strncpy(msg.u.fsm.shm_name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.shm_name));
-  msg.u.fsm.shm_name[sizeof(msg.u.fsm.shm_name)-1] = 0;
+  msg.u.fsm.program.matrix_len = sz;
+  msg.u.fsm.program.matrix_z_len = defSz;
+  ::strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
+  msg.u.fsm.name[sizeof(msg.u.fsm.name)-1] = 0;
   msg.u.fsm.wait_for_jump_to_state_0_to_swap_fsm = state0_fsm_swap_flg;
 #ifndef EMULATOR
   if (!doCompileLoadProgram(fsm_shm_name, fsm_prog)) return false;
@@ -1736,11 +1753,12 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
     return false;
   }
   msg.id = FSM;
-  ::memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero?
+  ::memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero
   
   // setup matrix here..
   msg.u.fsm.n_rows = m.rows(); // note this will get set to inpRow later in this function via the alias nRows...
   msg.u.fsm.n_cols = m.cols();
+  msg.u.fsm.type = FSM_TYPE_PLAIN;
   unsigned short & nRows = msg.u.fsm.n_rows; // alias used for below code, will get decremented once we pop out the sched wave spec that is in our matrix and the input event spec that is in our matrix..
 
   // seetup in_chan_type
@@ -1848,84 +1866,30 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   }
 #undef NEXT_COL
 
-  std::ostringstream prog;
-  prog << "// BEGIN PRE-DEFINED GLOBAL DECLARATIONS\n";
-  prog << "#define EMBC_MOD_INTERNAL\n";
-  prog << "#define EMBC_GENERATED_CODE\n";
-  prog << "#include <EmbC.h>\n";
-  std::string fsm_shm_name = newShmName();
-  prog << "const char *__embc_ShmName = \"" << fsm_shm_name << "\";\n";
-  prog << "void (*__embc_init)(void) = 0;\n";
-  prog << "void (*__embc_cleanup)(void) = 0;\n";
-  prog << "void (*__embc_transition)(void) = 0;\n";
-  prog << "void (*__embc_tick)(void) = 0;\n";
-  prog << "void __embc_fsm_do_state_entry(ushort s) { (void)s; }\n";
-  prog << "void __embc_fsm_do_state_exit(ushort s) { (void)s; }\n";
-  prog << "TRISTATE  (*__embc_threshold_detect)(int, double) = 0;\n";
-  prog << "\n// BEGIN USER-DEFINED PROGRAM\n";
-  // the state matrix as a static array
-  prog << "ulong __stateMatrix[" << nRows << "][" << m.cols() << "] = {\n";
-  
+  // make sure it fits
+  {
+      unsigned long inBytes = nRows * m.cols() * sizeof(msg.u.fsm.plain.matrix[0]),
+                    maxBytes = sizeof(msg.u.fsm.plain.matrix);
+    if ( inBytes > maxBytes ) {
+        Log() << "The specified matrix is too big!  It takes up " << inBytes << " bytes when the max capacity for a plain matrix is " << maxBytes << " bytes!  Try either an FSM program, or reduce the size of the matrix!\n"; 
+        return false;
+    }
+  }
+  // next, just assign it into msg.u.fsm.plain.matrix
   for (i = 0; i < (int)nRows; ++i) {
-    prog << " { ";
     for (j = 0; j < (int)m.cols(); ++j) {
       double val = m.at(i, j);
-      if (j == (int)TIMEOUT_TIME_COL(&msg.u.fsm)) val *= 1e6;  
-      prog << std::setw(5) << static_cast<unsigned long>(val) << "UL";  
-      if (j+1 < m.cols()) prog << ", ";
+      if (j == (int)TIMEOUT_TIME_COL(&msg.u.fsm)) val *= 1e6;
+      FSM_MATRIX_AT(&msg.u.fsm, i, j) = static_cast<unsigned>(val);
     }
-    prog << " }"; if (i+1 < m.rows()) prog << ", ";
-    prog << "\n";
   }
-  prog << "};\n" 
-       << "unsigned long __embc_fsm_get_at(ushort __r, ushort __c)\n"
-       << "{\n" 
-       << "  if (__r < " << nRows << " && __c < " << m.cols() << ") return __stateMatrix[__r][__c];\n"
-       << "  else printf(\"FSM Runtime Error: no such state,column found (%hu, %hu) at time %d.%d!\\n\", __r, __c, (int)time(), (int)((time()-(double)((int)time())) * 10000));\n"
-       << "  return 0;\n"
-       << "}\n";  
-  std::string fsm_prog = prog.str();
-
-  unsigned unc = fsm_prog.length()+1, cmp;
-  
-  std::auto_ptr<char> tmpBuf(deflateCpy(fsm_prog.c_str(), unc, &cmp));
-
-  if (!tmpBuf.get()) {
-    Log() << "Could not compress the FSM program text -- an unspecified error occurred from the compression library!\n"; 
-    return false;
-  }
-  if (cmp > FSM_PROGRAM_SIZE) {
-    Log() << "The generated compressed FSM program text is too large! Size is: " << cmp << " whereas size limit is: " << FSM_PROGRAM_SIZE << "!\n"; 
-    return false;
-  }
-  ::memcpy(msg.u.fsm.program_z, tmpBuf.get(), cmp);
-  msg.u.fsm.program_z_len = cmp;
-  msg.u.fsm.program_len = unc;
-  freeDHBuf(tmpBuf.release());
-  ::strncpy(msg.u.fsm.shm_name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.shm_name));
-  msg.u.fsm.shm_name[sizeof(msg.u.fsm.shm_name)-1] = 0;
-  
-  std::string stringtable = genStringTable(m);
-  unc = stringtable.length()+1;
-  tmpBuf.reset(deflateCpy(stringtable.c_str(), unc, &cmp));
-  if (!tmpBuf.get()) {
-    Log() << "Could not compress the FSM matrix text -- an unspecified error occurred from the compression library!\n"; 
-    return false;
-  }
-  if (cmp > FSM_MATRIX_SIZE) {
-    Log() << "The generated compressed FSM matrix text is too large! Size is: " << cmp << " whereas size limit is: " << FSM_MATRIX_SIZE << "!\n"; 
-    return false;
-  }
-  ::memcpy(msg.u.fsm.matrix_z, tmpBuf.get(), cmp);
-  msg.u.fsm.matrix_z_len = cmp;
-  msg.u.fsm.matrix_len = unc;
-  freeDHBuf(tmpBuf.release());
 
   msg.u.fsm.wait_for_jump_to_state_0_to_swap_fsm = state0_fsm_swap_flg;
 
-#ifndef EMULATOR
-  if (!doCompileLoadProgram(fsm_shm_name, fsm_prog)) return false;
-#endif
+  std::string fsm_shm_name = newShmName(); // the name is not really for a shm, just descriptive/unique
+  ::strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
+  msg.u.fsm.name[sizeof(msg.u.fsm.name)-1] = 0;
+
   sendToRT(msg);
   
   return true;
@@ -1938,7 +1902,7 @@ StringMatrix ConnectionThread::matrixFromRT()
 
   sendToRT(msg);
 
-  if (!msg.u.is_valid) {
+  if (!msg.u.is_valid/* NB: the check of this flag is a hack!  this works becuse the msg.u.is_valid flag takes up the same memory as the msg.u.fsm.n_rows and msg.u.fsm.n_cols fields due to the union!*/) {
     // no valid matrix defined
     unsigned rows, cols;
     getFSMSizeFromRT(rows, cols);
@@ -1956,11 +1920,37 @@ std::endl;
   sendToRT(msg);
   
   StringMatrix m(msg.u.fsm.n_rows, msg.u.fsm.n_cols);
-  std::auto_ptr<char> strBuf(inflateCpy(msg.u.fsm.matrix_z, msg.u.fsm.matrix_z_len, msg.u.fsm.matrix_len, 0));
   
-  parseStringTable(strBuf.get(), m);
-  freeDHBuf(strBuf.release());
-
+  switch (msg.u.fsm.type) {
+  case FSM_TYPE_EMBC: {  
+        std::auto_ptr<char> strBuf(inflateCpy(msg.u.fsm.program.matrix_z, msg.u.fsm.program.matrix_z_len, msg.u.fsm.program.matrix_len, 0));
+  
+        parseStringTable(strBuf.get(), m);
+        freeDHBuf(strBuf.release());
+    } 
+    break;
+  case FSM_TYPE_PLAIN: {
+        for (unsigned r = 0; r < m.rows(); ++r) 
+        for (unsigned c = 0; c < m.cols(); ++c) {
+            std::ostringstream os;
+            unsigned val = FSM_MATRIX_AT(&msg.u.fsm, r, c);
+            if (c == TIMEOUT_TIME_COL(&msg.u.fsm)) os << (double(val) / 1e6);
+            else os << val;
+            m.at(r,c) = os.str(); 
+        }
+    }
+    break;
+  default: {
+        const std::string zero = "0";
+        Log() << "INVALID MATRIX TYPE! Expected one of 'FSM_TYPE_PLAIN' or 'FSM_TYPE_EMBC' -- sending empty matrix\n";
+        for (unsigned r = 0; r < m.rows(); ++r) 
+        for (unsigned c = 0; c < m.cols(); ++c) 
+            m.at(r,c) = zero;
+        return m;
+    }
+    break;
+  } // end switch
+  
   if (debug) {
     Log() << "Matrix from RT is:" << std::endl;
     for (unsigned i = 0; i < m.rows(); ++i) {
