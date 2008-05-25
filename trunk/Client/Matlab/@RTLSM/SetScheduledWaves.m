@@ -201,6 +201,11 @@ function [sm] = SetScheduledWaves(varargin)
     
 function [sm] = SetScheduledWavesDIO(sm, sched_matrix)
     [m,n] = size(sched_matrix);
+    if (n == 7 && m >= 1), % they are using an old-style m x 7 matrix, patch it
+        warning('SetScheduledWaves now expects an m x 8 rather than an m x 7 matrix, fix the calling code!');
+        sched_matrix = [ sched_matrix(:,1:4) zeros(m,1) sched_matrix(:,5:7) ];
+        [m,n] = size(sched_matrix);
+    end;
     if (n ~= 8 || m < 1), error('Argment 2 to SetScheduledWaves needs to be an m x 8 matrix!'); end;
     id_ctr = zeros(32);
 % check for dupes
