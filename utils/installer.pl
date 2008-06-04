@@ -4,6 +4,8 @@ use strict;
 use English;
 use Cwd;
 
+$ENV{PATH} = $ENV{PATH} . ":/sbin:/usr/sbin:/usr/local/sbin"; # just in case they lacked the sbin stuff from their path.. sometimes this happens when sudoing, etc
+
 my @supportedFedoras = (8, 9); 
 my @supportedArches = ("i686", "x86_64");
 my $fedoraRelease = undef; # set to one of @supportedFedoras below..
