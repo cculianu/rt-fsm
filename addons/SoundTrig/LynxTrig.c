@@ -309,11 +309,19 @@ static void UNLOCK_SNDBUF(unsigned c, unsigned id)
 }
 static inline void LOCK_TRIGGERS(unsigned c) 
 {  
-    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS) down(&trigger_mutexes[c].card_mutex); 
+    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS) {
+        unsigned id;
+        down(&trigger_mutexes[c].card_mutex); 
+        for (id = 0; id < MAX_SND_ID; ++id) LOCK_SNDBUF(c, id);
+    }
 }
 static inline void UNLOCK_TRIGGERS(unsigned c) 
 {
-    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS) up(&trigger_mutexes[c].card_mutex); 
+    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS) {
+        unsigned id;
+        for (id = 0; id < MAX_SND_ID; ++id) UNLOCK_SNDBUF(c, id);
+        up(&trigger_mutexes[c].card_mutex); 
+    }
 }
 static int initTriggerLocks(void) 
 {
