@@ -61,6 +61,7 @@
 static inline int pthread_attr_setfp_np(pthread_attr_t *a, int b) {(void)(a); (void)(b); return 0; }
 #endif
 
+
 #if MAX_CARDS != L22_MAX_DEVS
 #error  MAX_CARDS needs to equal L22_MAX_DEVS.  Please fix either LynxTWO-RT.h or SoundTrig.h to make these #defines equal!
 #endif
@@ -344,12 +345,12 @@ static int initSTs(void);
 static void cleanupSTs(void);
 #define NUM_SOFTS_SEMS 16 /* the number of semaphores and softtasks we open up at module load time.. */
 static sem_t misc_sems[NUM_SOFTS_SEMS];
-static atomic_t misc_sem_idx = ATOMIC_INIT(0);
+static volatile unsigned long misc_sem_idx = 0;
 static pthread_mutex_t misc_sem_mut;
 static int setup_sems = 0;
 
 static struct SoftTask *soft_tasks[NUM_SOFTS_SEMS] = {0};
-static atomic_t soft_task_idx = ATOMIC_INIT(0);
+static volatile unsigned long soft_task_idx = 0;
 static pthread_mutex_t soft_task_mut;
 static int setup_soft_tasks = 0;
 
@@ -1448,7 +1449,7 @@ static void cancelAnyRunningRampedStops(unsigned c, unsigned chan)
 static void stopAllChans(CardID_t c)
 {
   unsigned chan;
-  
+  DEBUG("stopAllChans %u\n", (unsigned)c);
   for (chan = 0; chan < L22_NUM_CHANS; ++chan) {
       DevChan dc;
       dc.dev = c;
@@ -1524,7 +1525,16 @@ static void *doEventCmd(void *arg)
 
 static void *doSemPostCmd(void *arg)
 {
+    int v;
     sem_t *s = (sem_t *)arg;
+    sem_getvalue(s, &v);
+#ifdef RTAI
+    if (v >= 0) {
+#else
+    if (v > 0) {
+#endif
+        ERROR("doSemPostCmd(%d) value was %d\n", (int)(s-misc_sems), v);
+    }
     sem_post(s);
     return (void *)1;
 }
@@ -1548,10 +1558,11 @@ static void *doCmdInRTThread(int cmd, void *arg)
       /* we are not in an rt thread, so spawn a new thread and wait for it */
       pthread_t thr = 0;
       void * ret;
-      int err = pthread_create(&thr, 0, func, arg);
+      int err;
       DEBUG("doCmdInRTThread - CURRENT IS LINUX, creating RT thread\n");
+      err = pthread_create(&thr, 0, func, arg);
       if (err) {
-        ERROR("*** Internal Error *** Could not create RT thread in doCmdInRTThread: %d!\n", cmd);
+        ERROR("*** Internal Error *** pthread_create returned %d in doCmdInRTThread(%d)!\n", err, cmd);
         return 0;
       }
       pthread_join(thr, &ret);
@@ -1617,6 +1628,7 @@ static void mrSoftTask(void *arg)
     /* NB: according to paolo I can't call sem_post() from Linux context so I have to do this from
         an rt-thread.  Ugh. */
     doCmdInRTThread(SEMPOST_CMD, (void *)taskArg->sem);
+    /* NB: at this point the taskArg pointer might be invalid since caller may have woken up! */
 /*        sem_post(taskArg->sem);*/
     DEBUG("mrSoftTask gunna return\n");
 }
@@ -1757,13 +1769,18 @@ static int initSems(void)
     int i, ret;
     setup_sems = 0;
     for (i = 0; i < NUM_SOFTS_SEMS; ++i) {
-        if ( (ret = sem_init(&misc_sems[i], 0, 0)) ) return ret;
+        if ( (ret = sem_init(&misc_sems[i], 0, 0)) ) {
+            ERROR("Could not create sem #%d\n", i);
+            return ret;
+        }
         ++setup_sems;
     }
     if ( !pthread_mutex_init(&misc_sem_mut, 0) )
         ++setup_sems;
-    else
+    else {
+        ERROR("Could not create sem mutex\n");
         return -EINVAL;
+    }
     return 0;
 }
 static void cleanupSems(void)
@@ -1778,8 +1795,7 @@ static sem_t *get_unused_sem(void)
 {
     int i;
     pthread_mutex_lock(&misc_sem_mut);
-    atomic_inc(&misc_sem_idx);
-    i = atomic_read(&misc_sem_idx) % NUM_SOFTS_SEMS;
+    i = misc_sem_idx++ % NUM_SOFTS_SEMS;
     pthread_mutex_unlock(&misc_sem_mut);
     return &misc_sems[i];
 }
@@ -1788,8 +1804,7 @@ static struct SoftTask *get_unused_st(void)
 {
     int i;
     pthread_mutex_lock(&soft_task_mut);
-    atomic_inc(&soft_task_idx);
-    i = atomic_read(&soft_task_idx) % NUM_SOFTS_SEMS;
+    i = soft_task_idx++ % NUM_SOFTS_SEMS;
     pthread_mutex_unlock(&soft_task_mut);
     return soft_tasks[i];
 }
@@ -1800,13 +1815,18 @@ static int initSTs(void)
     setup_soft_tasks = 0;
     for (i = 0; i < NUM_SOFTS_SEMS; ++i) {
         char nam[] = { 's', 't', i+'0', 0 };
-        if ( !(soft_tasks[i] = softTaskCreate(mrSoftTask, nam)) ) return -ENOMEM;
+        if ( !(soft_tasks[i] = softTaskCreate(mrSoftTask, nam)) ) {
+            ERROR("Could not create softTask #%d\n", i);
+            return -ENOMEM;
+        }
         ++setup_soft_tasks;
     }
-    if ( !pthread_mutex_init(&soft_task_mut, 0) )
+    if ( !pthread_mutex_init(&soft_task_mut, 0) ) 
         ++setup_soft_tasks;
-    else
+    else {
+        ERROR("Could not create softTask mutex\n");
         return -EINVAL;
+    }
     return 0;
 }
 
