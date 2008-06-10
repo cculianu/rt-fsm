@@ -284,14 +284,58 @@ static struct RunState rs[L22_MAX_DEVS];
 
 #define SOFTWARE_TRIGGERS()  (!comedi_triggers)
 #define COMEDI_TRIGGERS() (comedi_triggers != 0)
-static DECLARE_MUTEX(trigger_mutex);
+/** Used in non-realtime context to lock audio buffers, cards, etc, and in 
+    realtime context the count is checked and buffer is ignored if locked. */
+static struct {
+    struct semaphore card_mutex;
+    struct semaphore snd_id_mutex[MAX_SND_ID];
+} trigger_mutexes[MAX_CARDS];
+static unsigned trigger_mutexes_initted = 0;
+#define TRIGGERS_LOCKED(c) (c >= 0 && c < MAX_CARDS && SOFTWARE_TRIGGERS() && atomic_read(&trigger_mutexes[c].card_mutex.count) <= 0)
+static int SNDBUF_IS_LOCKED(unsigned c, unsigned id) 
+{
+    return c < MAX_CARDS && id < MAX_SND_ID && SOFTWARE_TRIGGERS() && atomic_read(&trigger_mutexes[c].snd_id_mutex[id].count) <= 0;
+}
 /** Note locking only happens in non-rt context (SOFTWARE_TRIGGERS() mode).
     In COMEDI_TRIGGERS() mode, we don't lock anything as all trigger access 
     is synchronous. */
-#define LOCK_TRIGGERS() do { if (SOFTWARE_TRIGGERS()) down_interruptible(&trigger_mutex); } while(0)
-#define UNLOCK_TRIGGERS() do { if (SOFTWARE_TRIGGERS()) up(&trigger_mutex); } while(0)
-#define TRIGGERS_LOCKED() (SOFTWARE_TRIGGERS() && atomic_read(&trigger_mutex.count) <= 0)
-
+static void LOCK_SNDBUF(unsigned c, unsigned id)
+{
+    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS && id < MAX_SND_ID) down(&trigger_mutexes[c].snd_id_mutex[id]); 
+}
+static void UNLOCK_SNDBUF(unsigned c, unsigned id)
+{
+    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS && id < MAX_SND_ID) up(&trigger_mutexes[c].snd_id_mutex[id]); 
+}
+static inline void LOCK_TRIGGERS(unsigned c) 
+{  
+    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS) down(&trigger_mutexes[c].card_mutex); 
+}
+static inline void UNLOCK_TRIGGERS(unsigned c) 
+{
+    if (SOFTWARE_TRIGGERS() && c < MAX_CARDS) up(&trigger_mutexes[c].card_mutex); 
+}
+static int initTriggerLocks(void) 
+{
+    unsigned c, id;
+    for (c = 0; c < MAX_CARDS; ++c) {
+        init_MUTEX(&trigger_mutexes[c].card_mutex);
+        for (id = 0; id < MAX_SND_ID; ++id) init_MUTEX(&trigger_mutexes[c].snd_id_mutex[id]);
+        ++trigger_mutexes_initted;
+    }
+    return 0;
+}
+static void cleanupTriggerLocks(void)
+{
+    unsigned c, id;
+    for (c = 0; c < trigger_mutexes_initted; ++c) {
+        if (TRIGGERS_LOCKED(c)) 
+            ERROR("Trigger %u destroyed but it was currently locked! Argh!\n", c);
+        for (id = 0; id < MAX_SND_ID; ++id) 
+            if (SNDBUF_IS_LOCKED(c,id))
+                ERROR("SndBuf Mutex %u,%u destroyed but it was currently locked! Argh!\n", c, id);
+    }
+}
 /*---------------------------------------------------------------------------
  Some helper functions
 -----------------------------------------------------------------------------*/
@@ -417,7 +461,8 @@ int init (void)
 #ifdef RTAI
   DEBUG("linux prio: %x\n", rt_get_prio(rt_whoami()));
 #endif
-  if (    (retval = initSTs())
+  if (    (retval = initTriggerLocks())
+       || (retval = initSTs())
        || (retval = initSems())
        || (retval = initL22Devs())
        || (retval = initChanMapper())
@@ -458,9 +503,11 @@ void cleanup (void)
 {
   unsigned c;
   
-  LOCK_TRIGGERS();
 
-  for (c = 0; c < n_l22dev; ++c) stopAllChans(c);
+  for (c = 0; c < n_l22dev; ++c) {
+      LOCK_TRIGGERS(c);
+      stopAllChans(c);
+  }
   
   /* TODO: Worry about possible race conditions with RT thread in
      virtualTriggerFunction() (it's possible for an RT thread to 
@@ -511,7 +558,7 @@ void cleanup (void)
     LOG_MSG("unloaded successfully after %s virtual trigger events.\n", 
             uint64_to_cstr(cycle));
 
-  UNLOCK_TRIGGERS();
+  for (c = 0; c < n_l22dev; ++c) UNLOCK_TRIGGERS(c);
 
   cleanupL22Devs();
   
@@ -524,6 +571,7 @@ void cleanup (void)
   /* these need to happen last or almost last as they are used by the of the functions above.. */
   cleanupSems();
   cleanupSTs();
+  cleanupTriggerLocks();
 
   rt_spin_lock_destroy(&shmListLock.sl);
   pthread_mutex_trylock(&dispatch_Mut);
@@ -645,7 +693,7 @@ static int initRunState(CardID_t c)
   /* Grab current time from rtlinux */
   rs[c].init_ts = gethrtime();
 
-  rs[c].invalid = 1; /* Start out with an 'invalid' FSM since we expect it
+  rs[c].invalid = 1; /* Start out with an 'invalid' snd machine since we expect it
                      to be populated later from userspace..               */
 
   return 0;  
@@ -839,22 +887,25 @@ static void *doRT (void *arg)
 
 static void dispatchEvent(CardID_t c, int event_id)
 {
-  int chan = -1, snd_id;
+  int chan = -1, snd_id = 0;
   struct AudioBuf * buf;
 
   rs[c].current_event = 0;
 
-  if (!event_id || ABS(event_id) >= MAX_SND_ID) return;
-
+  if (!event_id || (snd_id = ABS(event_id)) >= MAX_SND_ID) return;
   DEBUG("dispatchEvent card=%u event_id=%d\n", c, event_id);
   
+  if (SNDBUF_IS_LOCKED(c, snd_id)) {
+      DEBUG("dispatchEvent ignoring event because audio buffer is locked!\n");
+      return;
+  }
+
   rs[c].last_event = event_id;
   rs[c].current_event = event_id;
 
 
   if (event_id < 0) { /* Handle stop events.. */
       pthread_mutex_lock(&dispatch_Mut); 
-      snd_id = -event_id;
       buf = &rs[c].audio_buffers[snd_id];
       chan = CM_LookupSound(channels[c], snd_id);
       if (chan > -1) doPossiblyRampedStop(c, chan);
@@ -863,7 +914,6 @@ static void dispatchEvent(CardID_t c, int event_id)
       pthread_mutex_unlock(&dispatch_Mut); 
       return;
   }
-  snd_id = event_id; /* at this point the snd_id == the event_id */
 
   /* else..   Event_id > 0, play event.. */
   buf = &rs[c].audio_buffers[snd_id];
@@ -907,15 +957,15 @@ static int virtualTriggerFunction(CardID_t card, int trig)
 
   /* TODO: Worry about race conditions with cleanup() here? */
   
-  if ( !TRIGGERS_LOCKED() ) 
+  if ( !TRIGGERS_LOCKED(card) ) 
   {
-      DEBUG("virtual trigger function called with %d\n", trig);
+      DEBUG("virtual trigger function called with %d, %d\n", (int)card, trig);
       dispatchEvent(card, trig);
       ++cycle;
       ret = 1;
   }
   else
-    DEBUG("virtual trigger function called with %d, skipping due to locked triggers\n", trig);
+    DEBUG("virtual trigger function (%d,%d), skipping due to locked triggers\n", (int)card, trig);
 
   MDEC;
   
@@ -931,7 +981,7 @@ static void freeAudioBuffer(struct AudioBuf *buf)
         arg.size = buf->len;
         ShmListDel(buf->data); /**< implicitly deletes the audio buffer using rt-shm mechanisms */
     }
-    memset((void *)buf, 0, sizeof(*buf));
+    memset((void *)buf, 0, sizeof(*buf)); 
 }
 
 static void freeAudioBuffers(CardID_t c)
@@ -967,10 +1017,6 @@ static int handleFifos(CardID_t c)
   FifoNotify_t dummy = 1;
   int errcode;
 
-  /** locking only does something for software trigger mode (in which case
-      this function is in non-realtime context), since that is the
-      only case where there is asynchronous access to trigger data.. */
-  LOCK_TRIGGERS();
 
   if (SOFTWARE_TRIGGERS()) 
     DEBUG("handleFifos called asynchronously in Linux context.\n");
@@ -990,9 +1036,14 @@ static int handleFifos(CardID_t c)
       switch (msg->id) {
         
       case INITIALIZE:
+        /** locking only does something for software trigger mode (in which case
+            this function is in non-realtime context), since that is the
+            only case where there is asynchronous access to trigger data.. */
+        LOCK_TRIGGERS(c);
           /* spawn a new thread and wait for it if we are not in rt-context..
              otherwise call function immediately.. */
         doCmdInRTThread(INITIALIZE, (void *)(unsigned long)c); 
+        UNLOCK_TRIGGERS(c);
         break;
                 
       case PAUSEUNPAUSE:
@@ -1040,8 +1091,10 @@ static int handleFifos(CardID_t c)
           unsigned id = msg->u.sound.id;
           msg->u.sound.transfer_ok = 0; /* Assume not until otherwise proven to be ok.. */
           if (id < MAX_SND_ID) {
-            struct AudioBuf *buf = &rs[c].audio_buffers[id];
+            struct AudioBuf *buf = 0;
             unsigned devRate = 0;
+            LOCK_SNDBUF(c,id);
+            buf = &rs[c].audio_buffers[id];
             /* TODO HACK BUG HELP! XXX NOTE -- We really REALLY need to handle the case where we are 
                freeing a sound that is currently playing here.  What do we do?! NEEDS TESTING. */
             { /* ok, we'll try and stop the sound here.  BUT it may not be obvious if it's still playing
@@ -1070,7 +1123,6 @@ static int handleFifos(CardID_t c)
             
             /* free and clear previous buffer.. a noop if it wasn't allocated */
             freeAudioBuffer(buf);
-            
             buf->len = msg->u.sound.size;
             buf->stop_ramp_tau_ms = msg->u.sound.stop_ramp_tau_ms;
             strncpy(buf->name, msg->u.sound.name, sizeof(buf->name));
@@ -1099,6 +1151,7 @@ static int handleFifos(CardID_t c)
               ERROR("Sound buffer %u named %s of size %lu could not be found! Did it fail to allocate via ALLOCSOUND?\n", id, buf->name, buf->len);
             }
             msg->u.sound.size = 0; /* Clear it, just in case? */
+            UNLOCK_SNDBUF(c,id);
           } else {
             /* ID is too high.. */
             ERROR("Sound buffer specified with invalid/too high an id %u.  Limit is %u.\n", id, MAX_SND_ID);
@@ -1152,9 +1205,6 @@ static int handleFifos(CardID_t c)
       if (!once_only)
         ERROR("got return value of (%d) when reading from fifo_in %d\n", errcode, shm->fifo_in[c]), once_only++;
   }
-
-  /** locking only does something for non-realtime! */
-  UNLOCK_TRIGGERS();
 
   return 0;
 }
