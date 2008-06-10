@@ -127,5 +127,43 @@ static int rtf_find_free(unsigned *minor, unsigned size)
 }
 #endif
 
+#ifdef RTAI
+#  if RTAI_VERSION_CODE == RTAI_MANGLE_VERSION(3,6,0) || RTAI_VERSION_CODE == RTAI_MANGLE_VERSION(3,6,1)
+/* Since RTAI headers are broken, we reimplement pthread_create here, and define pthread_create to be rtfsm_pthread_create */
+static int rtfsm_pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
+{
+	pthread_cookie_t *cookie = 0;
+    void *cookie_mem = 0;
+	cookie_mem = (void *)rt_malloc(sizeof(pthread_cookie_t) + L1_CACHE_BYTES);
+	if (cookie_mem) {
+        int err;
+        /* align memory for RT_TASK to L1_CACHE_BYTES boundary */
+        cookie = (pthread_cookie_t *)( (((unsigned long)cookie_mem) + ((unsigned long)L1_CACHE_BYTES)) & ~(((unsigned long)L1_CACHE_BYTES) - 1UL) );
+
+		cookie->cookie = cookie_mem;
+		(cookie->task).magic = 0;
+		cookie->task_fun = (void *)start_routine;
+		cookie->arg = (long)arg;
+		if (!(err = rt_task_init(&cookie->task, (void *)posix_wrapper_fun, (long)cookie, (attr) ? attr->stacksize : STACK_SIZE, (attr) ? attr->priority : RT_SCHED_LOWEST_PRIORITY, 1, NULL))) {
+			rt_typed_sem_init(&cookie->sem, 0, BIN_SEM | FIFO_Q);
+			rt_task_resume(&cookie->task);
+			*thread = &cookie->task;
+			return 0;
+		} else {
+            rt_free(cookie->cookie);
+            rt_printk(KERN_ERR "rtfsm_pthread_create(): error %d from rt_task_init\n", err);
+            return err;
+        }
+	}
+    rt_printk(KERN_ERR "rtfsm_pthread_create(): could not allocate %lu bytes for cookie!\n", sizeof(pthread_cookie_t)+L1_CACHE_BYTES);
+	return -ENOMEM;
+    rtfsm_pthread_create(0, 0, 0, 0); /* avoid compiler warnings about unused.. */
+}
+#    define pthread_create rtfsm_pthread_create
+#  else
+#    warning POSSIBY UNSUPPORTED RTAI VERSION!  We require something like rtai 3.6.0 or 3.6.1 to workaround pthread_create() bugs.. otherwise use at your own risk!
+#  endif
+#endif /* ifdef RTAI */
+
 
 #endif
