@@ -6,6 +6,7 @@
 #include <linux/wait.h>
 #include <linux/version.h>
 #include <asm/atomic.h>
+#include <asm/semaphore.h>
 
 #if defined(RTLINUX) && !defined(RTAI)
 /* NB: assumption is Linux 2.4 */
@@ -69,6 +70,7 @@ static LIST_HEAD(pendingSoftTasks);
 static atomic_t numPendingSoftTasks = ATOMIC_INIT(0);
 static atomic_t numExtantSoftTasks = ATOMIC_INIT(0);
 static rt_spinlock_t spinlock = RT_SPINLOCK_INITIALIZER;
+DECLARE_MUTEX(mut);
 
 struct SoftTask *softTaskCreate(SoftTask_Handler handler_function,
                                 const char *name)
@@ -76,6 +78,8 @@ struct SoftTask *softTaskCreate(SoftTask_Handler handler_function,
   SoftTask *t = 0;
   int err = 0;
 
+  down(&mut);
+  
   if (sirq < 0) {
 #ifdef RTLINUX
     sirq = rtl_get_soft_irq(soft_irq_handler, "SoftTaskIRQ");
@@ -93,8 +97,10 @@ struct SoftTask *softTaskCreate(SoftTask_Handler handler_function,
 #ifdef DEBUG
     if (sirq >= 0) printk(KERN_DEBUG "softtask: reserved soft irq %d\n", sirq);
 #endif
-  } 
-      
+  }
+   
+  up(&mut);
+  
   if (sirq < 0) {
       printk(KERN_CRIT "softtask: could not reserve an sirq, failure!\n");
       return 0; /* always phail! */
@@ -161,6 +167,8 @@ void softTaskDestroy(struct SoftTask *t)
   if (!t) return; /* paranoia */
 
   if (atomic_dec_and_test(&numExtantSoftTasks)) { /* true iff zero */
+    down(&mut);
+    
 #ifdef RTLINUX
     rtl_free_soft_irq(sirq);
 #else /* RTAI */
@@ -171,6 +179,8 @@ void softTaskDestroy(struct SoftTask *t)
     printk(KERN_DEBUG "softtask: last soft task freed, releasing soft irq %d\n", sirq);
 #endif
     sirq = -1;
+    
+    up(&mut);
   }
 #ifdef RTAI
   flush_scheduled_work(); /* globally flush queue? */
