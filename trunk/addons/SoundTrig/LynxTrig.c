@@ -395,7 +395,7 @@ static sem_t *get_unused_sem(void);
 static struct SoftTask *get_unused_st(void);
 static int initSTs(void);
 static void cleanupSTs(void);
-#define NUM_SOFTS_SEMS 16 /* the number of semaphores and softtasks we open up at module load time.. */
+#define NUM_SOFTS_SEMS 32 /* the number of semaphores and softtasks we open up at module load time.. */
 static sem_t misc_sems[NUM_SOFTS_SEMS];
 static volatile unsigned long misc_sem_idx = 0;
 static pthread_mutex_t misc_sem_mut;
