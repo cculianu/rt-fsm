@@ -1071,9 +1071,9 @@ static int handleFifos(CardID_t c)
            /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
           void *mem = ShmListNew(msg->u.sound.name, msg->u.sound.size);
           if (mem) {
-              DEBUG("ALLOCSOND: allocated shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
+              DEBUG("ALLOCSOUND: allocated shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
           } else {
-              ERROR("ALLOCSOND: could not allocate shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
+              ERROR("ALLOCSOUND: could not allocate shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
           }
           msg->u.sound.transfer_ok = mem != 0;
       }

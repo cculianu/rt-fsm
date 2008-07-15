@@ -21,25 +21,25 @@
    <View0 Encoding="ISO 8859-1" Type="Source" />
   </Doc5>
   <Doc6 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/SoundTrig.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="30" Type="Source" />
   </Doc6>
   <Doc7 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTrig.c" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="719" Type="Source" />
   </Doc7>
   <Doc8 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/ChanMapper.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc8>
   <Doc9 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/ChanMapper.c" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc9>
   <Doc10 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/softtask.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc10>
   <Doc11 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/softtask.c" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="67" Type="Source" />
   </Doc11>
   <Doc12 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/rtos_compat.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="61" Type="Source" />
   </Doc12>
   <Doc13 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/Version.h" >
    <View0 Encoding="ISO 8859-1" Type="Source" />
@@ -69,7 +69,7 @@
    <View0 Encoding="ISO 8859-1" Type="Source" />
   </Doc21>
   <Doc22 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/SoundServer.cpp" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
+   <View0 Encoding="ISO 8859-1" line="883" Type="Source" />
   </Doc22>
   <Doc23 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/utils/installer.pl" >
    <View0 Encoding="ISO 8859-1" Type="Source" />
@@ -78,7 +78,7 @@
    <View0 Encoding="ISO 8859-1" Type="Source" />
   </Doc24>
   <Doc25 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/install.sh" >
-   <View0 Encoding="ISO 8859-1" line="8" Type="Source" />
+   <View0 Encoding="ISO 8859-1" Type="Source" />
   </Doc25>
   <Doc26 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/INSTALL" >
    <View0 Encoding="ISO 8859-1" line="10" Type="Source" />
