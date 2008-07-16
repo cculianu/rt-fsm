@@ -12,7 +12,8 @@ extern "C" {
 #define MAX_SND_ID 0x80
 
 #define MAX_CARDS 6 /* Keep this the same as L22_MAX_DEVS in LynxTWO-RT.h! */
-
+#define FIFO_DATA_SZ (128*1024) /* 128KB for fifo data size */
+    
 enum FifoMsgID {
     GETPAUSE,  /**< Query to find out if it is paused. */
     PAUSEUNPAUSE, /**< Halt the trigger detect (temporarily).  No variables
@@ -22,6 +23,7 @@ enum FifoMsgID {
     INVALIDATE, /**< Invalidate (clear) the state machine specification, 
                    but preserve other system variables. */
     SOUND, /**< Load a sound. */    
+    SOUNDXFER, /**< continue a sound xfer started with SOUND above */
     /*    GETSOUND, */
     FORCEEVENT, /**< Force a particular event to have occurred. */
     GETLASTEVENT, /**< Query the event we are playing/last played, if any.. */
@@ -56,6 +58,8 @@ struct FifoMsg {
                           normally after 1 playing. */
         int transfer_ok; /**< True is written by kernel to indicate transter was 
                             ok, otherwise writes 0 to indicate error..  */
+        char databuf[FIFO_DATA_SZ]; /** used only for id == SOUNDXFER */
+        unsigned datalen;
       } sound;
 
       /** For id == GETPAUSE */
@@ -108,7 +112,7 @@ struct FifoMsg {
 #endif
 
 #define SND_SHM_NAME "STrigShm"
-#define SND_SHM_MAGIC ((int)(0xf00d0609)) /*< Magic no. for shm... 'food0609'  */
+#define SND_SHM_MAGIC ((int)(0xf00d060a)) /*< Magic no. for shm... 'food060b'  */
 #define SND_SHM_SIZE (sizeof(struct Shm))
 
 #ifdef __cplusplus

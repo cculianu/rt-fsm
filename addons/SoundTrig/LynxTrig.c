@@ -47,6 +47,7 @@
 #include <linux/comedilib.h>
 #include <linux/seq_file.h>
 #include <asm/system.h>
+#include <linux/mutex.h>
 
 #include "rtos_compat.h"
 #include "IntTypes.h"
@@ -55,6 +56,9 @@
 #include "LynxTWO-RT.h"
 #include "ChanMapper.h"
 #include "softtask.h"
+#include "smalloc.h"
+#include "bigcontarea.h"
+#include "Version.h"
 
 #ifdef RTAI
 /* this is a noop on rtai -- all rt tasks use fpu.  */
@@ -74,9 +78,16 @@ static inline int pthread_attr_setfp_np(pthread_attr_t *a, int b) {(void)(a); (v
 #  define STR1(x) #x
 #  define STR(x) STR1(x)
 #endif
+#ifndef MIN
+#  define MIN(a,b) ( (a) < (b) ? (a) : (b) )
+#endif 
+#ifndef MAX
+#  define MAX(a,b) ( (a) > (b) ? (a) : (b) )
+#endif 
 #ifndef ABS
 #  define ABS(x) ( (x) < 0 ? -(x) : (x) )
 #endif
+  
 #define LOG_MSG(x...) rt_printk(KERN_INFO MODULE_NAME": "x)
 #ifndef NDEBUG
 #  define DEBUG(x...)  do { if(debug) { rt_printk(KERN_DEBUG MODULE_NAME":(thr: %p)", (void *)pthread_self()); rt_printk(" DEBUG: "x); } } while(0)
@@ -126,10 +137,8 @@ enum {
   STOP_CMD,
   ALLOC_KMEM_CMD,
   FREE_KMEM_CMD,
-  ALLOC_MBUFF_CMD,
-  FREE_MBUFF_CMD,
-  DETACH_MBUFF_CMD,
-  ATTACH_MBUFF_CMD,
+  ALLOC_SMA_CMD,
+  FREE_SMA_CMD,
   SEMPOST_CMD
 };
 static void *doCmdInRTThread(int cmd, void *arg);
@@ -161,7 +170,8 @@ int minordev = 0,
     first_trig_chan = 0,
     num_trig_chans = 8,
     comedi_triggers = 0,
-    trig_on_event_chan = -1;
+    trig_on_event_chan = -1,
+    audio_memory = -1;
 module_param(minordev, int, 0444);
 MODULE_PARM_DESC(minordev, "The minor number of the comedi device to use.");
 module_param(sampling_rate, int, 0444);
@@ -176,6 +186,8 @@ module_param(comedi_triggers, int, 0444);
 MODULE_PARM_DESC(comedi_triggers, "If set, use COMEDI DIO device to do triggering.  Otherwise use a SHM which contains a singe int for 'virtual' triggering from another RT module.  The SHM name is \""FSM_EXT_TRIG_SHM_NAME"\".  Defaults to 0 (virtual).");
 module_param(trig_on_event_chan, int, 0444);
 MODULE_PARM_DESC(trig_on_event_chan, "If non-negative, the DIO channel (not related to first_trig_chan or num_trig_chans at all!) to 'trigger' for one cycle whenever a play event occurs. This feature is intended to be used for debugging the timing of the play command. Defaults to -1 (off).");
+module_param(audio_memory, int, 0444);
+MODULE_PARM_DESC(audio_memory, "The number of megabytes of RAM to use for audio memory buffers.   Note that all the RAM is pre-reserved at module load time as 1 or more contiguous regions.  If sufficiently large (24MB each) contiguous regions can't be reserved for audio memory, then the module will fail to load.  Note that vmalloc is not used since vmalloc's vmap() function is limited to a ~128MB address space -- instead we use our own kludgy mechanism to obtain contigious ram.   Defaults to -1 (auto-detect and use 1/3 of system RAM or 95% of free RAM whichever is smaller).");
 
 #define NUM_CHANS_REQUIRED (first_trig_chan+(num_trig_chans-1))
 
@@ -251,6 +263,8 @@ struct AudioBuf {
   unsigned short is_looped_flag;
   unsigned trig_play_ct;
   unsigned trig_stop_ct;
+  unsigned long xfer_pos; /**< used only in initial setup of buffer when
+                               doing multiple xfers from kernel->userspace */
 };
 
 struct RunState {
@@ -414,40 +428,48 @@ typedef struct AllocArg {
         void * volatile ptr;
     };
 } AllocArg;
-static void *doAllocMbuffCmd(void *);
 static void *doAllocKmemCmd(void *);
-static void *doFreeMbuffCmd(void *);
 static void *doFreeKmemCmd(void *);
-static void *doAttachMbuffCmd(void *);
-static void *doDetachMbuffCmd(void *);
+static void *doAllocSMACmd(void *);
+static void *doFreeSMACmd(void *);
 /** Used to keep track of rt-shm's allocated by ALLOCSOUND but not yet 
  *  used in SOUND cmds.  This is to make sure that if userspace crashes it doesn't
  *  leave around  shms.. */
-typedef struct ShmList
+typedef struct MemList
 {
     struct list_head list;
     char name[SNDNAME_SZ];
     void *mem;
     unsigned long size;
-} ShmList;
-static struct list_head shmList = LIST_HEAD_INIT(shmList);
-static struct ShmListLock 
+} MemList;
+static struct list_head memList = LIST_HEAD_INIT(memList);
+static struct MemListLock 
 {
     rt_spinlock_t sl;
     unsigned long flags;
-} shmListLock;
+} memListLock;
 /** Call in any context -- rt or not -- auto-allocates shm in rt-safe manner and returns a pointer to it*/
-static void *ShmListNew(const char *name, unsigned long size);
+static void *MemListNew(const char *name, unsigned long size);
 /** Call in any context -- rt or not -- see if a particular shm is in our list */
-static void *ShmListFind(const char *name, unsigned long size);
+static void *MemListFind(const char *name, unsigned long size);
 /** Call in any context-- rt or not -- deletes a specific mem form the shm list and deallocates the rtshm */
-static void ShmListDel(void *mem);
+static void MemListDel(void *mem);
 /** Call from module_exit -- cleans up any orphaned shms. */
-static void ShmListCleanup(void);
+static void MemListCleanup(void);
 /** Since I learned it's unsafe to call pthread_mutex_lock etc from linux context, we need this scheme */
-static void ShmListLock(void);
-static void ShmListUnlock(void);
+static void MemListLock(void);
+static void MemListUnlock(void);
         
+        
+static smalloc_t *sma = 0;
+DEFINE_MUTEX(sma_mut);
+#define MAX_CONT_REGIONS 16
+#define MIN_CONT_SIZE (24*1024*1024) /* 24 MB */
+static void *contRegions[MAX_CONT_REGIONS];
+static unsigned numContRegions = 0;
+static int initAudioMemory(void);
+static void cleanupAudioMemory(void);
+
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -455,7 +477,7 @@ int init (void)
   int retval = -ENOMEM;
   
   pthread_mutex_init(&dispatch_Mut, 0); /* do this regardles.. */
-  rt_spin_lock_init(&shmListLock.sl);
+  rt_spin_lock_init(&memListLock.sl);
     
 #ifdef RTAI
   if (!rt_is_hard_timer_running()) {
@@ -469,7 +491,8 @@ int init (void)
 #ifdef RTAI
   DEBUG("linux prio: %x\n", rt_get_prio(rt_whoami()));
 #endif
-  if (    (retval = initTriggerLocks())
+  if (    (retval = initAudioMemory())
+       || (retval = initTriggerLocks())
        || (retval = initSTs())
        || (retval = initSems())
        || (retval = initL22Devs())
@@ -574,17 +597,19 @@ void cleanup (void)
   for (c = 0; c < n_l22dev; ++c) 
     freeAudioBuffers(c); 
   
-  ShmListCleanup(); /**< free any lingering 'orphaned' shms.. */
+  MemListCleanup(); /**< free any lingering 'orphaned' shms.. */
   
   /* these need to happen last or almost last as they are used by the of the functions above.. */
   cleanupSems();
   cleanupSTs();
   cleanupTriggerLocks();
 
-  rt_spin_lock_destroy(&shmListLock.sl);
+  rt_spin_lock_destroy(&memListLock.sl);
   pthread_mutex_trylock(&dispatch_Mut);
   pthread_mutex_unlock(&dispatch_Mut);
   pthread_mutex_destroy(&dispatch_Mut);
+  
+  cleanupAudioMemory();
 }
 
 static int initL22Devs(void)
@@ -813,8 +838,8 @@ static int myseq_show (struct seq_file *m, void *dummy)
 
   seq_printf(m, "%s Module\n\n", MODULE_NAME);
   
-  seq_printf(m, "shm addr: %p\tshm magic: %08x\n", (void *)shm, shm->magic);
-
+  seq_printf(m, "Software Version: %s\nshm addr: %p\tshm magic: %08x\n", VersionSTR, (void *)shm, shm->magic);
+  
   for (c = 0; c < n_l22dev; ++c) {
     seq_printf(m, "\nSound Card %u:", c);
     if (rs[c].invalid) {
@@ -829,6 +854,8 @@ static int myseq_show (struct seq_file *m, void *dummy)
       }      
     }
   }
+    seq_printf(m, "\nAudio memory   allocated: %lu   free: %lu (%u fragment%s)\n", smalloc_get_allocated(sma), smalloc_get_free(sma), smalloc_get_n_free_areas(sma), smalloc_get_n_free_areas(sma)==1 ? "" : "s");
+  
   return 0;
 }
 #endif
@@ -987,7 +1014,7 @@ static void freeAudioBuffer(struct AudioBuf *buf)
         DEBUG("Freeing buffer named %s size %lu\n", buf->name, buf->len);
         arg.name = buf->name;
         arg.size = buf->len;
-        ShmListDel(buf->data); /**< implicitly deletes the audio buffer using rt-shm mechanisms */
+        MemListDel(buf->data); /**< implicitly deletes the audio buffer using smalloc's sfree() mechanism */
     }
     memset((void *)buf, 0, sizeof(*buf)); 
 }
@@ -1069,21 +1096,21 @@ static int handleFifos(CardID_t c)
         break;
       case ALLOCSOUND: {
            /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
-          void *mem = ShmListNew(msg->u.sound.name, msg->u.sound.size);
+          void *mem = MemListNew(msg->u.sound.name, msg->u.sound.size);
           if (mem) {
-              DEBUG("ALLOCSOUND: allocated shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
+              DEBUG("ALLOCSOUND: allocated soundbuf for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
           } else {
-              ERROR("ALLOCSOUND: could not allocate shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
+              ERROR("ALLOCSOUND: could not allocate soundbuf %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
           }
           msg->u.sound.transfer_ok = mem != 0;
       }
           break;
       case FREESOUND: {
            /** NB: this potentially blocks this thread for a while!  If we are in RT it will break RT, but that's ok since this is not a realtime operation anyway */
-          void *mem = ShmListFind(msg->u.sound.name, msg->u.sound.size);
+          void *mem = MemListFind(msg->u.sound.name, msg->u.sound.size);
           if (mem) {
-              ShmListDel(mem);
-              DEBUG("FREESOUND: freed shm for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
+              MemListDel(mem);
+              DEBUG("FREESOUND: freed sndbuf for %s of size %lu\n", msg->u.sound.name, msg->u.sound.size);
           } else {
               ERROR("FREESOUND: could not find shm %s size %lu\n", msg->u.sound.name, msg->u.sound.size);
           }
@@ -1135,15 +1162,23 @@ static int handleFifos(CardID_t c)
             buf->stop_ramp_tau_ms = msg->u.sound.stop_ramp_tau_ms;
             strncpy(buf->name, msg->u.sound.name, sizeof(buf->name));
             buf->name[sizeof(buf->name)-1] = 0;/* force NUL termination */
-            DEBUG("Looking up buffer %s of length %lu in ShmList\n", buf->name, (unsigned long)buf->len);
+            DEBUG("Looking up buffer %s of length %lu in MemList\n", buf->name, (unsigned long)buf->len);
             msg->u.sound.transfer_ok = 0;
-            if ( (buf->data = ShmListFind(buf->name, buf->len)) ) {
-              DEBUG("ShmList buffer found!\n");
+            if ( (buf->data = MemListFind(buf->name, buf->len)) ) {
+              unsigned n2copy = 0;
+              DEBUG("MemList buffer found!\n");
               buf->nchans = msg->u.sound.chans;
               buf->rate = msg->u.sound.rate;
               buf->bits = msg->u.sound.bits_per_sample;
               buf->is_looped_flag = msg->u.sound.is_looped;
               buf->trig_play_ct = buf->trig_stop_ct = 0;
+              buf->xfer_pos = 0;
+              /* begin the data xfer too.. */
+              n2copy = MIN(FIFO_DATA_SZ, MIN(msg->u.sound.datalen, buf->len-buf->xfer_pos));
+              memcpy(((char *)buf->data)+buf->xfer_pos, msg->u.sound.databuf, n2copy);
+              buf->xfer_pos += n2copy;
+              /* clear the rest of the sound for now.. */
+              memset(((char *)buf->data)+buf->xfer_pos, 0, buf->len-buf->xfer_pos);
               msg->u.sound.transfer_ok = 1;
 
               /** Verify the sampling rate matches the L22 device.. */
@@ -1168,6 +1203,30 @@ static int handleFifos(CardID_t c)
         rs[c].invalid = 0; /* Unlock.. */
         mb();
         
+        break;
+        
+      case SOUNDXFER:
+        rs[c].invalid = 1; /* lock? */
+        mb();
+        DEBUG("handleFifos: SOUNDXFER cmd received\n", (unsigned)c);
+        
+        {
+          unsigned id = msg->u.sound.id;
+          msg->u.sound.transfer_ok = 0; /* Assume not until otherwise proven to be ok.. */
+          if (id < MAX_SND_ID) {
+            struct AudioBuf *buf = 0;
+            unsigned n2copy;
+            LOCK_SNDBUF(c,id);
+            buf = &rs[c].audio_buffers[id];
+            n2copy = MIN(FIFO_DATA_SZ, MIN(msg->u.sound.datalen, buf->len-buf->xfer_pos));
+            memcpy(((char *)buf->data)+buf->xfer_pos, msg->u.sound.databuf, n2copy);
+            buf->xfer_pos += n2copy;
+            msg->u.sound.transfer_ok = 1;
+            UNLOCK_SNDBUF(c,id);
+          }
+        }
+        rs[c].invalid = 0; /* unlock? */
+        mb();
         break;
         
       case FORCEEVENT:
@@ -1647,11 +1706,9 @@ static void *doCmdInSoftThread(int cmd, void *arg)
     DEBUG("doCmdInSoftThread(%d, %p)\n", cmd, arg);
     switch(cmd) {
     case ALLOC_KMEM_CMD: func = doAllocKmemCmd; break;
-    case ALLOC_MBUFF_CMD: func = doAllocMbuffCmd; break;
-    case ATTACH_MBUFF_CMD: func = doAttachMbuffCmd; break;
+    case ALLOC_SMA_CMD: func = doAllocSMACmd; break;
     case FREE_KMEM_CMD: func = doFreeKmemCmd; break;
-    case FREE_MBUFF_CMD: func = doFreeMbuffCmd; break;
-    case DETACH_MBUFF_CMD: func = doDetachMbuffCmd; break;
+    case FREE_SMA_CMD: func = doFreeSMACmd; break;
     default:
         ERROR("*** Internal Error *** Invalid command passed to doCmdInSoftThread: %d!\n", cmd);
         return 0;
@@ -1691,18 +1748,15 @@ static void mrSoftTask(void *arg)
     DEBUG("mrSoftTask gunna return\n");
 }
 
-static void *doAllocMbuffCmd(void *arg)
+static void *doAllocSMACmd(void *arg)
 {
     AllocArg *allocArg = (AllocArg *)arg;
-    DEBUG("doAllocMbuffCmd(%p) -> %s %lu\n", arg, allocArg->name, allocArg->size);
-    return mbuff_alloc(allocArg->name, allocArg->size);
-}
-
-static void *doAttachMbuffCmd(void *arg)
-{
-    AllocArg *allocArg = (AllocArg *)arg;
-    DEBUG("doAttachMbuffCmd(%p) -> %s %lu\n", arg, allocArg->name, allocArg->size);
-    return mbuff_attach(allocArg->name, allocArg->size);
+    void *ret;
+    DEBUG("doAllocSMACmd(%p) -> %s %lu\n", arg, allocArg->name, allocArg->size);
+    mutex_lock(&sma_mut);
+    ret = smalloc(sma, allocArg->size);
+    mutex_unlock(&sma_mut);
+    return ret;
 }
 
 static void *doAllocKmemCmd(void *arg)
@@ -1720,105 +1774,99 @@ static void *doFreeKmemCmd(void *arg)
     return 0;
 }
 
-static void *doFreeMbuffCmd(void *arg)
+static void *doFreeSMACmd(void *arg)
 {
     AllocArg *allocArg = (AllocArg *)arg;
-    DEBUG("doFreeMbuffCmd(%p) -> %s %p\n", arg, allocArg->name, allocArg->ptr);
-    mbuff_free(allocArg->name, allocArg->ptr);
+    DEBUG("doFreeSMACmd(%p) -> %s %p\n", arg, allocArg->name, allocArg->ptr);
+    mutex_lock(&sma_mut);
+    sfree(sma, allocArg->ptr);
+    mutex_unlock(&sma_mut);
     return 0;
 }
 
-static void *doDetachMbuffCmd(void *arg)
+
+static void MemListLock(void)
 {
-    AllocArg *allocArg = (AllocArg *)arg;
-    DEBUG("doDetachMbuffCmd(%p) -> %s %p\n", arg, allocArg->name, allocArg->ptr);
-    mbuff_detach(allocArg->name, allocArg->ptr);
-    return 0;
+    memListLock.flags = rt_spin_lock_irqsave(&memListLock.sl);
 }
 
-static void ShmListLock(void)
+static void MemListUnlock(void)
 {
-    shmListLock.flags = rt_spin_lock_irqsave(&shmListLock.sl);
+    rt_spin_unlock_irqrestore(memListLock.flags, &memListLock.sl);
 }
 
-static void ShmListUnlock(void)
+static void *MemListNew(const char *name, unsigned long size)
 {
-    rt_spin_unlock_irqrestore(shmListLock.flags, &shmListLock.sl);
-}
-
-static void *ShmListNew(const char *name, unsigned long size)
-{
-    struct ShmList *entry = doCmdInSoftThread(ALLOC_KMEM_CMD, (void *)sizeof(*entry));
+    struct MemList *entry = doCmdInSoftThread(ALLOC_KMEM_CMD, (void *)sizeof(*entry));
     AllocArg arg;
     if (!entry) {
-        ERROR("ShmListNew: could not allocate a list entry data structure!\n");
+        ERROR("MemListNew: could not allocate a list entry data structure!\n");
         return 0;
     }
     arg.name = name;
     arg.size = size;
-    entry->mem = doCmdInSoftThread(ALLOC_MBUFF_CMD, (void *)&arg);
+    entry->mem = doCmdInSoftThread(ALLOC_SMA_CMD, (void *)&arg);
     if (!entry->mem) {
-        ERROR("ShmListNew: failed to allocated mbuff %s size %lu\n", arg.name, arg.size);
+        ERROR("MemListNew: failed to allocated from smalloc: '%s' size %lu\n", arg.name, arg.size);
         doCmdInSoftThread(FREE_KMEM_CMD, (void *)entry);
         return 0;
     }
     strncpy(entry->name, name, SNDNAME_SZ);
     entry->name[SNDNAME_SZ-1] = 0;
     entry->size = size;
-    ShmListLock();
-    list_add(&entry->list, &shmList);
-    ShmListUnlock();
+    MemListLock();
+    list_add(&entry->list, &memList);
+    MemListUnlock();
     return entry->mem;
 }
-static void ShmListDel_havelock(void *mem)
+static void MemListDel_havelock(void *mem)
 {
     struct list_head *pos, *next;
-    list_for_each_safe(pos, next, &shmList) {
-        struct ShmList *entry = (struct ShmList *)pos;
+    list_for_each_safe(pos, next, &memList) {
+        struct MemList *entry = (struct MemList *)pos;
         if (entry->mem == mem) {
             AllocArg arg;
             arg.name = entry->name;
             arg.ptr = entry->mem;
             list_del(pos);
-            ShmListUnlock();
-            doCmdInSoftThread(FREE_MBUFF_CMD, &arg);
-            doCmdInSoftThread(FREE_KMEM_CMD, (void *)entry);
-            ShmListLock();
+            MemListUnlock();
+            doCmdInSoftThread(FREE_SMA_CMD, &arg);
+            MemListLock();
             break;
         }
     }
 }
-static void ShmListDel(void *mem)
+static void MemListDel(void *mem)
 {
-    ShmListLock();
-    ShmListDel_havelock(mem);
-    ShmListUnlock();
+    MemListLock();
+    MemListDel_havelock(mem);
+    MemListUnlock();
 }
-static void ShmListCleanup(void)
+static void MemListCleanup(void)
 {
     struct list_head *pos, *next;
-    // NB: don't lock here it will hang system.. ShmListLock();
-    list_for_each_safe(pos, next, &shmList) {
-        ShmList *entry = (ShmList *)pos;
-        ShmListDel(entry->mem);
+    // NB: don't lock here it will hang system.. MemListLock();
+    list_for_each_safe(pos, next, &memList) {
+        MemList *entry = (MemList *)pos;
+        MemListDel(entry->mem);
     }
-    //ShmListUnlock();
+    //MemListUnlock();
 }
-static void *ShmListFind(const char *name, unsigned long size)
+static void *MemListFind(const char *name, unsigned long size)
 {
     struct list_head *pos;
     void *found = 0;
-    ShmListLock();
-    list_for_each(pos, &shmList) {
-        ShmList *entry = (ShmList *)pos;
+    MemListLock();
+    list_for_each(pos, &memList) {
+        MemList *entry = (MemList *)pos;
         if (!strcmp(entry->name, name)) {
             if (entry->size != size) 
-                WARNING("ShmListFind found entry %s buf entry->size != passed-in size, (%lu != %lu)\n", entry->size, size);
+                WARNING("MemListFind found entry %s buf entry->size != passed-in size, (%lu != %lu)\n", entry->size, size);
             found = entry->mem;
             break;
         }
     }
-    ShmListUnlock();
+    MemListUnlock();
     return found;
 }
 
@@ -1897,6 +1945,80 @@ static void cleanupSTs(void)
             soft_tasks[i] = 0;
     }
     setup_soft_tasks = 0;
+}
+
+static int initAudioMemory(void)
+{
+    unsigned long mem = audio_memory * 1024UL * 1024UL, allocd = 0, unit = 0, largest = 0, contSizes[MAX_CONT_REGIONS];
+    int i;
+    struct sysinfo si;
+    si_meminfo(&si);
+    memset(contSizes, 0, sizeof(contSizes));
+    if (audio_memory <= 0) {
+        mem = MIN(si.totalram*si.mem_unit/3, (si.freeram * si.mem_unit/100UL) * 95UL); /* try for about 95% of free ram or 1/3 of total RAM, whichever is smaller! */
+        if (mem < (24*1024*1024)) {
+            ERROR("Not enough system RAM!  Need at least 24 MBytes of free RAM and 64MB total RAM!\n");
+            return -ENOMEM;
+        }
+    } else {
+        mem = si.totalram * si.mem_unit;
+        if (audio_memory * 1024 * 1024 >= mem) {
+            ERROR("Specified audio_memory size of %d MBytes is too big to fit in RAM!\n", audio_memory);
+            return -EINVAL;
+        }
+        if (audio_memory < 24) {
+            ERROR("Need to set audo_memory to at least 24 MBytes!\n");
+            return -EINVAL;
+        }
+        mem = audio_memory * 1024 * 1024;
+    }
+    unit = mem;
+    for (i = 0; i < MAX_CONT_REGIONS && allocd < mem && unit >= (24*1024*1024); ++i) {
+        void *area = bigcontarea_alloc(unit);
+        if (!area) { unit /= 2; --i; }
+        else { 
+            contRegions[i] = area; 
+            ++numContRegions; 
+            if (unit > largest) largest = unit;
+            allocd += unit; 
+            contSizes[i] = unit; 
+            unit = mem-allocd; 
+        }
+    }
+    if (allocd < mem) {
+        ERROR("audio_memory: Could not allocate %lu bytes of memory in at least 24MB sized blocks!  (Allocated %lu total bytes, last blocksize=%lu bytes, largest=%lu.)\n", mem, allocd, unit, largest);
+        return -ENOMEM;
+    }
+    sma = smalloc_init(contRegions[0], contSizes[0], (printf_fn_t)rt_printk);
+    if (!sma) {
+        ERROR("audio_memory: smalloc_init() returned NULL, probably out of memory?\n");
+        return -ENOMEM;
+    }
+    for (i = 1; i < (int)numContRegions; ++i) {
+        smalloc_add_memory_chunk(sma, contRegions[i], contSizes[i]);
+    }
+    if (numContRegions > 1) {
+        LOG_MSG("audio_memory: allocated %lu MB in %u contiguous memory regions, largest being of size %lu MB\n", allocd/(1024UL*1024UL), numContRegions,  largest/(1024*1024));
+    } else {
+        LOG_MSG("audio_memory: allocated %lu MB in one contiguous memory region\n", allocd/(1024UL*1024UL));
+    }
+    return 0;
+}
+
+static void cleanupAudioMemory(void)
+{
+    int i;
+    
+    if (sma) {
+        smalloc_destroy(sma);
+        sma = 0;
+    }
+    for (i = 0; i < (int)numContRegions; ++i) {
+        bigcontarea_free(contRegions[i]);
+        contRegions[i] = 0;
+    }
+    LOG_MSG("audio_memory: freed %u contiguous memory regions\n", numContRegions);
+    numContRegions = 0;
 }
 
 #ifdef FAKE_L22
