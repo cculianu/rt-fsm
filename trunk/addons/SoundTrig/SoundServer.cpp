@@ -443,16 +443,11 @@ void KernelSM::allocSBMem(SoundBuffer & sb)
       msg->u.sound.size = sb.size();
       sendToRT(sb.card, *msg);
       if (!msg->u.sound.transfer_ok) {
-        s << "Kernel failed to create a new rt-shm of length " << sb.len_bytes << " named " << sb.name() << " for sound " << sb.id << ".  Out of memory?";
+        s << "Kernel failed to create a new soundbuf of length " << sb.len_bytes << " named " << sb.name() << " for sound " << sb.id << ".  Out of memory in kernel audio buffers?";
         throw Exception(s.str());
       }
     }
-    RTOS::ShmStatus status;
-    sb.mem = static_cast<unsigned char *>(RTOS::shmAttach(sb.name(), sb.len_bytes, &status, false));
-    if (!sb.mem) {
-        s << "Could not attach to rt-shm of length " << sb.len_bytes << " named " << sb.name() << " for sound " << sb.id << ".  Error was: " << RTOS::statusString(status);
-        throw Exception(s.str());
-    }
+    sb.mem = new unsigned char[sb.len_bytes];
 }
 
 void UserSM::allocSBMem(SoundBuffer & sb)
@@ -473,8 +468,9 @@ void UserSM::allocSBMem(SoundBuffer & sb)
 SoundBuffer::SoundBuffer(unsigned long size,
                          int id, int n_chans, int sample_size, int rate, int stop_ramp_tau_ms, 
                          int loop_flg, int card) 
-    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), card(card), len_bytes(size), mem(0), sentOk(false)
+    : id(id), chans(n_chans), sample_size(sample_size), rate(rate), stop_ramp_tau_ms(stop_ramp_tau_ms), loop_flg(loop_flg), card(card), len_bytes(size), sentOk(false)
 {
+    mem = 0;
     if (!sm) throw Exception("Global variable 'sm' needs to be set and point to a SoundMachine object!");
     sm->allocSBMem(*this);
 }
@@ -488,11 +484,7 @@ void UserSM::freeSBMem(SoundBuffer & sb) const
 void KernelSM::freeSBMem(SoundBuffer & sb) const
 {
     if (sb.mem) {
-        RTOS::ShmStatus status;
-        RTOS::shmDetach(sb.mem, &status);
-        if (status != RTOS::Ok) {
-            Error() << "Detach of shm: " << sb.name() << " reported error: " << RTOS::statusString(status) << "\n";
-        } else if (!sb.sentOk) { // issue a FREESOUND to kernel if the sound was not transferred ok to kernel
+        if (!sb.sentOk) { // issue a FREESOUND to kernel if the sound was not transferred ok to kernel
             std::auto_ptr<FifoMsg> msg(new FifoMsg);
             msg->id = FREESOUND;
             strncpy(msg->u.sound.name, sb.name(), SNDNAME_SZ);
@@ -500,6 +492,7 @@ void KernelSM::freeSBMem(SoundBuffer & sb) const
             msg->u.sound.size = sb.size();
             sendToRT(sb.card, *msg);
         }
+        delete [] sb.mem;
         sb.mem = 0;
     }
 }
@@ -819,6 +812,7 @@ bool KernelSM::setSound(unsigned card, SoundBuffer & s)
   msg->id = SOUND;
 
   Timer timer;
+  unsigned n2copy;
 
   strncpy(msg->u.sound.name, s.name(), SNDNAME_SZ);
   msg->u.sound.name[SNDNAME_SZ-1] = 0;
@@ -829,12 +823,24 @@ bool KernelSM::setSound(unsigned card, SoundBuffer & s)
   msg->u.sound.rate = s.rate;
   msg->u.sound.stop_ramp_tau_ms = s.stop_ramp_tau_ms;
   msg->u.sound.is_looped = s.loop_flg;
-
+  n2copy = MIN(FIFO_DATA_SZ, s.size());
+  msg->u.sound.datalen = n2copy;
+  memcpy(msg->u.sound.databuf, &s[0], n2copy);
   sendToRT(card, *msg);
-
+  
   // todo: check msg->u.transfer_ok and report errors..
   if (!msg->u.sound.transfer_ok) return false;
-
+  unsigned ncopied = n2copy;
+  while (ncopied < s.size()) {
+      n2copy = MIN(FIFO_DATA_SZ, s.size()-ncopied);
+      memcpy(msg->u.sound.databuf, &s[ncopied], n2copy);
+      msg->u.sound.id = s.id;
+      msg->id = SOUNDXFER;
+      msg->u.sound.datalen = n2copy;
+      sendToRT(card, *msg);
+      if (!msg->u.sound.transfer_ok) return false;
+      ncopied += n2copy;
+  }
   Log() << "Sent sound to kernel in " << unsigned(timer.elapsed()*1000) << " millisecs." << std::endl; 
 
   s.sentOk = true;

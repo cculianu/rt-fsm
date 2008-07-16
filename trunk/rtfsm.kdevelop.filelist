@@ -127,6 +127,10 @@ addons/SoundTrig/SoundServer.cpp
 addons/SoundTrig/SoundTrig.h
 addons/SoundTrig/WavFile.cpp
 addons/SoundTrig/WavFile.h
+addons/SoundTrig/bigcontarea.c
+addons/SoundTrig/bigcontarea.h
+addons/SoundTrig/smalloc.c
+addons/SoundTrig/smalloc.h
 addons/UserspaceExtTrig
 addons/UserspaceExtTrig/Makefile
 addons/UserspaceExtTrig/UserspaceExtTrig.h
