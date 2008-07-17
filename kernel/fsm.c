@@ -149,8 +149,8 @@ static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch
 #define MAX_AO_CHANS MAX_AI_CHANS
 #define MAX_DIO_CHANS MAX_AI_CHANS
 #define MAX_DIO_SUBDEVS 4
-#define MAX(a,b) ( a > b ? a : b )
-#define MIN(a,b) ( a < b ? a : b )
+#define MAX(a,b) ( (a) > (b) ? (a) : (b) )
+#define MIN(a,b) ( (a) < (b) ? (a) : (b) )
 static char COMEDI_DEVICE_FILE[] = "/dev/comediXXXXXXXXXXXXXXX";
 int minordev = 0, minordev_ai = -1, minordev_ao = -1,
     task_rate = DEFAULT_TASK_RATE, 
@@ -353,6 +353,9 @@ struct RunState {
     /* End FSM Specification. */
     FSMID_t id; /* the ID of this RunState; links to embedded C's 'fsm' var */
 
+    /* Bitset of the events that were detected for an fsm cycle.. cleared each task period */
+    unsigned long events_bits[(0x1UL<<(sizeof(unsigned short)*8))/(8*sizeof(unsigned long))+1];
+    
     unsigned current_state;
     int64 current_ts; /* Time elapsed, in ns, since init_ts */
     double current_ts_secs; /* current_ts above, normalized to seconds, used
@@ -461,7 +464,7 @@ static inline volatile struct VarLogItem *logItemTop(FSMID_t);
 static inline void logItemPush(FSMID_t f, const char *n, double v);
 
 static int gotoState(FSMID_t, unsigned state_no, int event_id_for_history); /**< returns 1 if new state, 0 if was the same and no real transition ocurred, -1 on error */
-static unsigned long detectInputEvents(FSMID_t); /**< returns 0 on no input detected, otherwise returns bitfield array of all the events detected -- each bit corresponds to a state matrix "in event column" position, eg center in is bit 0, center out is bit 1, left-in is bit 2, etc */
+static void detectInputEvents(FSMID_t); /**< sets the bitfield array rs[f].events_bits of all the events detected -- each bit corresponds to a state matrix "in event column" position, eg center in is bit 0, center out is bit 1, left-in is bit 2, etc */
 static int doSanityChecksStartup(void); /**< Checks mod params are sane. */
 static int doSanityChecksRuntime(FSMID_t); /**< Checks FSM input/output params */
 static void doSetupThatNeededFloatingPoint(void);
@@ -482,8 +485,8 @@ static int readAI(unsigned chan); /**< reads comedi, caches channel if need be, 
 static int writeAO(unsigned chan, lsampl_t samp); /**< writes samp to our AO subdevice.  This is a thin wrapper around comedi_data_write that also tallyies some stats.. returns true on success */
 static int bypassDOut(unsigned f, unsigned mask);
 static void doDAQ(void); /* does the data acquisition for remaining channels that grabAI didn't get.  See STARTDAQ fifo cmd. */
-static unsigned long processSchedWaves(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
-static unsigned long processSchedWavesAO(FSMID_t); /**< updates active wave state, does output, returns event id mask of any waves that generated input events (if any) */
+static void processSchedWaves(FSMID_t); /**< updates active wave state, does output, sets event id mask in rs[f].events_bits of any waves that generated input events */
+static void processSchedWavesAO(FSMID_t); /**< updates active wave state, does output, sets event id mask  in rs[f].events_bits of any waves that generated input events */
 static void scheduleWave(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveDIO(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveAO(FSMID_t, unsigned wave_id, int op);
@@ -1729,7 +1732,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
           seq_printf(m, "\nFSM %02u Timeout Timer\n"
                           "--------------------\n", f);
           seq_printf(m, "Columns:\n");
-          seq_printf(m, "\tColumn %u: timeout jump-state\n\tColumn %u: timeout time (seconds)\n", tstate_col, tstate_col+1);
+          seq_printf(m, "\tColumn %u: timeout jump-state\n\tColumn %u: timeout time (microseconds)\n", tstate_col, tstate_col+1);
         }
 
         { /* print output routing */
@@ -1884,11 +1887,13 @@ static void *doFSM (void *arg)
       
       if ( rs[f].valid ) {
 
-        unsigned long events_bits = 0;
-        int got_timeout = 0, n_evt_loops;
+        int got_timeout = 0, n_evt_loops, evt_id;
         FSMSpec *fsm = FSM_PTR(f); 
         unsigned state = rs[f].current_state;
         unsigned long state_timeout_us;
+        
+        /* clear events bitset */
+        memset((void *)rs[f].events_bits, 0, MIN(NUM_INPUT_EVENTS(f)/8+8, sizeof(rs[f].events_bits)));
         
         state_timeout_us = STATE_TIMEOUT_US(fsm, state);
         
@@ -1903,7 +1908,7 @@ static void *doFSM (void *arg)
         if (rs[f].forced_event > -1) {
           
           /* Ok, it was a forced input transition.. indicate this event in our bitfield array */
-          events_bits |= 0x1 << rs[f].forced_event;
+          set_bit(rs[f].forced_event, rs[f].events_bits);
           rs[f].forced_event = -1;
           
         } 
@@ -1928,31 +1933,31 @@ static void *doFSM (void *arg)
             
           }
           
-          /* Normal event transition code -- detectInputEvents() returns
-             a bitfield array of all the input events we have right now.
+          /* Normal event transition code -- detectInputEvents() modifies the rs[f].events_bits
+             bitfield array for all the input events we have right now.
              Note how we can have multiple ones, and they all get
              acknowledged by the loop later in this function!
              
-             Note we |= this because we may have forced some event to be set 
-             as part of the forced_event stuff in this function above.  */
-          events_bits |= detectInputEvents(f);   
+             Note that we may have some events bits already 
+             as part of the forced_event stuff above.  */
+          detectInputEvents(f);   
           
-          DEBUG_VERB("FSM %u Got input events mask %08x\n", f, events_bits);
+          DEBUG_VERB("FSM %u Got input events mask %08x\n", f, *(unsigned *)rs[f].events_bits);
           
           /* Process the scheduled waves by checking if any of their components
              expired.  For scheduled waves that result in an input event
-             on edge-up/edge-down, they will return those event ids
-             as a bitfield array.  */
-          events_bits |= processSchedWaves(f);
+             on edge-up/edge-down, they will set those event ids
+             in the rs[f].events_bits bitfield array.  */
+          processSchedWaves(f);
           
-          DEBUG_VERB("FSM %u After processSchedWaves(), got input events mask %08x\n", f, events_bits);
+          DEBUG_VERB("FSM %u After processSchedWaves(), got input events mask %08x\n", f, *(unsigned *)rs[f].events_bits);
           
           /* Process the scheduled AO waves -- do analog output for
              samples this cycle.  If there's an event id for the samples
-             outputted, will get a mask of event ids.  */
-          events_bits |= processSchedWavesAO(f);
+             outputted, will get a mask of event ids set in rs[f].events_bits.  */
+          processSchedWavesAO(f);
           
-          DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08x\n", f, events_bits);
+          DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08x\n", f, *(unsigned *)rs[f].events_bits);
           
         }
         
@@ -1960,23 +1965,15 @@ static void *doFSM (void *arg)
           /* Timeout expired, transistion to timeout_state.. */
           gotoState(f, STATE_TIMEOUT_STATE(fsm, state), -1);
         
-        
         /* Normal event transition code, keep popping ones off our 
            bitfield array, events_bits. */
-        for (n_evt_loops = 0; events_bits && n_evt_loops < NUM_INPUT_EVENTS(f); ++n_evt_loops) {
-          unsigned event_id; 
-          
-          /* use asm/bitops.h __ffs to find the first set bit */
-          event_id = __ffs(events_bits);
-          /* now clear or 'pop off' the bit.. */
-          events_bits &= ~(0x1UL << event_id); 
-          
-          dispatchEvent(f, event_id);
+        for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit(rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < NUM_INPUT_EVENTS(f) && n_evt_loops < NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
+            dispatchEvent(f, evt_id);
         }
-        
-        if (NUM_INPUT_EVENTS(f) && n_evt_loops >= NUM_INPUT_EVENTS(f) && events_bits) {
+        /*
+        if (NUM_INPUT_EVENTS(f) && n_evt_loops >= NUM_INPUT_EVENTS(f)) {
           ERROR_INT("Event detection code in doFSM() for FSM %u tried to loop more than %d times!  DEBUG ME!\n", f, n_evt_loops, NUM_INPUT_EVENTS(f));
-        }
+        }*/
         
       }
     } /* end loop through each state machine */
@@ -2302,10 +2299,9 @@ static inline void clearTriggerLines(FSMID_t f)
   }
 }
 
-static unsigned long detectInputEvents(FSMID_t f)
+static void detectInputEvents(FSMID_t f)
 {
   unsigned i, bits, bits_prev, try_use_embc_thresh = 0;
-  unsigned long events = 0;
   volatile unsigned long *thresh_hi_ct = 0, *thresh_lo_ct = 0;
   
   switch(IN_CHAN_TYPE(f)) { 
@@ -2326,7 +2322,7 @@ static unsigned long detectInputEvents(FSMID_t f)
   default:  
     /* Should not be reached, here to suppress warnings and avoid possible NULL ptr? */
     ERROR_INT("Illegal IN_CHAN_TYPE for fsm %u -- THIS SHOULD NEVER HAPPEN!!\n", (unsigned)f);
-    return 0;
+    return;
     break;
   }
   
@@ -2350,7 +2346,8 @@ static unsigned long detectInputEvents(FSMID_t f)
     /* Edge-up transitions */ 
     if (event_id_edge_up > -1 && bit && !last_bit) {
       /* before we were below, now we are above,  therefore yes, it is an blah-IN */
-      events |= 0x1 << event_id_edge_up; 
+      set_bit(event_id_edge_up, rs[f].events_bits); 
+      DEBUG_VERB("detectInputEvents set bit %d\n", event_id_edge_up);
        ++thresh_hi_ct[i]; /* tally this thresh crossing 
                          -- writes to either globals: ai_thresh_hi_ct or di_thresh_lo_ct */
     }
@@ -2360,11 +2357,11 @@ static unsigned long detectInputEvents(FSMID_t f)
     if (event_id_edge_down > -1 /* input event is actually routed somewhere */
         && last_bit /* Last time we were above */
         && !bit ) {/* Now we are below, therefore yes, it is event*/
-      events |= 0x1 << event_id_edge_down; /* Return the event id */		   
+      set_bit(event_id_edge_down, rs[f].events_bits); 
+      DEBUG_VERB("detectInputEvents set bit %d\n", event_id_edge_down);
       ++thresh_lo_ct[i]; /* tally this thresh crossing, either writes to ai_thresh_lo_ct or di_thresh_lo_ct*/
     }
   }
-  return events; 
 }
 
 
@@ -3161,10 +3158,9 @@ static inline void putDebugFifo(unsigned val)
   }
 }
 
-static unsigned long processSchedWaves(FSMID_t f)
+static void processSchedWaves(FSMID_t f)
 {  
   unsigned wave_mask = rs[f].active_wave_mask;
-  unsigned long wave_events = 0;
 
   while (wave_mask) {
     unsigned wave = __ffs(wave_mask);
@@ -3176,10 +3172,11 @@ static unsigned long processSchedWaves(FSMID_t f)
          physically or both. */
           int id = SW_INPUT_ROUTING(f, wave*2);
           if (id > -1 && id <= NUM_IN_EVT_COLS(f)) {
-            wave_events |= 0x1 << id; /* mark the event as having occurred
-                                         for the in-event of the matrix, if
-                                         it's routed as an input event wave
-                                         for edge-up transitions. */
+           /* mark the event as having occurred
+              for the in-event of the matrix, if
+              it's routed as an input event wave
+              for edge-up transitions. */
+              set_bit(id, rs[f].events_bits); 
           }
           
           id = SW_DOUT_ROUTING(f, wave);
@@ -3198,10 +3195,11 @@ static unsigned long processSchedWaves(FSMID_t f)
          physically or both. */
           int id = SW_INPUT_ROUTING(f, wave*2+1);
           if (id > -1 && id <= NUM_IN_EVT_COLS(f)) {
-            wave_events |= 0x1 << id; /* mark the event as having occurred
-                                         for the in-event of the matrix, if
-                                         it's routed as an input event wave
-                                         for edge-up transitions. */
+             /* mark the event as having occurred
+                for the in-event of the matrix, if
+                it's routed as an input event wave
+                for edge-up transitions. */
+            set_bit(id, rs[f].events_bits);
           }
           
           id = SW_DOUT_ROUTING(f, wave);
@@ -3225,13 +3223,11 @@ static unsigned long processSchedWaves(FSMID_t f)
               UNLOCK_DO_CHAN(chan);
     }
   }
-  return wave_events;
 }
 
-static unsigned long processSchedWavesAO(FSMID_t f)
+static void processSchedWavesAO(FSMID_t f)
 {  
   unsigned wave_mask = rs[f].valid ? rs[f].active_ao_wave_mask : 0;
-  unsigned long wave_events = 0;
 
   while (wave_mask) {
     unsigned wave = __ffs(wave_mask);
@@ -3247,14 +3243,13 @@ static unsigned long processSchedWavesAO(FSMID_t f)
       lsampl_t samp = w->samples[w->cur];
       writeAO(w->aoline, samp); /* NB this function does checking to make sure data write is sane */
       if (evt_col > -1 && evt_col <= NUM_IN_EVT_COLS(f))
-        wave_events |= 0x1 << evt_col;
+        set_bit(evt_col, rs[f].events_bits);
       w->cur++;
     } else { /* w->cur >= w->nsamples, so wave ended.. unschedule it. */
       scheduleWaveAO(f, wave, -1);
       rs[f].active_ao_wave_mask &= ~(1<<wave);
     }
   }
-  return wave_events;
 }
 
 static void scheduleWave(FSMID_t f, unsigned wave_id, int op)
