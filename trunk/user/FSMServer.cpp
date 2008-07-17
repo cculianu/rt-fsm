@@ -314,9 +314,9 @@ private:
   bool doCompileLoadProgram(const std::string &prog_name, const std::string & program_text) const;
   bool System(const std::string &cmd) const;
 
-  Matrix doGetTransitionsFromRT(int & first, int & last, int & state);
-  Matrix doGetTransitionsFromRT(int & first, int & last) { int dummy; return doGetTransitionsFromRT(first, last, dummy); }
-  Matrix doGetTransitionsFromRT(int & first) { int dummy = -1; return doGetTransitionsFromRT(first, dummy); }
+  Matrix doGetTransitionsFromRT(int & first, int & last, int & state, bool old_format = false);
+  Matrix doGetTransitionsFromRT(int & first, int & last, bool old_format = false) { int dummy; return doGetTransitionsFromRT(first, last, dummy, old_format); }
+  Matrix doGetTransitionsFromRT(int & first, bool old_format = false) { int dummy = -1; return doGetTransitionsFromRT(first, dummy, old_format); }
 
   IntStringMap parseIntStringMapBlock(const std::string &); ///< not static because it needs object for logging errors
   static void parseStringTable(const char *stable, StringMatrix &m);
@@ -868,13 +868,32 @@ void *ConnectionThread::threadFunc(void)
             s << msg.u.current_state << std::endl;
             sockSend(s.str());
             cmd_error = false;        
+        } else if (line.find("GET EVENTS_II") == 0) {
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                int first = -1, last = -1;
+                s >> first >> last;
+                Matrix mat = doGetTransitionsFromRT(first, last, false);
+
+                std::ostringstream os;
+                os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
+                sockSend(os.str());
+
+                line = sockReceiveLine(); // wait for "READY" from client
+
+                if (line.find("READY") != std::string::npos) {
+                    sockSend(mat.buf(), mat.bufSize(), true);
+                    cmd_error = false;
+                }
+            }
         } else if (line.find("GET EVENTS") == 0) {
             std::string::size_type pos = line.find_first_of("0123456789");
             if (pos != std::string::npos) {
                 std::stringstream s(line.substr(pos));
                 int first = -1, last = -1;
                 s >> first >> last;
-                Matrix mat = doGetTransitionsFromRT(first, last);
+                Matrix mat = doGetTransitionsFromRT(first, last, true);
 
                 std::ostringstream os;
                 os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
@@ -2674,7 +2693,7 @@ bool ConnectionThread::System(const std::string &cmd) const
   return std::system(cmd.c_str()) == 0;
 }
 
-Matrix ConnectionThread::doGetTransitionsFromRT(int & first, int & last, int & state)
+Matrix ConnectionThread::doGetTransitionsFromRT(int & first, int & last, int & state, bool old_format)
 {
   static const Matrix empty (0, 5);
 
@@ -2708,7 +2727,10 @@ Matrix ConnectionThread::doGetTransitionsFromRT(int & first, int & last, int & s
             for (int i = 0; i < (int)msg.u.transitions.num; ++i, ++ct) {
               struct StateTransition & t = msg.u.transitions.transitions[i];
               mat.at(ct, 0) = t.previous_state;
-              mat.at(ct, 1) = t.event_id > -1 ? 0x1 << t.event_id : 0x1<<num_input_events;
+              if (old_format)
+                mat.at(ct, 1) = t.event_id > -1 ? 0x1 << t.event_id : 0x1<<num_input_events;
+              else
+                mat.at(ct, 1) = t.event_id;
               mat.at(ct, 2) = static_cast<double>(t.ts/1000ULL) / 1000000.0; /* convert us to seconds */
               mat.at(ct, 3) = t.state;
               mat.at(ct, 4) = static_cast<double>(t.ext_ts/1000ULL) / 1000000.0;
