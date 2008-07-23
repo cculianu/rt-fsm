@@ -1,121 +1,19 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
 <!DOCTYPE KDevPrjSession>
 <KDevPrjSession>
- <DocsAndViews NumberOfDocuments="38" >
-  <Doc0 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/fsm.c" >
-   <View0 Encoding="ISO 8859-1" line="2528" Type="Source" />
+ <DocsAndViews NumberOfDocuments="4" >
+  <Doc0 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/GetEvents2.m" >
+   <View0 Encoding="ISO 8859-1" line="21" Type="Source" />
   </Doc0>
-  <Doc1 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/EmbC.h" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
+  <Doc1 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/FSMServer.cpp" >
+   <View0 Encoding="ISO 8859-1" line="876" Type="Source" />
   </Doc1>
-  <Doc2 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/FSM.h" >
-   <View0 Encoding="ISO 8859-1" line="231" Type="Source" />
+  <Doc2 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/fsm.c" >
+   <View0 Encoding="ISO 8859-1" line="1955" Type="Source" />
   </Doc2>
-  <Doc3 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/FSMServer.cpp" >
-   <View0 Encoding="ISO 8859-1" line="2681" Type="Source" />
+  <Doc3 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/old/FSM/Matlab/%40RTLSM/GetEvents2.m" >
+   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
   </Doc3>
-  <Doc4 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LinuxInterface.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc4>
-  <Doc5 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTWO-RT/LynxTWO-RT.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc5>
-  <Doc6 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/SoundTrig.h" >
-   <View0 Encoding="ISO 8859-1" line="21" Type="Source" />
-  </Doc6>
-  <Doc7 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/LynxTrig.c" >
-   <View0 Encoding="ISO 8859-1" line="856" Type="Source" />
-  </Doc7>
-  <Doc8 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/ChanMapper.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc8>
-  <Doc9 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/ChanMapper.c" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc9>
-  <Doc10 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/softtask.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc10>
-  <Doc11 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/kernel/softtask.c" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc11>
-  <Doc12 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/rtos_compat.h" >
-   <View0 Encoding="ISO 8859-1" line="153" Type="Source" />
-  </Doc12>
-  <Doc13 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/include/Version.h" >
-   <View0 Encoding="ISO 8859-1" line="7" Type="Source" />
-  </Doc13>
-  <Doc14 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/GetAIMode.m" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc14>
-  <Doc15 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/SetAIMode.m" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc15>
-  <Doc16 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/Contents.m" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc16>
-  <Doc17 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/DoQueryCmd.m" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc17>
-  <Doc18 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/runtime/Kernel2.6MakefileTemplate" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc18>
-  <Doc19 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/SetStateProgram.m" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc19>
-  <Doc20 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/Util.h" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc20>
-  <Doc21 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/user/Util.cpp" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc21>
-  <Doc22 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/SoundServer.cpp" >
-   <View0 Encoding="ISO 8859-1" line="878" Type="Source" />
-  </Doc22>
-  <Doc23 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/utils/installer.pl" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc23>
-  <Doc24 NumberOfViews="1" URL="file:///home/calin/iso/master/SetupRTLSystem.sh" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc24>
-  <Doc25 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/install.sh" >
-   <View0 Encoding="ISO 8859-1" Type="Source" />
-  </Doc25>
-  <Doc26 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/INSTALL" >
-   <View0 Encoding="ISO 8859-1" line="10" Type="Source" />
-  </Doc26>
-  <Doc27 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/bigcontarea.h" >
-   <View0 Encoding="ISO 8859-1" line="21" Type="Source" />
-  </Doc27>
-  <Doc28 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/Kbuild" >
-   <View0 Encoding="ISO 8859-1" line="3" Type="Source" />
-  </Doc28>
-  <Doc29 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/bigcontarea.c" >
-   <View0 Encoding="ISO 8859-1" line="19" Type="Source" />
-  </Doc29>
-  <Doc30 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/smalloc.c" >
-   <View0 Encoding="ISO 8859-1" line="404" Type="Source" />
-  </Doc30>
-  <Doc31 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/addons/SoundTrig/smalloc.h" >
-   <View0 Encoding="ISO 8859-1" line="40" Type="Source" />
-  </Doc31>
-  <Doc32 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/runtime/embc_mod_wrapper.c" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
-  </Doc32>
-  <Doc33 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/SetScheduledWaves.m" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
-  </Doc33>
-  <Doc34 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/SetStateMatrix.m" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
-  </Doc34>
-  <Doc35 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/Set_StateMatrix.m" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
-  </Doc35>
-  <Doc36 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/NetClient/FSMClient.cpp" >
-   <View0 Encoding="ISO 8859-1" line="0" Type="Source" />
-  </Doc36>
-  <Doc37 NumberOfViews="1" URL="file:///home/calin/src/rtfsm/Client/Matlab/%40RTLSM/GetEvents.m" >
-   <View0 Encoding="ISO 8859-1" line="20" Type="Source" />
-  </Doc37>
  </DocsAndViews>
  <pluginList>
   <kdevdebugger>
