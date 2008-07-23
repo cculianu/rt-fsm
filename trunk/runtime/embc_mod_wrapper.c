@@ -65,7 +65,7 @@ int init(void)
   __embc = mbuff_alloc(__embc_ShmName, sizeof(struct EmbC));
   if (!__embc) {
     printk("%s: could not allocate shm!\n", __embc_ShmName);
-    return ENOMEM;
+    return -ENOMEM;
   }
   memset(__embc, 0, sizeof(*__embc));
   __embc->init = __embc_init;
