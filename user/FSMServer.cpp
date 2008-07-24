@@ -145,6 +145,7 @@ namespace
 
   bool debug = false; // set with -d command-line switch to enable debug mode.
   std::string compiler = ""; // set with -c command-line switch to specify an alternate compiler
+  bool fast_embc_builds = true; // set by default, unset with the -e command-line switch which makes it more compatible
 
   unsigned n_threads;
   ConnectedThreadsList connectedThreads;
@@ -158,12 +159,15 @@ namespace
   const std::string & KernelVersion();
   bool IsKernel24() { return KernelVersion().substr(0, 4) == "2.4."; }
   bool IsKernel26() { return KernelVersion().substr(0, 4) == "2.6."; }
+  bool IsFastEmbCBuilds() { return fast_embc_builds; }
 
   std::string CompilerPath() { return compiler.length() ? compiler : (IsKernel24() ? "tcc/tcc" : ""); }
   std::string IncludePath() { char buf[128]; return std::string(getcwd(buf, 128)) + "/include"; }
   std::string EmbCHPath() { return IncludePath() + "/EmbC.h"; }
+  std::string EmbCBuildPath() { return (IsKernel26() && IsFastEmbCBuilds()) ? "runtime/EmbC.build" : ""; }
   std::string ModWrapperPath() { return IsKernel24() ? "./embc_mod_wrapper.o" : "runtime/embc_mod_wrapper.c"; }
-  std::string MakefileTemplatePath() { return IsKernel26() ? "runtime/Kernel2.6MakefileTemplate" : ""; }
+  std::string MakefileTemplatePath() { return IsKernel26() ? (IsFastEmbCBuilds() ? "runtime/EmbC.build/Makefile_for_Kbuild.EmbC" : "runtime/Kernel2.6MakefileTemplate") : ""; }
+  std::string Makefile() { return (IsKernel26() && IsFastEmbCBuilds()) ? "Makefile_for_Kbuild.EmbC" : ""; }
   std::string LdPath() { return "ld"; }
   std::string TmpPath() { return "/tmp/"; } // TODO handle Win32 tmp path..?
   std::string InsMod() { return "/sbin/insmod"; }
@@ -262,6 +266,7 @@ private:
   static const unsigned MAX_LINE = 16384;
   char sockbuf[MAX_LINE];
   unsigned sockbuf_len;
+  mutable pthread_mutex_t compileLock;
   
   struct TLog : public ::Log
   {
@@ -333,12 +338,13 @@ private:
 /* some statics for class ConnectionThread */
 int ConnectionThread::id = 0;
 
-ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false), sockbuf_len(0) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; sockbuf[0] = 0; }
+ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false), sockbuf_len(0) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; sockbuf[0] = 0; pthread_mutex_init(&compileLock, NULL); }
 ConnectionThread::~ConnectionThread()
 { 
   if (sock > -1)  ::shutdown(sock, SHUT_RDWR), ::close(sock), sock = -1;
   if (isRunning())  pthread_join(handle, NULL), thread_running = false;
   Log() <<  "deleted." << std::endl;
+  pthread_mutex_destroy(&compileLock);
 }
 extern "C" 
 {
@@ -483,10 +489,13 @@ static void init()
   std::string missing;
   if (IsKernel24()) {
     if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = CompilerPath()) || !FileExists(missing = ModWrapperPath()) ) 
-      throw Exception(std::string("Required file or program '") + missing + "' is not found!");
+      throw Exception(std::string("Required file or program '") + missing + "' is not found -- make sure you are in the rtfsm build dir and that you fully built the rtfsm tree!");
   } else if (IsKernel26()) {
-    if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = MakefileTemplatePath()) || !FileExists(missing = ModWrapperPath()) )
-      throw Exception(std::string("Required file or program '") + missing + "' is not found!");
+    if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = MakefileTemplatePath()) || !FileExists(missing = ModWrapperPath()) || (IsFastEmbCBuilds() && ( !FileExists(missing = EmbCBuildPath()) || !FileExists(missing = (EmbCBuildPath()+"/mod.ko")) ) ) )
+      throw Exception(std::string("Required file or program '") + missing + "' is not found -- make sure you are in the rtfsm build dir and that you fully built the rtfsm tree!");
+    if (CompilerPath().length() && IsFastEmbCBuilds()) {
+        throw Exception(std::string("Cannot use -c switch *and* use the fast embedded C build scheme because the compiler was already decided by the rtfsm build system.  Please specify -e switch to turn off fast embedded C builds (or omit the -c switch)."));
+    }
   } else 
       throw Exception("Could not determine Linux kernel version!  Is this Linux??");
 #endif
@@ -508,19 +517,28 @@ static void cleanup(void)
 static void handleArgs(int argc, char *argv[])
 {
   int opt;
-  while ( ( opt = getopt(argc, argv, "dl:c:")) != -1 ) {
+  while ( ( opt = getopt(argc, argv, "edl:c:")) != -1 ) {
     switch(opt) {
-    case 'd': debug = true; break;
+    case 'e': 
+        Log() << "-e switch, using slower more compatible EmbC build mechanism\n";
+        fast_embc_builds = false; 
+        break;
+    case 'd': 
+        Log() << "-d switch, debug printing turned on\n";        
+        debug = true; 
+        break;
     case 'l': 
       listenPort = atoi(optarg);
+      Log() << "-l switch, set listenport to `" << optarg << "'\n";
       if (! listenPort) throw Exception ("Could not parse listen port.");
       break;
     case 'c':
       compiler = optarg;
+      Log() << "-c switch, set compiler to `" << optarg << "'\n";
       break;
     default:
       throw Exception(std::string("Unknown command line parameters.\n\nUsage: ")
-                      + argv[0] + " [-l LISTEN_PORT] [-c COMPILER_OVERRIDE] [-d]");
+                      + argv[0] + " [-l LISTEN_PORT] [-c COMPILER_OVERRIDE] [-e] [-d]");
       break;
     }
   }
@@ -1657,6 +1675,8 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
 bool ConnectionThread::doCompileLoadProgram(const std::string & prog_name, const std::string & prog_text) const
 {
   bool ret = true;
+  MutexLocker ml(compileLock); // make sure only 1 thread at a time compiles because sometimes we use the *same* tmp dir for all compiles..
+
   if (!compileProgram(prog_name, prog_text)) {
     Log() << "Error compiling the program.\n"; 
     ret = false;
@@ -1683,16 +1703,32 @@ bool ConnectionThread::compileProgram(const std::string & fsm_name, const std::s
     if ( System(CompilerPath() + " -I'" + IncludePath() + "' -c -o '" + objname + "' '" + fname + "'") ) 
       ret = System(LdPath() + " -r -o '" + modname + "' '" + objname + "' '" + ModWrapperPath() + "'");
   } else if ( IsKernel26() ) { // Kernel 2.6 mechanism
-    std::string 
-        buildDir = TmpPath() + fsm_name + ".build", 
-        fname = buildDir + "/" + fsm_name + "_generated.c", 
-        objname = TmpPath() + fsm_name + ".ko";
-    if (System(std::string("mkdir -p '") + buildDir + "'")) {
-      std::ofstream outfile(fname.c_str());
-      outfile << program_text;
-      outfile.close();
-      ret = System(std::string("cp -f '") + ModWrapperPath() + "' '" + buildDir + "' && cp -f '" + MakefileTemplatePath() + "' '" + buildDir + "/Makefile' && make -C '" + buildDir + "' TARGET='" + fsm_name + "' EXTRA_INCL='" + IncludePath() + "'" + ( CompilerPath().length() ? (std::string(" COMPILER_OVERRIDE='") + CompilerPath() + "'") : "" ) );
-    }
+      if (!IsFastEmbCBuilds()) { // traditional EmbC build scheme
+
+          std::string 
+              buildDir = TmpPath() + fsm_name + ".build", 
+              fname = buildDir + "/" + fsm_name + "_generated.c";
+          if (System(std::string("mkdir -p '") + buildDir + "'")) {
+              std::ofstream outfile(fname.c_str());
+              outfile << program_text;
+              outfile.close();
+              ret = System(std::string("cp -f '") + ModWrapperPath() + "' '" + buildDir + "' && cp -f '" + MakefileTemplatePath() + "' '" + buildDir + "/Makefile' && make -C '" + buildDir + "' TARGET='" + fsm_name + "' EXTRA_INCL='" + IncludePath() + "'" + ( CompilerPath().length() ? (std::string(" COMPILER_OVERRIDE='") + CompilerPath() + "'") : "" ) );
+          }
+
+      } else { // faster embc build scheme that avoids the kernel makefiles
+               // by precaching partially built kernel objects..
+
+          std::string 
+              buildDir = EmbCBuildPath(), 
+              fname = buildDir + "/mod_impl.c", 
+              cpSwitches = debug ? "fpvra" : "fpra";
+          std::ofstream outfile(fname.c_str(), std::ios::out|std::ios::trunc);
+          outfile << program_text;
+          outfile.close();
+          // copy makefile to build dir, use sed to replace instances of KBUILD_MODNAME=KBUILD_STR(mod) with KBUILD_MODNAME=KBUILD_STR($fsm_name) in the .cmd files, run make in the build dir
+          ret = System(std::string("for f in '") + buildDir + "'/.*.cmd; do cat \"$f\" | sed '{s/KBUILD_MODNAME=KBUILD_STR(.*)/KBUILD_MODNAME=KBUILD_STR(" + fsm_name + ")/g}' > \"$f\".tmp && mv -f \"$f\".tmp \"$f\"; done && make -C '" + buildDir + "' -f '" + Makefile() + "' mod.ko");
+
+      }
   } else {
     Log() << "ERROR: Unsupported Kernel version in ConnectionThread::compileProgram()!";
   }
@@ -1707,9 +1743,12 @@ bool ConnectionThread::loadModule(const std::string & program_name) const
   std::string modname;
   if ( IsKernel24() ) 
     modname = TmpPath() + program_name;
-  else if ( IsKernel26() )
-    modname = TmpPath() + program_name + ".build/" + program_name + ".ko";
-  else {
+  else if ( IsKernel26() ) {
+      if (IsFastEmbCBuilds()) 
+          modname = EmbCBuildPath() + "/mod.ko";
+      else
+          modname = TmpPath() + program_name + ".build/" + program_name + ".ko";
+  } else {
     Log() << "ERROR: Unsupported Kernel version in ConnectionThread::loadModule()!";
     return false;
   }
@@ -1726,8 +1765,12 @@ bool ConnectionThread::unlinkModule(const std::string & program_name) const
     ret |= ::unlink(objfile.c_str());
     return ret == 0;
   } else if ( IsKernel26() ) {
-    std::string buildDir = TmpPath() + program_name + ".build"; 
-    System("rm -fr '" + buildDir + "'");
+      if (IsFastEmbCBuilds()) {
+          std::string buildDir = TmpPath() + program_name + ".build"; 
+          System("rm -fr '" + buildDir + "'");
+      } else {
+          System("rm -f '" + EmbCBuildPath() + "'/mod.ko");          
+      }
   } else
     Log() << "ERROR: Unsupported Kernel version in ConnectionThread::unlinkModule()!";
   return false;

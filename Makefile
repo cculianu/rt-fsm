@@ -1,7 +1,10 @@
 
 
 
-all:  __KERNEL_MOD__ __USER_APP__ __USER_EXT_TRIG_MOD__ __SOUND_SERVER__ __UTILS__
+all:  __KERNEL_MOD__ __EMBC_RUNTIME__ __USER_APP__ __USER_EXT_TRIG_MOD__ __SOUND_SERVER__ __UTILS__
+
+__EMBC_RUNTIME__:
+	$(MAKE) -C runtime
 
 __KERNEL_MOD__:
 	$(MAKE) -C kernel && cp -f kernel/RealtimeFSM.ko .
@@ -14,12 +17,13 @@ __UTILS__:
 
 __USER_EXT_TRIG_MOD__:
 	$(MAKE) -C addons/UserspaceExtTrig && cp -f addons/UserspaceExtTrig/UserspaceExtTrig.ko .
-	
+
 __SOUND_SERVER__:
 	$(MAKE) -C addons/SoundTrig && cp -f addons/SoundTrig/SoundServer . && cp -f addons/SoundTrig/LynxTrig_RT.ko . && cp -f addons/SoundTrig/LynxTWO-RT/LynxTWO_RT.ko .
-	
+
 clean: 
 	$(MAKE) -C kernel clean
+	$(MAKE) -C runtime clean
 	$(MAKE) -C user clean
 	$(MAKE) -C utils clean
 	$(MAKE) -C addons/UserspaceExtTrig/ clean
