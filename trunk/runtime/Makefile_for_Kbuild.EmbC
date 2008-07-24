@@ -1,0 +1,26 @@
+
+include .mod_impl.o.cmd
+include .mod_wrapper.o.cmd
+include .mod.ko.cmd
+include .mod.mod.o.cmd
+include .mod.o.cmd
+
+all: mod.ko
+
+clean:
+	rm -f *.o *~
+
+mod_impl.o: $(deps_REPLACEME/mod_impl.o)
+	cd /usr/src/linux && $(cmd_REPLACEME/mod_impl.o)
+
+mod_wrapper.o: $(deps_REPLACEME/mod_wrapper.o)
+	cd /usr/src/linux && $(cmd_REPLACEME/mod_wrapper.o)
+
+mod.o:  mod_impl.o mod_wrapper.o
+	cd /usr/src/linux && $(cmd_REPLACEME/mod.o)
+
+mod.mod.o: $(deps_REPLACEME/mod.mod.o)
+	cd /usr/src/linux && $(cmd_REPLACEME/mod.mod.o)
+
+mod.ko: mod_impl.o  mod_wrapper.o  mod.o mod.mod.o
+	cd /usr/src/linux && $(cmd_REPLACEME/mod.ko)
