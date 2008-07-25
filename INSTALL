@@ -138,7 +138,9 @@ M)
         ----> Timer Frequency (100Hz) (I prefer 100Hz but 1000Hz works too)
         ----> [ ] PAE (Physical Address Extension) Support  (OFF) 
     ---->  Power Management options (ACPI, APM)
-        ----> [ ] Power Management support (OFF) (power management is BAD BAD BAD for realtime!!)
+        ----> [x] Power Management support (ON) (Needed for ACPI/SMP)
+	----> [x] ACPI Support (Advanced Configuration and Power Interface) Support (ON) (Needed for SMP to work on all systems)
+	**** DISABLE ALL OTHER POWER MANAGEMENT OPTIONS EXCEPT FOR THE ABOVE TWO ****
         ---->  CPU Frequency scaling 
             ----> [ ] CPU Frequency scaling (OFF) (you don't want to mess with the frequency of the processor in an RTOS!!!)
             

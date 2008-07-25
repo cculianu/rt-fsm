@@ -493,7 +493,7 @@ static void init()
     if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = CompilerPath()) || !FileExists(missing = ModWrapperPath()) ) 
       throw Exception(std::string("Required file or program '") + missing + "' is not found -- make sure you are in the rtfsm build dir and that you fully built the rtfsm tree!");
   } else if (IsKernel26()) {
-    if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = MakefileTemplatePath()) || !FileExists(missing = ModWrapperPath()) || (IsFastEmbCBuilds() && ( !FileExists(missing = EmbCBuildPath()) || !FileExists(missing = (EmbCBuildPath()+"/mod.ko")) ) ) )
+    if ( !FileExists(missing = EmbCHPath()) || !FileExists(missing = MakefileTemplatePath()) || !FileExists(missing = ModWrapperPath()) || (IsFastEmbCBuilds() && ( !FileExists(missing = EmbCBuildPath()) || !FileExists(missing = (EmbCBuildPath()+"/.mod.ko.cmd")) ) ) )
       throw Exception(std::string("Required file or program '") + missing + "' is not found -- make sure you are in the rtfsm build dir and that you fully built the rtfsm tree!");
     if (CompilerPath().length() && IsFastEmbCBuilds()) {
         throw Exception(std::string("Cannot use -c switch *and* use the fast embedded C build scheme because the compiler was already decided by the rtfsm build system.  Please specify -e switch to turn off fast embedded C builds (or omit the -c switch)."));
@@ -1757,7 +1757,7 @@ bool ConnectionThread::compileProgram(const std::string & fsm_name, const std::s
           outfile << program_text;
           outfile.close();
           // copy makefile to build dir, use sed to replace instances of KBUILD_MODNAME=KBUILD_STR(mod) with KBUILD_MODNAME=KBUILD_STR($fsm_name) in the .cmd files, run make in the build dir
-          ret = System(std::string("for f in '") + buildDir + "'/.*.cmd; do cat \"$f\" | sed '{s/KBUILD_MODNAME=KBUILD_STR(.*)/KBUILD_MODNAME=KBUILD_STR(" + fsm_name + ")/g}' > \"$f\".tmp && mv -f \"$f\".tmp \"$f\"; done && make -C '" + buildDir + "' -f '" + Makefile() + "' mod.ko");
+          ret = System(std::string("for f in '") + buildDir + "'/.*.cmd; do cat \"$f\" | sed '{s/KBUILD_MODNAME=KBUILD_STR(.*)/KBUILD_MODNAME=KBUILD_STR(" + fsm_name + ")/g}' > \"$f\".tmp && mv -f \"$f\".tmp \"$f\"; done && rm -f '" + buildDir + "'/mod_impl.o && make -C '" + buildDir + "' -f '" + Makefile() + "' mod.ko");
 
       }
   } else {
@@ -1797,10 +1797,10 @@ bool ConnectionThread::unlinkModule(const std::string & program_name) const
     return ret == 0;
   } else if ( IsKernel26() ) {
       if (IsFastEmbCBuilds()) {
+          System("rm -f '" + EmbCBuildPath() + "'/mod.ko '" + EmbCBuildPath() + "'/mod_impl.o");
+      } else {
           std::string buildDir = TmpPath() + program_name + ".build"; 
           System("rm -fr '" + buildDir + "'");
-      } else {
-          System("rm -f '" + EmbCBuildPath() + "'/mod.ko");          
       }
   } else
     Log() << "ERROR: Unsupported Kernel version in ConnectionThread::unlinkModule()!";
