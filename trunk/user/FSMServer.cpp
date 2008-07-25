@@ -266,7 +266,7 @@ private:
   static const unsigned MAX_LINE = 16384;
   char sockbuf[MAX_LINE];
   unsigned sockbuf_len;
-  mutable pthread_mutex_t compileLock;
+  static pthread_mutex_t compileLock;
   
   struct TLog : public ::Log
   {
@@ -337,15 +337,16 @@ private:
 
 /* some statics for class ConnectionThread */
 int ConnectionThread::id = 0;
+pthread_mutex_t ConnectionThread::compileLock = PTHREAD_MUTEX_INITIALIZER;
 
-ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false), sockbuf_len(0) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; sockbuf[0] = 0; pthread_mutex_init(&compileLock, NULL); }
+ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false), sockbuf_len(0) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; sockbuf[0] = 0; }
 ConnectionThread::~ConnectionThread()
 { 
   if (sock > -1)  ::shutdown(sock, SHUT_RDWR), ::close(sock), sock = -1;
   if (isRunning())  pthread_join(handle, NULL), thread_running = false;
   Log() <<  "deleted." << std::endl;
-  pthread_mutex_destroy(&compileLock);
 }
+
 extern "C" 
 {
   static void * threadfunc_wrapper(void *arg)   
