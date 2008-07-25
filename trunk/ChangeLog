@@ -1,3 +1,28 @@
+2008-07-25 17:24  calin.culianu
+
+	* [r113] include/Version.h, user/FSMServer.cpp:
+	  
+	  - Bumped version
+	  - Optimized generation of Embedded C code to generate a 2D matrix
+	  for matrix cells that are purely numeric, and otherwise
+	  generate a big function for matrix cells that are non-numeric.
+	  
+	  This hopefully makes compilation much easier/faster.
+
+2008-07-25 06:16  calin.culianu
+
+	* [r112] user/FSMServer.cpp:
+	  
+	  Ooops. The compileLock mutex was a non-static class member of the
+	  ConnectionThread class. It needs to be static because it locks
+	  across all threads.
+
+2008-07-24 22:41  calin.culianu
+
+	* [r111] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-07-24 22:39  calin.culianu
 
 	* [r110] ChangeLog, Makefile, include/Version.h,
