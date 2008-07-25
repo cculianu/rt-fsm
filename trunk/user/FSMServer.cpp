@@ -31,6 +31,7 @@
 #include <ctype.h>
 #include <pthread.h>
 #include <limits.h>
+#include <regex.h>
 
 #include <cstdlib>
 #include <iostream>
@@ -1511,7 +1512,36 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
   
     // build __fsm_get_at function based on the matrix m
     {
-   
+      regex_t isNumericRE;
+      
+      if ( regcomp(&isNumericRE, "^([-+]?[[:digit:]]+)|([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)$", REG_EXTENDED) ) {
+          throw FatalException("INTERNAL ERROR: regcomp() returned failure status!  Argh!");
+      }
+      std::ostringstream numArrayStrm;
+      // as an optimization to keep the switch/case function below smaller, first build a table of the *NUMERIC* state matrix for cells that are numeric (should be the common case)
+      numArrayStrm << "unsigned long __embc_state_matrix[" << m.rows() << "][" << m.cols() << "] = {\n";
+      std::list<std::pair<unsigned, unsigned> > nonNumerics;
+      unsigned numericsCt = 0;
+      for (unsigned r = 0; r < m.rows(); ++r) {
+          numArrayStrm << "{ ";
+          for (unsigned c = 0; c < m.cols(); ++c) {
+              std::string thisCell = trimWS(m.at(r,c));
+              if (!thisCell.length()) thisCell = "0";
+              if ( 0 == regexec(&isNumericRE, thisCell.c_str(), 0, 0, 0) ) {
+                  numArrayStrm << thisCell << (c == TIMEOUT_TIME_COL(&msg.u.fsm) ? "*1000000UL" : "") << ", ";
+                  ++numericsCt;
+              } else {
+                  numArrayStrm << "0/*C Expr Omitted*/, ";
+                  nonNumerics.push_back(std::pair<unsigned, unsigned>(r, c));
+              }
+          }
+          numArrayStrm << "},\n";
+      }
+      numArrayStrm << "};\n\n";
+      if (numericsCt) {
+          prog << numArrayStrm.str();
+      }
+      // next, for non-numeric cells (ones containing bona-fide C-expressions) build a function with a big switch/case on the row/cols containing the c-expressions for each case..
       prog << 
         "unsigned long __embc_fsm_get_at(ushort __r, ushort __c)\n" 
         "{\n" 
@@ -1520,39 +1550,39 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
         "    return 0;\n"
         "  }\n" // end if
         "  switch(__r) {\n";
-      for (unsigned r = 0; r < m.rows(); ++r) {
-        std::ostringstream statebuf;
-        bool stateHasNonZero = false;
-        statebuf <<
-        "  case " << r << ":\n"
-        "    switch(__c) {\n";
-        for (unsigned c = 0; c < m.cols(); ++c) {
-          std::string thisCell = trimWS(m.at(r,c));
-          if ( thisCell.length() && thisCell != "0" ) {
-              stateHasNonZero = true;
-              statebuf << 
-        "    case " << c << ":\n"
-        "      return ({ " << thisCell << "; })";
-              // make sure the timeout column is timeout_us and not timeout_s!
-              if (c == TIMEOUT_TIME_COL(&msg.u.fsm)) statebuf << " * 1e6 /* timeout secs to usecs */";
-              statebuf << ";\n";
+      unsigned last_r = 0xffffffff;
+      for (std::list<std::pair<unsigned, unsigned> >::const_iterator it = nonNumerics.begin(); it != nonNumerics.end(); ) {
+          const unsigned r = (*it).first, c = (*it).second;
+          if (last_r != r) {
+              prog <<
+                  "  case " << r << ":\n"
+                  "    switch(__c) {\n";
           }
-        }
-        statebuf << 
-        "    }\n" // end switch(__c)
-        "    break;\n"; // this is needed to prevent fall-thru to next state and instead do retun 0; below..
-        
-        // as an optimization, don't generate any C code if the entire state is zeros
-        // this is so we fall throught to bottom and return 0
-        if (stateHasNonZero) 
-            prog << statebuf.str(); 
+          const std::string & thisCell = m.at(r,c);
+          prog << 
+              "    case " << c << ":\n"
+              "      return ({ " << thisCell << "; })";
+              // make sure the timeout column is timeout_us and not timeout_s!
+          if (c == TIMEOUT_TIME_COL(&msg.u.fsm)) prog << " * 1e6 /* timeout secs to usecs */";
+          prog << ";\n";
+          ++it;
+          if (it == nonNumerics.end() || (*it).first != r) { // test if the state (row) ended, if so, close the switch(__c)...
+              prog << 
+                  "    }\n" // end switch(__c)
+                  "    break;\n"; // this is needed to prevent fall-thru to next state and instead do retun 0; below..              
+          }
+          last_r = r;
       }
       prog <<
-        "  } // end switch(__r)\n"; // end switch(__r);
-        
-      prog <<  
-        "  return 0; /* reached sometimes if an entire state was all 0s, or if a particular column was 0, in which case it was ommitted from switch(__r) or switch(__c) above and we fall thru to here */ "
-        "}\n"; // end function
+          "  } // end switch(__r)\n"; // end switch(__r);
+      if (numericsCt) {
+          prog <<  
+              "  return __embc_state_matrix[__r][__c]; /* reached for states that have numeric values rather than C expressions (should be the common case actually) */\n";
+      } else {
+          prog << "  return 0; /* uncommon.. all states are non-numeric so this should never be reached! */\n";
+      }
+      prog <<  "}\n\n"; // end function
+      regfree(&isNumericRE);
     }
   
     // build the __fsm_do_state_entry and __finChanTypesm_do_state_exit functions.. 
