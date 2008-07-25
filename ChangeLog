@@ -1,3 +1,14 @@
+2008-07-25 22:14  calin.culianu
+
+	* [r114] ChangeLog, INSTALL, user/FSMServer.cpp,
+	  utils/config-i686-fc8:
+	  
+	  - Updated x86 kernel .config file to use ACPI since it was found
+	  you need ACPI enabled to get SMP on SMP systems on x86
+	  - Updated INSTALL document to tell user to enable ACPI
+	  - Fixed small bug in FSMServer where it wasn't cleaning up
+	  compiled EmbC fsm module after a compile properly
+
 2008-07-25 17:24  calin.culianu
 
 	* [r113] include/Version.h, user/FSMServer.cpp:
