@@ -108,7 +108,7 @@ USHORT LinuxGlue::MapIO( PVOID pContext, PPCI_CONFIGURATION pPCI )
       base.ulSize = len;
       base.usType = PCI_BARTYPE_MEM; // erm it's all memory mapped, right?!
       ++ok;
-    } else { // !vaddr -> error in Linux Kernel map_io.. need to abort and unroll the areas we mapped..
+    } else if (ok < 2) { // HACK, we hardcode that we need 2 regions..  !vaddr -> error in Linux Kernel map_io.. need to abort and unroll the areas we mapped..
         // unroll previos maps, return 1 (failure)
         for (int r = 0; r < bar; ++r) {
             PCI_BASEADDRESS & base =  pPCI->Base[r]; // reference..
@@ -118,7 +118,7 @@ USHORT LinuxGlue::MapIO( PVOID pContext, PPCI_CONFIGURATION pPCI )
         return 1;
     }
   }
-  return ok == 0;
+  return 0;
 }
 
 USHORT LinuxGlue::UnmapIO( PVOID pContext, PPCI_CONFIGURATION pPCI )
