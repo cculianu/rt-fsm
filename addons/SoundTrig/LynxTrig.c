@@ -1987,6 +1987,7 @@ static int initAudioMemory(void)
     }
     if (allocd < mem) {
         ERROR("audio_memory: Could not allocate %lu bytes of memory in at least 24MB sized blocks!  (Allocated %lu total bytes, last blocksize=%lu bytes, largest=%lu.)\n", mem, allocd, unit, largest);
+        ERROR("audio_memory: Reboot the system and try again -- that sometimes solves this problem!\n");
         return -ENOMEM;
     }
     sma = smalloc_init(contRegions[0], contSizes[0], (printf_fn_t)rt_printk);
