@@ -142,6 +142,16 @@ L22LINKAGE void * linux_map_io(LinuxContext *ctx, unsigned bar, unsigned long *p
   if (pci_request_region(ctx->dev, bar, MODULE_NAME)) return 0;
 #endif
   virt = ioremap(start, rlen);
+  if (!virt) {
+      ERROR("Could not map pci region %u (length %lu) for device %s into virtual address space!  Need more vmalloc space?!\n", bar, rlen, pci_name(ctx->dev));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29) /* Linux < 2.4.29 lacks pci_request_region so fake it */
+      if (!--ctx->region_ct)
+          pci_release_regions(ctx->dev);
+#else
+      pci_release_region(ctx->dev, bar);
+#endif
+      return 0;
+  }
   /* save the region in our context so that we can pass correct stuff back to pci_release_region() and iounmap() */
   ctx->regions[bar].virt = virt;
   ctx->regions[bar].phys = start;
