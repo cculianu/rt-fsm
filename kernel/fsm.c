@@ -2301,20 +2301,20 @@ static inline void clearTriggerLines(FSMID_t f)
 
 static void detectInputEvents(FSMID_t f)
 {
-  unsigned i, bits, bits_prev, try_use_embc_thresh = 0;
+  unsigned i, *bits, *bits_prev, try_use_embc_thresh = 0;
   volatile unsigned long *thresh_hi_ct = 0, *thresh_lo_ct = 0;
   
   switch(IN_CHAN_TYPE(f)) { 
   case DIO_TYPE: /* DIO input */
-    bits = dio_bits;
-    bits_prev = dio_bits_prev;
+    bits = &dio_bits;
+    bits_prev = &dio_bits_prev;
     thresh_hi_ct = di_thresh_hi_ct;
     thresh_lo_ct = di_thresh_lo_ct;
     try_use_embc_thresh = 0;
     break;
   case AI_TYPE: /* AI input */
-    bits = ai_bits;
-    bits_prev = ai_bits_prev;
+    bits = &ai_bits;
+    bits_prev = &ai_bits_prev;
     thresh_hi_ct = ai_thresh_hi_ct;
     thresh_lo_ct = ai_thresh_lo_ct;
     try_use_embc_thresh = 1;
@@ -2328,8 +2328,8 @@ static void detectInputEvents(FSMID_t f)
   
   /* Loop through all our event channel id's comparing them to our DIO bits */
   for (i = FIRST_IN_CHAN(f); i < AFTER_LAST_IN_CHAN(f); ++i) {
-    int bit = ((0x1 << i) & bits) != 0, 
-        last_bit = ((0x1 << i) & bits_prev) != 0,
+    int bit = ((0x1 << i) & (*bits)) != 0, 
+        last_bit = ((0x1 << i) & (*bits_prev)) != 0,
         event_id_edge_up = INPUT_ROUTING(f, i*2), /* Even numbered input event 
                                                   id's are edge-up events.. */
         event_id_edge_down = INPUT_ROUTING(f, i*2+1); /* Odd numbered ones are 
@@ -2339,8 +2339,8 @@ static void detectInputEvents(FSMID_t f)
         and override our default threshold detector. */
     if (try_use_embc_thresh && EMBC_HAS_FUNC(f, threshold_detect)) {
         TRISTATE ret = CALL_EMBC_RET2(f, threshold_detect, i, ai_samples_volts[i]);
-        if (ISPOSITIVE(ret)) bit = 1;
-        else if (ISNEGATIVE(ret)) bit = 0;
+        if (ISPOSITIVE(ret)) { bit = 1; (*bits) |= (0x1<<i); }
+        else if (ISNEGATIVE(ret)) { bit = 0; (*bits) &= ~(0x1<<i); }
         else bit = last_bit; /* NEUTRAL condition */
     }
     /* Edge-up transitions */ 

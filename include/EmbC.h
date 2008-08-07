@@ -17,7 +17,7 @@ typedef int TRISTATE; /* A tristate value takes one of 3 states: POSITIVE, NEGAT
 #define NEUTRAL (0)
 #define ISPOSITIVE(t) (t > 0)
 #define ISNEGATIVE(t) (t < 0)
-#define ISNEUTRAL(t)   t == 0)
+#define ISNEUTRAL(t)  (t == 0)
 #define EMBC_TCP 0
 #define EMBC_UDP 1
 
