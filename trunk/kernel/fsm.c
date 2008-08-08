@@ -355,6 +355,10 @@ struct RunState {
 
     /* Bitset of the events that were detected for an fsm cycle.. cleared each task period */
     unsigned long events_bits[(0x1UL<<(sizeof(unsigned short)*8))/(8*sizeof(unsigned long))+1];
+
+    /* inherited from ai_bits and/or dio_bits, but overwritten by
+       optional embedded-C event detection code */
+    unsigned long input_bits, input_bits_prev;
     
     unsigned current_state;
     int64 current_ts; /* Time elapsed, in ns, since init_ts */
@@ -2301,20 +2305,21 @@ static inline void clearTriggerLines(FSMID_t f)
 
 static void detectInputEvents(FSMID_t f)
 {
-  unsigned i, *bits, *bits_prev, try_use_embc_thresh = 0;
+  unsigned i, try_use_embc_thresh = 0;
+  unsigned global_bits = 0;
   volatile unsigned long *thresh_hi_ct = 0, *thresh_lo_ct = 0;
+
+  rs[f].input_bits_prev = rs[f].input_bits;
   
   switch(IN_CHAN_TYPE(f)) { 
   case DIO_TYPE: /* DIO input */
-    bits = &dio_bits;
-    bits_prev = &dio_bits_prev;
+    global_bits = dio_bits;    
     thresh_hi_ct = di_thresh_hi_ct;
     thresh_lo_ct = di_thresh_lo_ct;
     try_use_embc_thresh = 0;
     break;
   case AI_TYPE: /* AI input */
-    bits = &ai_bits;
-    bits_prev = &ai_bits_prev;
+    global_bits = ai_bits;
     thresh_hi_ct = ai_thresh_hi_ct;
     thresh_lo_ct = ai_thresh_lo_ct;
     try_use_embc_thresh = 1;
@@ -2328,21 +2333,39 @@ static void detectInputEvents(FSMID_t f)
   
   /* Loop through all our event channel id's comparing them to our DIO bits */
   for (i = FIRST_IN_CHAN(f); i < AFTER_LAST_IN_CHAN(f); ++i) {
-    int bit = ((0x1 << i) & (*bits)) != 0, 
-        last_bit = ((0x1 << i) & (*bits_prev)) != 0,
+      int bit = 0,  /* default bit to 0, either it comes from EmbC or from global thresh detector */
+        last_bit = ((0x1 << i) & rs[f].input_bits_prev) != 0,
         event_id_edge_up = INPUT_ROUTING(f, i*2), /* Even numbered input event 
                                                   id's are edge-up events.. */
         event_id_edge_down = INPUT_ROUTING(f, i*2+1); /* Odd numbered ones are 
                                                       edge-down */
 
     /* If they specified a threshold detection function for this FSM, call it, 
-        and override our default threshold detector. */
+        and use the bit from that. */
     if (try_use_embc_thresh && EMBC_HAS_FUNC(f, threshold_detect)) {
         TRISTATE ret = CALL_EMBC_RET2(f, threshold_detect, i, ai_samples_volts[i]);
-        if (ISPOSITIVE(ret)) { bit = 1; (*bits) |= (0x1<<i); }
-        else if (ISNEGATIVE(ret)) { bit = 0; (*bits) &= ~(0x1<<i); }
+        if (ISPOSITIVE(ret)) { bit = 1;  }
+        else if (ISNEGATIVE(ret)) { bit = 0; }
         else bit = last_bit; /* NEUTRAL condition */
+    } else {
+        /* No EmbC or using DIO, so just use the global bits to get our bit */
+        bit = ((0x1 << i) & global_bits) != 0;        
     }
+
+    /* now we save the bit state per FSM -- at this point this bit (specifying
+       whether there's an high or low thesh)
+       *may* have come from either 
+         - Embedded C threshold detection 
+         - or from the global threshold detector
+         
+         but we need to remember the bitstate per-fsm. */
+
+    if (bit) {
+        set_bit(i, &rs[f].input_bits);
+    } else {
+        clear_bit(i, &rs[f].input_bits);
+    }
+
     /* Edge-up transitions */ 
     if (event_id_edge_up > -1 && bit && !last_bit) {
       /* before we were below, now we are above,  therefore yes, it is an blah-IN */
