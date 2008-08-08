@@ -1,3 +1,46 @@
+2008-08-08 18:46  calin.culianu
+
+	* [r120] include/Version.h, kernel/fsm.c:
+	  
+	  - Finally fixed bug in EmbC threshold detection
+	  - Bumped version
+
+2008-08-07 20:40  calin.culianu
+
+	* [r119] include/EmbC.h, include/Version.h, kernel/fsm.c:
+	  
+	  - Bumped version number
+	  - Fixed possible bug in EmbC thresh detect code
+
+2008-07-29 17:40  calin.culianu
+
+	* [r118] addons/SoundTrig/LynxTrig.c, include/Version.h:
+	  
+	  - Bumped version
+	  - Added some messaging to LynxTrig advising user to reboot the
+	  system and try again on contiguous allocation failure
+
+2008-07-29 16:34  calin.culianu
+
+	* [r117] addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp:
+	  
+	  Oops -- introduced a new bug into LynxTWO-RT -- fixed!
+
+2008-07-29 16:06  calin.culianu
+
+	* [r116] addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
+	  addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp:
+	  
+	  Tweaks to LynxTWO-RT driver to make it cope better with error in
+	  mapping IO
+	  to virtual address space.
+
+2008-07-25 22:15  calin.culianu
+
+	* [r115] ChangeLog:
+	  
+	  - Updated ChangeLog
+
 2008-07-25 22:14  calin.culianu
 
 	* [r114] ChangeLog, INSTALL, user/FSMServer.cpp,
