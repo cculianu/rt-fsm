@@ -1058,6 +1058,9 @@ static int initAISubdev(void)
     maxdata_ai  = comedi_get_maxdata(dev_ai, subdev_ai, 0);
     ai_thresh_hi = AI_THRESHOLD_VOLTS_HI * 10 / 5 * maxdata_ai / 10;
     ai_thresh_low = AI_THRESHOLD_VOLTS_LOW * 10 / 5 * maxdata_ai / 10;    
+  } else {
+      /* range >= 0, so store ai_krange struct which we use later in SAMPLE_TO_VOLTS macro.. */
+      comedi_get_krange(dev_ai, subdev_ai, 0, range, &ai_krange);
   }
   DEBUG("AI dev: %s subdev: %d range: %d min: %d max: %d thresh (%dV-%dV): %u-%u maxdata: %u \n", COMEDI_DEVICE_FILE, (int)subdev_ai, (int)ai_range, minV, maxV, AI_THRESHOLD_VOLTS_LOW, AI_THRESHOLD_VOLTS_HI, ai_thresh_low, ai_thresh_hi, maxdata_ai);
 
