@@ -1,3 +1,9 @@
+2008-08-08 18:47  calin.culianu
+
+	* [r121] ChangeLog:
+	  
+	  - Updated ChangeLog
+
 2008-08-08 18:46  calin.culianu
 
 	* [r120] include/Version.h, kernel/fsm.c:
