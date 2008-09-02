@@ -24,16 +24,19 @@
 #include <limits.h>
 #include <errno.h>
 #include <string.h>
-
+#include <errno.h>
+#ifdef OS_OSX
+#include <kvm.h>
+#include <sys/sysctl.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <assert.h>
+static int GetBSDProcessList(struct kinfo_proc **procList, size_t *procCount);
+#endif
 #define PROCPATH "/proc"
 
-
+#ifndef OS_OSX
 static int have_proc_fs(void);
-static int select_numeric_dir(const struct dirent *);
-static int countlist(void **);
-/*static int find_in_list(void **list, void *val);*/
-static int find_pid_in_list(const pid_t *list, pid_t val);
-
 static int HAVEPROC_ = -1;
 #define HAVEPROC (HAVEPROC_ > -1 ? HAVEPROC_ : (HAVEPROC_ = have_proc_fs()))
 #define CHKPROC do { if (!HAVEPROC) return 0; } while (0)
@@ -49,7 +52,6 @@ static int have_proc_fs(void)
   
   return ( !stat(pself, &buf)  && S_ISDIR(buf.st_mode) );
 }
-
 static int select_numeric_dir(const struct dirent *d)
 {
   char *endptr = (char *)d->d_name;
@@ -63,9 +65,35 @@ static int select_numeric_dir(const struct dirent *d)
   /* return true -- this is a numeric dir */
   return 1;
 }
+#endif
+
+static int countlist(void **);
+/*static int find_in_list(void **list, void *val);*/
+static int find_pid_in_list(const pid_t *list, pid_t val);
 
 static char *get_my_exe(void)
 {
+#ifdef OS_OSX
+    size_t cnt;
+    struct kinfo_proc *procs = 0;
+    int err;
+    char *ret = 0;
+    if ( (err=GetBSDProcessList(&procs, &cnt )) ) {
+        fprintf(stderr, "GetBSDProcessList: err %d\n", err);
+        return 0;
+    }
+    if (procs) {
+        int i;
+        pid_t mypid = getpid();
+        for (i = 0; i < (int)cnt; ++i) {
+            if (procs[i].kp_proc.p_pid == mypid) {
+                ret = strdup(procs[i].kp_proc.p_comm);
+            }
+        }
+    }
+    free(procs);
+    return ret;
+#else
   char buf[PATH_MAX+1], myexe[PATH_MAX+1];
   char *ret = 0;
   int count = 0;
@@ -87,6 +115,7 @@ static char *get_my_exe(void)
   if (!ret) { perror("calloc"); return 0; }
   strncpy(ret, myexe, count);
   return ret;
+#endif
 }
 
 /* returns NULL on major error, or a malloc'd pointer to a zero-terminated
@@ -108,6 +137,36 @@ pid_t *pids_of_my_exe(void)
    pid_t array (which may itself be of length 0) on success */
 pid_t *pids_of_exe(const char *exe)
 {
+#ifdef OS_OSX
+    size_t cnt, num = 0;
+    struct kinfo_proc *procs = 0;
+    int err;
+    pid_t *ret = 0;
+    if ( (err=GetBSDProcessList(&procs, &cnt)) ) {
+        fprintf(stderr, "GetBSDProcessList: err %d\n", err);
+        return 0;
+    }
+    if (procs) {
+        int i;
+        for (i = 0; i < (int)cnt; ++i) {
+            if (!strcmp(procs[i].kp_proc.p_comm, exe)) {
+                ++num;
+            }
+        }
+    }
+    if (num) {
+        int i,j;
+        ret = malloc(sizeof(*ret)*(num+1));
+        ret[num] = 0;
+        for (i = 0, j = 0; i < (int)cnt; ++i) {
+            if (!strcmp(procs[i].kp_proc.p_comm,exe)) {
+                ret[j++] = procs[i].kp_proc.p_pid;
+            }
+        }
+    }
+    free(procs);
+    return ret;
+#else
   struct dirent **dirs;
   pid_t *ret, *pcur;
   int n;
@@ -173,6 +232,7 @@ pid_t *pids_of_exe(const char *exe)
   free(dirs);
 
   return ret;
+#endif
 }
 
 int num_procs_of_my_exe(void)
@@ -231,7 +291,7 @@ int num_procs_of_exe_no_children(const char *exe)
   return ret; 
 }
 
-
+#ifndef OS_OSX
 char * grab_full_cmd_name_of_pid(pid_t pid, int *sz)
 {
   char cmdfile[PATH_MAX+1];
@@ -286,9 +346,31 @@ char * grab_my_stripped_cmd_name(int *sz)
 {
   return grab_stripped_cmd_name_of_pid(getpid(), sz);
 }
+#endif
 
 pid_t grab_parent_of_pid(pid_t pid) 
 {
+#ifdef OS_OSX
+    size_t cnt;
+    struct kinfo_proc *procs = 0;
+    int err;
+    pid_t ret = 0;
+    if ( (err=GetBSDProcessList(&procs, &cnt)) ) {
+        fprintf(stderr, "GetBSDProcessList: err %d\n", err);
+        return 0;
+    }
+    if (procs) {
+        int i;
+        for (i = 0; i < (int)cnt; ++i) {
+            if (procs[i].kp_proc.p_pid == pid) {
+                ret = procs[i].kp_eproc.e_ppid;
+                break;
+            }
+        }
+    }
+    free(procs);
+    return ret;
+#else
   char statusfile[PATH_MAX+1];
   FILE *f;
   int ret = 0, s;
@@ -304,6 +386,7 @@ pid_t grab_parent_of_pid(pid_t pid)
   fclose(f);
 
   return (pid_t)ret;
+#endif
 }
 
 
@@ -339,13 +422,13 @@ static int find_pid_in_list(const pid_t *list, pid_t val)
   return -1;
 }
 
+#ifndef OS_OSX
 static char * strsep_ne(char **stringp, const char *delims)
 {
   char * ret;
   while ( (ret = strsep(stringp, delims)) && !*ret );
   return ret;
 }
-
 /* returns a struct ModList of all the modules listed in /proc/modules */
 const struct ModList * get_module_list(void)
 {
@@ -432,3 +515,120 @@ const struct ModList * find_module_in_modlist(const struct ModList *ml,
   }
   return cur;
 }
+#endif
+
+#ifdef OS_OSX
+typedef struct kinfo_proc kinfo_proc;
+
+static int GetBSDProcessList(struct kinfo_proc **procList, size_t *procCount)
+    // Returns a list of all BSD processes on the system.  This routine
+    // allocates the list and puts it in *procList and a count of the
+    // number of entries in *procCount.  You are responsible for freeing
+    // this list (use "free" from System framework).
+    // On success, the function returns 0.
+    // On error, the function returns a BSD errno value.
+{
+    int                 err;
+    kinfo_proc *        result;
+    bool                done;
+    static const int    name[] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    // Declaring name as const requires us to cast it when passing it to
+    // sysctl because the prototype doesn't include the const modifier.
+    size_t              length;
+
+    assert( procList != NULL);
+    assert(*procList == NULL);
+    assert(procCount != NULL);
+
+    *procCount = 0;
+
+    // We start by calling sysctl with result == NULL and length == 0.
+    // That will succeed, and set length to the appropriate length.
+    // We then allocate a buffer of that size and call sysctl again
+    // with that buffer.  If that succeeds, we're done.  If that fails
+    // with ENOMEM, we have to throw away our buffer and loop.  Note
+    // that the loop causes use to call sysctl with NULL again; this
+    // is necessary because the ENOMEM failure case sets length to
+    // the amount of data returned, not the amount of data that
+    // could have been returned.
+
+    result = NULL;
+    done = false;
+    do {
+        assert(result == NULL);
+
+        // Call sysctl with a NULL buffer.
+
+        length = 0;
+        err = sysctl( (int *) name, (sizeof(name) / sizeof(*name)) - 1,
+                      NULL, &length,
+                      NULL, 0);
+        if (err == -1) {
+            err = errno;
+        }
+
+        // Allocate an appropriately sized buffer based on the results
+        // from the previous call.
+
+        if (err == 0) {
+            result = malloc(length);
+            if (result == NULL) {
+                err = ENOMEM;
+            }
+        }
+
+        // Call sysctl again with the new buffer.  If we get an ENOMEM
+        // error, toss away our buffer and start again.
+
+        if (err == 0) {
+            err = sysctl( (int *) name, (sizeof(name) / sizeof(*name)) - 1,
+                          result, &length,
+                          NULL, 0);
+            if (err == -1) {
+                err = errno;
+            }
+            if (err == 0) {
+                done = true;
+            } else if (err == ENOMEM) {
+                assert(result != NULL);
+                free(result);
+                result = NULL;
+                err = 0;
+            }
+        }
+    } while (err == 0 && ! done);
+
+    // Clean up and establish post conditions.
+
+    if (err != 0 && result != NULL) {
+        free(result);
+        result = NULL;
+    }
+    *procList = result;
+    if (err == 0) {
+        *procCount = length / sizeof(kinfo_proc);
+    }
+
+    assert( (err == 0) == (*procList != NULL) );
+
+    return err;
+}
+#endif
+
+#ifdef TSCANPROC
+int main(void)
+{
+    char *myexe = get_my_exe();
+    pid_t *pids;
+    printf("myexe: %s\n", myexe);
+    free(myexe);
+    pids = pids_of_exe("login");
+    printf("pids of login proc:");
+    while (pids && *pids) {
+        printf("%d ", (int)*pids);
+        ++pids;
+    }
+    printf("\n");
+    return 0;
+}
+#endif

@@ -1,11 +1,26 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#if defined(OS_WINDOWS) || defined(WIN32) || defined(WINDOWS)
+#  undef OS_WINDOWS
+#  undef WIN32
+#  undef WINDOWS
+#  define WIN32
+#  define OS_WINDOWS
+#  define WINDOWS
+#endif
 #include "rtos_utility.h"
-#include "rtos_shared_memory.h"
+#ifdef WIN32
+#define MAP_LOCKED 0
+#endif
+#ifndef WIN32
+#  include "rtos_shared_memory.h"
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef WIN32
 #include <sys/ioctl.h>
+#endif
 #include <fcntl.h> 
 #include <unistd.h>
 #include <stdio.h>
@@ -18,19 +33,41 @@
 #include <sstream>
 #include <fstream>
 
-#if defined(WINDOWS) || defined(WIN32)
+#define ERRLOG "err.log"
+//#define PRTERR
+
+#if defined(WIN32)
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
-#else
+#  define mbuff_attach(n,s) (0)
+#  define mbuff_detach(n,s) (0)
+#  define rtai_shm_attach(n,s) (0)
+#  define rtai_shm_detach(n,s) (0)
+#  define RTAI_SHM_DEV ""
+#  define MBUFF_DEV_NAME ""
+#  define MBUFF_DEV_NAME2 ""
+#elif defined(OS_LINUX)
 #  include <sys/ipc.h>
-#  include <sys/shm.h>
 #  include <sys/types.h>
+#  include <sys/msg.h>
+#  include <sys/shm.h>
+#elif defined(OS_OSX)
 #  include <sys/socket.h>
 #  include <sys/un.h>
+#  include <sys/ipc.h>
+#  include <sys/types.h>
+#  include <sys/shm.h>
+#  include <sys/select.h>
+#  include <pthread.h>
+#elif !defined(EMULATOR)
+#  include <sys/ipc.h>
+#  include <sys/types.h>
+#  include <sys/msg.h>
+#  include <sys/shm.h>
 #endif
 
-#ifndef UNIX_PATH_MAX
-#define UNIX_PATH_MAX 108
+#ifndef MIN
+#define MIN(a,b) ( (a) < (b) ? (a) : (b) )
 #endif
 
 namespace 
@@ -41,17 +78,48 @@ namespace
 struct RTOS::Fifo
 {
   long handle; /* EMULATOR:
-                 in Windows the hHandle of the named pipe, 
-                 otherwise the a unix socket dgram socket fd!
+                 Windows: the hHandle of the named pipe, 
+                 Linux: sysv ipc msg id for a msg queue
+                 OSX: the fd of the connectionless socket
                  Non-EMULATOR:
                  the file descriptor of the /dev/rtfXX opened for reading or 
                  writing */
   int key;    /* the minor specified at open time */
-  std::string name; /* in Windows the \\.\pipe\PIPENAME string, otherwise
-                       nothing */
+  std::string name; /* On Windows the \\.\pipe\PIPENAME string, 
+                       On OSX: the path of the named pipe
+                       On Linux: nothing */
   unsigned size, refct;
-  bool unlink;
-  Fifo() : handle(-1), key(-1), size(0), refct(0), unlink(false) {}  
+  volatile bool destroy, needcon;
+  unsigned ctr;
+#ifdef WIN32
+  HANDLE thrd;
+  static DWORD WINAPI winPipeListener(void *);
+#endif
+#ifdef OS_OSX
+  pthread_t thrd;
+  pthread_cond_t cond;
+  pthread_mutex_t mut;
+  static void *osxListenThr(void *);
+  bool osxAccept(bool);
+#endif
+  Fifo() : handle(-1), 
+           key(-1), size(0), refct(0), destroy(false), needcon(false), ctr(0)
+#ifdef WIN32
+, thrd(0) 
+#endif
+{
+#ifdef OS_OSX
+    pthread_cond_init(&cond,0);
+    pthread_mutex_init(&mut,0);
+#endif
+}
+ ~Fifo() 
+ {
+#ifdef OS_OSX
+    pthread_cond_destroy(&cond);
+    pthread_mutex_destroy(&mut);
+#endif
+ }
 };
 
 RTOS::Fifo * const RTOS::INVALID_FIFO = 0;
@@ -65,6 +133,7 @@ namespace {
 RTOS::RTOS RTOS::determine()
 {
   RTOS rtosUsed = Unknown;
+#ifndef EMULATOR
   struct stat statbuf;
   if (!stat("/proc/rtai", &statbuf)) rtosUsed = RTAI;
   else if(!stat("/proc/modules", &statbuf)) {
@@ -88,7 +157,7 @@ RTOS::RTOS RTOS::determine()
       }
     }
   }
-  
+#endif  
   return rtosUsed;
 }
 
@@ -97,8 +166,17 @@ struct ShmInfo
   std::string name;
   size_t size;
   void *address;
+#ifdef WIN32
+  HANDLE hMapFile;
+#endif
   RTOS::RTOS rtos;
-  ShmInfo() : size(0), address(0), rtos(RTOS::Unknown) {}
+
+  ShmInfo() : size(0), address(0), 
+#ifdef WIN32
+              hMapFile(0),
+#endif
+              rtos(RTOS::Unknown)
+ {}
 };
 
 typedef std::map<unsigned long, ShmInfo> ShmMap;
@@ -148,27 +226,29 @@ void *RTOS::shmAttach(const char *SHM_NAME, size_t size, ShmStatus *s, bool crea
 #else
     if (s) *s = NoRTOSFound;    
 #endif
-#if defined(WINDOWS) || defined(WIN32)
+#if defined(WIN32)
   /* in cygwin we don't use sysv ipc *at all* because it requires 
      cygserver be running and it's annoying.  
      
      Instead, will go ahead and use the built-in windows 
      functions for shared memory.. */
-    HANDLE hMapFile;
+    std::string shm_name = std::string("Global\\") + SHM_NAME;
+    HANDLE hMapFile = 0;
     if (create) {
-      hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,   // use paging file
-                                   NULL,       // default security attributes
-                                   PAGE_READWRITE,  // read/write access
-                                   0,           // size: high 32-bits
-                                   size,       // size: low 32-bits
-                                   SHM_NAME); // name of map object
+      hMapFile = CreateFileMappingA(INVALID_HANDLE_VALUE,   // use paging file
+                                    NULL,       // default security attributes
+                                    PAGE_READWRITE,  // read/write access
+                                    0,           // size: high 32-bits
+                                    size,       // size: low 32-bits
+                                    shm_name.c_str()); // name of map object
       
     } else {
-      hMapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, SHM_NAME);
+      hMapFile = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, shm_name.c_str());
     }
     if (hMapFile) {
       ret = (void *)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
-      CloseHandle(hMapFile);
+      //CloseHandle(hMapFile);
+      
     }
 #else
     // note we only attach to existing sysvipc shm
@@ -196,6 +276,9 @@ void *RTOS::shmAttach(const char *SHM_NAME, size_t size, ShmStatus *s, bool crea
       shm_info.name = SHM_NAME;
       shm_info.rtos = rtos;
       shm_info.address = ret;
+#ifdef WIN32
+      shm_info.hMapFile = hMapFile;
+#endif
       if (s) *s = Ok;
     }
   }
@@ -215,12 +298,14 @@ void RTOS::shmDetach(const void *SHM, ShmStatus *s, bool destroy)
         case RTLinux:  mbuff_detach(inf.name.c_str(), inf.address); break;
         case RTAI:     rtai_shm_detach(inf.name.c_str(), inf.address); break;
         case Unknown:  
-#if defined(WINDOWS) || defined(WIN32)
+#if defined(WIN32)
           {
-            HANDLE hMapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, inf.name.c_str());
-            if (hMapFile) {
+              //std::string shm_name = std::string("Global\\") + inf.name.c_str();
+
+            //HANDLE hMapFile = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, shm_name.c_str());
+            if (inf.hMapFile) {
               UnmapViewOfFile(inf.address);
-              CloseHandle(hMapFile);
+              CloseHandle(inf.hMapFile);
             }
           }
 #else
@@ -358,7 +443,7 @@ const char *RTOS::fifoFilePrefix(int rtos)
 }
 
 // opens /dev/rtf[minor no] and returns its fd or 0 on error              
-RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode)
+RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode, std::string *errmsg)
 {
   FIFO f = 0;
 #ifdef EMULATOR
@@ -370,28 +455,77 @@ RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode)
   }
   f->refct++;
 
-#  if defined(WIN32)
+#  ifdef WIN32
   if (!f->name.length()) {
     std::ostringstream os;
     os << fifoFilePrefix() << key;
     f->name = os.str();
   }
   if (f->handle < 0) {
-    int m = GENERIC_READ | GENERIC_WRITE; // always open read/write, no matter what they asked for
-    f->handle = (long)CreateFile(f->name.c_str(), m, 0, NULL, OPEN_EXISTING, 0, NULL); 
+      f->handle = -1;
+      f->destroy = false;
+      DWORD m = 0;
+      if (mode & Read) m |= GENERIC_READ;
+      if (mode & Write) m |= GENERIC_WRITE;
+      m = GENERIC_READ|GENERIC_WRITE;
+      HANDLE h = CreateFileA( f->name.c_str(),   // pipe name 
+                              m, // access mode. GENERIC_READ GENERIC_WRITE etc
+                              0,              // no sharing 
+                              NULL,           // default security attributes
+                              OPEN_EXISTING,  // opens existing pipe 
+                              0,              // default attributes 
+                              NULL);          // no template file
+      if (h != INVALID_HANDLE_VALUE) f->handle = (long)h;
+      else {
+          DWORD err = GetLastError();
+#ifdef PRTERR
+          FILE *fo = fopen(ERRLOG, "a");
+          fprintf(fo, "(PID %d) open error on %s is %d\n", (int)GetCurrentProcessId(), f->name.c_str(), err);
+          fclose(fo);
+#endif
+          if (errmsg) {
+              std::ostringstream os;
+              os << "(PID " << GetCurrentProcessId() << ") open error on " << f->name << " is " << err;
+              *errmsg = os.str();
+          }
+      }
   }
-#  else // unix socket
+#  elif defined(OS_OSX)
+  if (!f->name.length()) {
+      std::ostringstream os;
+      os << fifoFilePrefix() << key;
+      f->name = os.str();
+  }
+  if (f->handle < 0) {
+      f->destroy = false;
+      f->handle = socket(PF_UNIX, SOCK_STREAM, 0);
+      if (f->handle < 0) {
+          int err = errno;
+          perror("socket");
+          if (errmsg) *errmsg = strerror(err);          
+      } else {
+          struct sockaddr_un addr;
+          addr.sun_family = AF_UNIX;
+          snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", f->name.c_str());
+          if (connect(f->handle, (struct sockaddr *)&addr, sizeof(addr))) {
+              int err = errno;
+              perror("connect");
+              close(f->handle);
+              f->handle = -1;
+              if (errmsg) *errmsg = strerror(err);
+          }
+      }
+  }
+#  else // LINUX: unix sysv ipc msg queue
   if (!f->name.length()) {
     std::ostringstream os;
-    os << fifoFilePrefix() << key;
+    os << "sysv msg q: " << key;
     f->name = os.str();
-    f->handle = socket(PF_UNIX, SOCK_DGRAM, 0);
-    if (f->handle > -1) {
-      struct sockaddr_un addr;
-      addr.sun_family = AF_UNIX;
-      strncpy(addr.sun_path, f->name.c_str(), UNIX_PATH_MAX);
-      addr.sun_path[UNIX_PATH_MAX-1] = 0;
-      connect(f->handle, (struct sockaddr *)&addr, sizeof(addr));
+    f->destroy = false;
+    f->handle = ::msgget(key, 0777); 
+    if (f->handle < 0) {
+        if (errmsg) *errmsg = strerror(errno);
+        f->handle = -1;
     }
   }
 #  endif  
@@ -408,7 +542,10 @@ RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode)
   buf[63] = 0;
   int m = mode == Read ? O_RDONLY : (mode == Write ? O_WRONLY : O_RDWR);
   int ret = ::open(buf, m);
-  if (ret < 0) return INVALID_FIFO;
+  if (ret < 0) {
+      if (errmsg) *errmsg = strerror(errno);
+      return INVALID_FIFO;
+  }
   f = new Fifo;
   f->handle = ret;
   f->key = key;
@@ -419,6 +556,86 @@ RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode)
   if (f) { fifos.insert(f); fifo_map[key] = f; }
   return f;
 }
+
+#ifdef WIN32
+DWORD WINAPI RTOS::Fifo::winPipeListener(void *arg)
+{
+    RTOS::Fifo *f = reinterpret_cast<RTOS::Fifo *>(arg);
+    HANDLE h = (HANDLE)f->handle;
+    bool ok = true;
+    DWORD err;
+    BOOL res = ConnectNamedPipe(h, 0);
+    err = GetLastError();
+    ok = res || (!res && err == ERROR_PIPE_CONNECTED);
+    /*        } while (ok);*/
+    if (!ok) {
+#ifdef PRTERR
+        FILE *fo = fopen(ERRLOG, "a");
+        fprintf(fo, "(PID %d) ConnectNamedPipe err: %d\n", (int)GetCurrentProcessId(), (int)err);
+        fclose(fo);
+#endif
+    } else {
+        f->needcon = false;
+        f->destroy = true;
+#ifdef PRTERR
+        FILE *fo = fopen(ERRLOG, "a");
+        fprintf(fo, "(PID %d) ConnectNamedPipe received connection on %s\n", (int)GetCurrentProcessId(), f->name.c_str());
+        fclose(fo);
+#endif
+    }
+    f->thrd = 0;
+    return 0;
+}
+#endif
+
+#ifdef OS_OSX
+
+void *RTOS::Fifo::osxListenThr(void *arg)
+{
+    RTOS::Fifo *f = reinterpret_cast<RTOS::Fifo *>(arg);
+    pthread_detach(pthread_self());
+    int dummy;
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &dummy);
+    while (!f->osxAccept(true)) {
+        pthread_testcancel();
+    }
+    return 0;
+}
+
+bool RTOS::Fifo::osxAccept(bool block)
+{
+    int listen_fd = handle;
+    int fl = 0;
+    if (!block) {
+        fl = fcntl(listen_fd, F_GETFL, 0);
+        fcntl(listen_fd, F_SETFL, fl|O_NONBLOCK);
+    }
+    struct sockaddr_un addr;
+    socklen_t len = sizeof(addr);
+    int dummy;
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &dummy);
+    handle = accept(listen_fd, (struct sockaddr *)&addr, &len);
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &dummy);
+    if (handle > -1) {
+        close(listen_fd);
+        listen_fd = -1;
+        pthread_mutex_lock(&mut);
+        needcon = false;
+        pthread_cond_broadcast(&cond);
+        pthread_mutex_unlock(&mut);
+        return true;
+    } else if (!block && (errno == EWOULDBLOCK || errno == EAGAIN)) {
+        handle = listen_fd;
+    } else {
+        perror("accept");
+        handle = listen_fd;        
+    }
+    if (!block) {
+        fcntl(listen_fd, F_SETFL, fl);
+    }
+    return false;
+}
+#endif
 
 #ifdef EMULATOR
 RTOS::FIFO RTOS::createFifo(unsigned & key_out, unsigned size)
@@ -432,31 +649,70 @@ RTOS::FIFO RTOS::createFifo(unsigned & key_out, unsigned size)
     os << fifoFilePrefix() << ++key_out;    
     f->name = os.str();
     // keep trying various key_out id's until one succeeds
-    h = CreateNamedPipe(f->name.c_str(), 
-                        PIPE_ACCESS_DUPLEX,
-                        PIPE_TYPE_MESSAGE|PIPE_READMODE_MESSAGE|PIPE_WAIT,
-                        PIPE_UNLIMITED_INSTANCES,
-                        size, size, 0, NULL);
+    h = CreateNamedPipeA(f->name.c_str(), 
+                         PIPE_ACCESS_DUPLEX|0x00080000/*|FILE_FLAG_FIRST_PIPE_INSTANCE*/,
+                         PIPE_TYPE_BYTE|PIPE_READMODE_BYTE|PIPE_WAIT/*|PIPE_REJECT_REMOTE_CLIENTS*/,
+                         PIPE_UNLIMITED_INSTANCES,
+                         size, size, 0,                      
+                         (LPSECURITY_ATTRIBUTES)NULL);
   } while (h == INVALID_HANDLE_VALUE);
-  f->handle = (long)h;
+  f->handle = (long)h;  
+  f->needcon = true;
+  f->thrd = CreateThread(0, 0, RTOS::Fifo::winPipeListener, (void *)f, 0, 0);
+  if (f->thrd) {
+      // noop
+  } else {
+      f->destroy = false;
+      CloseHandle(h);
+      f->handle = -1;
+  }
+      
+  
 #else  //!WIN32
-  static int fifo_ids = getpid()*1000;
-  key_out = ++fifo_ids;
+#  ifdef OS_OSX
+  f->handle = socket(PF_UNIX, SOCK_STREAM, 0);
+  if (f->handle >= 0) {
+      static unsigned fifo_ids = 11211; // zip code of Williamsburg, Brooklyn
+      std::ostringstream os;
+      key_out = fifo_ids++;
+      os << fifoFilePrefix() << key_out;
+      f->name = os.str();
+      struct sockaddr_un addr;
+      addr.sun_family = AF_UNIX;
+      snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", f->name.c_str());
+      remove(addr.sun_path);
+      if ( bind(f->handle, (struct sockaddr *)&addr, sizeof(addr)) ) {
+          perror("bind");
+          close(f->handle);
+          f->handle = -1;
+      } else {
+          if (listen(f->handle, 1)) {
+              perror("listen");
+              close(f->handle);
+              f->handle = -1;
+          } else {
+              f->destroy = true;
+              f->needcon = true;
+              pthread_create(&f->thrd, 0, RTOS::Fifo::osxListenThr, f);
+          }
+      }
+  }
+#  elif defined(OS_LINUX) // Linux
+  static int fifo_ids = 11211; // zip code of williamsburg, brooklyn :)
+  key_out = fifo_ids++;
   std::ostringstream os;
-  os << fifoFilePrefix() << key_out;
+  os << "sys v msg q: " << key_out;
   f->name = os.str();
-  f->handle = socket(PF_UNIX, SOCK_DGRAM, 0);
-  struct sockaddr_un addr;
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, f->name.c_str(), UNIX_PATH_MAX);
-  addr.sun_path[UNIX_PATH_MAX-1] = 0;
-  int err = bind(f->handle, (struct sockaddr *)&addr, sizeof(addr)); // bind socket to /tmp/file..  
-  if (err) {    
+  f->handle = ::msgget(key_out, IPC_CREAT|0777);
+  f->destroy = true;
+  if (f->handle < 0) {    
     closeFifo(f); 
     return INVALID_FIFO;
   }
-  f->unlink = true;
-#endif
+#  else
+#    error Define one of OS_WINDOWS, OS_LINUX, or OS_OSX
+#  endif // ifdef OSX
+#endif // ifdef WIN32
 
   if (f->handle < 0) {
     closeFifo(f);
@@ -470,7 +726,7 @@ RTOS::FIFO RTOS::createFifo(unsigned & key_out, unsigned size)
   fifo_map[f->key] = f;
   return f;
 }
-#endif
+#endif // EMULATOR
 
 void RTOS::closeFifo(FIFO f)
 {
@@ -478,15 +734,26 @@ void RTOS::closeFifo(FIFO f)
 #ifdef EMULATOR
 #  ifdef WIN32
   if (!f->refct && f->handle != (long)INVALID_HANDLE_VALUE) {
+      if (f->destroy) DisconnectNamedPipe((HANDLE)f->handle);
+      if (f->thrd) TerminateThread(f->thrd, 0), f->thrd = 0;
       CloseHandle((HANDLE)f->handle);
   }
-#  else
+#  elif defined(OS_LINUX)
   if (!f->refct) { 
-    ::shutdown(f->handle, SHUT_RDWR);
-    ::close(f->handle);
+      struct msqid_ds dummy;
+      if (f->destroy) 
+          msgctl(f->handle, IPC_RMID, &dummy);
     f->handle = -1;
-    if (f->unlink)
-      ::unlink(f->name.c_str());
+  }
+#  else // OS_OSX
+  if (!f->refct) { 
+      if (f->needcon && f->destroy) {
+          pthread_cancel(f->thrd);
+          pthread_cond_broadcast(&f->cond);
+      }
+      close(f->handle);
+      if (f->destroy) remove(f->name.c_str());
+      f->handle = -1;
   }
 #  endif
 #else /* !EMULATOR */
@@ -510,53 +777,228 @@ void RTOS::destroyAllFifos()
   fifo_map.clear();
 }
 
-int RTOS::writeFifo(FIFO f, const void *buf, unsigned long bufsz)
+int RTOS::writeFifo(FIFO f, const void *buf, unsigned long bufsz, bool block)
 {
   int ret = -1;
-#ifdef WIN32  
-  DWORD nwrit = 0;
+#ifndef EMULATOR
+  (void)block;
+  ret = ::write(f->handle, buf, bufsz);
+#elif defined(WIN32)
+  DWORD nwrit = 0, oldstate = 0, state = 0;
+
+  if (f->needcon) {
+#  ifdef PRTERR
+          FILE *fo = fopen(ERRLOG, "a");
+          fprintf(fo, "(PID %d) writeFifo pipe %s is not connected? \n", (int)GetCurrentProcessId(), f->name.c_str());
+          fclose(fo);
+#  endif
+          if (!block) return 0;
+          else WaitNamedPipeA(f->name.c_str(), NMPWAIT_WAIT_FOREVER);
+  }
+  
+  if (!block) {      
+      GetNamedPipeHandleState((HANDLE)f->handle,
+                              &oldstate,
+                              0, 0, 0, 0, 0);
+      state = oldstate;
+      state &= ~(PIPE_WAIT);
+      state |= PIPE_NOWAIT;
+      SetNamedPipeHandleState((HANDLE)f->handle, &state, 0, 0);
+  }
   BOOL fSuc = WriteFile((HANDLE)f->handle, (void *)buf, bufsz, &nwrit, NULL);
   if (fSuc) ret = nwrit;  
-#else
-#  ifdef EMULATOR
-  ret = ::send(f->handle, buf, bufsz, 0);
-#  else
-  ret = ::write(f->handle, buf, bufsz);
+  else {
+#  ifdef PRTERR
+      DWORD err = GetLastError();
+      FILE *fo = fopen(ERRLOG, "a");
+      fprintf(fo, "(PID %d) write error on %s is %d\n", (int)GetCurrentProcessId(), f->name.c_str(), err);
+      fclose(fo);
 #  endif
-#endif
+  }
+  if (!block) {      
+      SetNamedPipeHandleState((HANDLE)f->handle, &oldstate, 0, 0);
+  }
+#elif defined(OS_OSX)
+  if (f->needcon) {
+      if (!block) return 0;
+      pthread_mutex_lock(&f->mut);      
+      while (f->needcon && f->refct) {
+          pthread_cond_wait(&f->cond, &f->mut);
+      }
+      pthread_mutex_unlock(&f->mut);
+      if (!f->refct) return -1;
+  }
+  int fl = 0;
+  if (!block) {
+      fl = fcntl(f->handle, F_GETFL, 0);
+      fcntl(f->handle, F_SETFL, fl|O_NONBLOCK);
+  }
+  long sz;
+  bool tryagain;
+  do {
+      tryagain = false;
+      sz = send(f->handle, buf, bufsz, 0);      
+      if (sz < 0) {
+          int err = errno;
+          perror("send");
+          if (!block && (err == EAGAIN || err == ENOBUFS) ) ret = 0;
+          else if (block && (err == ENOBUFS || err == EAGAIN)) {
+              tryagain = true;
+              fd_set fds;
+              FD_ZERO(&fds);
+              FD_SET(f->handle, &fds);
+              if ( select(f->handle+1, 0, &fds, 0, 0) < 0 ) {
+                  tryagain = false;              
+                  perror("select");
+              }
+          }
+      } else if (sz > -1) 
+          ret = sz;
+  } while (tryagain);
+  if (!block) {
+      fcntl(f->handle, F_SETFL, fl);
+  }
+#elif defined(OS_LINUX)
+  struct msgbuf {
+      long mtype;
+      char mtext[1];
+  };
+  char mbuf[64*1024]; // 64kb buffer
+  struct msgbuf *mb = reinterpret_cast<struct msgbuf *>(mbuf);
+  do { mb->mtype = ++f->ctr; } while(!mb->mtype);  
+  unsigned n = MIN(bufsz, sizeof(mbuf)-sizeof(long));
+  memcpy(mb->mtext, buf, n);
+  int msgflg = 0;
+  if (!block) msgflg |= IPC_NOWAIT;
+  ret = msgsnd(f->handle, mb, n, msgflg);
+  if (ret == 0) ret = n;
+  if (ret < 0 && !block && errno == EAGAIN) ret = 0;
+//   if (ret < 0) {
+//       fprintf(stderr, "error in RTOS::writeFifo: %s\n", strerror(errno));
+//   }
+#else
+#  error Emulator mode: Need to define one of OS_WINDOWS, OS_LINUX, or OS_OSX
+#endif  
   return ret;
 }
 
-int RTOS::readFifo(FIFO f, void *buf, unsigned long bufsz)
+int RTOS::readFifo(FIFO f, void *buf, unsigned long bufsz, bool block)
 {
   int ret = -1;
-#ifdef WIN32  
+#ifndef EMULATOR
+  (void)block;
+  ret = ::read(f->handle, buf, bufsz);
+#elif defined(WIN32)
+  DWORD state = 0, oldstate = 0, err;
+  if (f->needcon) {
+#  ifdef PRTERR
+          FILE *fo = fopen(ERRLOG, "a");
+          fprintf(fo, "(PID %d) readFifo pipe %s is not connected? \n", (int)GetCurrentProcessId(), f->name.c_str());
+          fclose(fo);
+#  endif
+          if (!block) return 0;
+          else WaitNamedPipeA(f->name.c_str(), NMPWAIT_WAIT_FOREVER);
+  }
+  if (!block) {
+      if (!GetNamedPipeHandleState((HANDLE)f->handle,
+                                   &oldstate,
+                                   0, 0, 0, 0, 0)) {
+#  ifdef PRTERR
+          FILE *fo = fopen(ERRLOG, "a");
+          err = GetLastError();
+          fprintf(fo, "(PID %d) GetNamedPipeHandleState error on %s is %d (block=%d)\n", (int)GetCurrentProcessId(), f->name.c_str(), err, block?1:0);
+          fclose(fo);
+#  endif
+      }
+      state = oldstate;
+      state &= ~(PIPE_WAIT);
+      state |= PIPE_NOWAIT;
+      if (!SetNamedPipeHandleState((HANDLE)f->handle, &state, 0, 0)) {
+#  ifdef PRTERR
+          FILE *fo = fopen(ERRLOG, "a");
+          err = GetLastError();
+          fprintf(fo, "(PID %d) SetNamedPipeHandleState error on %s is %d (block=%d)\n", (int)GetCurrentProcessId(), f->name.c_str(), err, block?1:0);
+          fclose(fo);
+#  endif
+      }
+  }
   DWORD nread = 0;
   BOOL fSuc = ReadFile((HANDLE)f->handle, (void *)buf, bufsz, &nread, NULL);
+  err = GetLastError();
   if (fSuc) ret = nread;
-#else
-#  ifdef EMULATOR
-  ret = ::recv(f->handle, buf, bufsz, 0);
-#  else
-  ret = ::read(f->handle, buf, bufsz);
+  else if (!err 
+           || (err == ERROR_PIPE_NOT_CONNECTED && !block)
+           || (err == ERROR_NO_DATA && !block)) ret = 0;
+  else {
+#  ifdef PRTERR
+      FILE *fo = fopen(ERRLOG, "a");
+      fprintf(fo, "(PID %d) read error on %s is %d (block=%d)\n", (int)GetCurrentProcessId(), f->name.c_str(), err, block?1:0);
+      fclose(fo);
 #  endif
+  }
+  if (!block) {
+      SetNamedPipeHandleState((HANDLE)f->handle, &oldstate, 0, 0);
+  }
+#elif defined(OS_OSX)
+  if (f->needcon) {
+      if (!block) return 0;
+      pthread_mutex_lock(&f->mut);      
+      while (f->needcon && f->refct) {
+          pthread_cond_wait(&f->cond, &f->mut);
+      }
+      pthread_mutex_unlock(&f->mut);
+      if (!f->refct) return -1;
+  }
+  int fl = 0;
+  if (!block) {
+      fl = fcntl(f->handle, F_GETFL, 0);
+      fcntl(f->handle, F_SETFL, fl|O_NONBLOCK);
+  }
+  int sz = recv(f->handle, buf, bufsz, 0);
+  if (sz < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && !block) ret = 0;
+  else if (sz > -1) ret = sz;
+  else {
+      perror("recv");      
+  }
+  if (!block) {
+      fcntl(f->handle, F_SETFL, fl);
+  }
+#elif defined(OS_LINUX)
+  struct msgbuf {
+      long mtype;
+      char mtext[1];
+  };
+  char mbuf[64*1024]; // 64kb buffer
+  struct msgbuf *mb = reinterpret_cast<struct msgbuf *>(mbuf);
+  mb->mtype = 0;
+  int msgflg = MSG_NOERROR;
+  if (!block) msgflg |= IPC_NOWAIT;
+  unsigned n = MIN(bufsz,sizeof(mbuf)-sizeof(long));
+  ret = msgrcv(f->handle, mb, n, 0, msgflg);
+  if (ret > -1) memcpy(buf, mb->mtext, MIN(((unsigned)ret), bufsz));
+  else if (ret < 0 && !block && errno == ENOMSG) ret = 0;
+  else {
+      printf("error reading fifo %d: %s\n", f->key, strerror(errno));
+  }
+#else 
+#  error Emulator mode: Need to define one of OS_WINDOWS, OS_LINUX, or OS_OSX 
 #endif
   return ret;
 }
 
-int RTOS::readFifo(unsigned key, void *buf, unsigned long bufsz)
+int RTOS::readFifo(unsigned key, void *buf, unsigned long bufsz, bool block)
 {
   std::map<unsigned, Fifo *>::iterator it = fifo_map.find(key);
   if (it != fifo_map.end()) 
-    return readFifo(it->second, buf, bufsz);  
+    return readFifo(it->second, buf, bufsz, block);
   return -1;
 }
 
-int RTOS::writeFifo(unsigned key, const void *buf, unsigned long bufsz)
+int RTOS::writeFifo(unsigned key, const void *buf, unsigned long bufsz, bool block)
 {
   std::map<unsigned, Fifo *>::iterator it = fifo_map.find(key);
   if (it != fifo_map.end()) 
-    return writeFifo(it->second, buf, bufsz);  
+    return writeFifo(it->second, buf, bufsz, block);
   return -1;
 }
 
@@ -570,15 +1012,47 @@ void RTOS::closeFifo(unsigned key)
 int RTOS::fifoNReadyForReading(FIFO f)
 {
   int num = -1;
-#ifdef WIN32
+#if !defined(EMULATOR) || defined(OS_OSX)
+  ioctl(f->handle, FIONREAD, &num); // how much data is there?
+#elif defined(WIN32)
   DWORD avail;
-  if (PeekNamedPipe((HANDLE)f->handle, 0, 0, 0, &avail, 0)) num = avail;  
+  if (f->needcon) {
+#  ifdef PRTERR
+          FILE *fo = fopen(ERRLOG, "a");
+          fprintf(fo, "(PID %d) fifoNReadyForReading pipe %s is not connected? \n", (int)GetCurrentProcessId(), f->name.c_str());
+          fclose(fo);
+#  endif
+          return 0;
+  }
+
+  if (PeekNamedPipe((HANDLE)f->handle, 0, 0, 0, &avail, 0)) {
+      num = avail;
+  } else {
+#  ifdef PRTERR
+      DWORD err = GetLastError();
+      FILE *fo = fopen(ERRLOG, "a");
+      fprintf(fo, "(PID %d) PeekNamedPipe error on %s is %d\n", (int)GetCurrentProcessId(), f->name.c_str(), err);
+      fclose(fo);      
+#  endif
+  }
+#elif defined(OS_LINUX)
+  struct msqid_ds md;
+  memset(&md, 0, sizeof(md));
+  msgctl(f->handle, IPC_STAT, &md);
+  num = md.msg_cbytes;
 #else
-  ::ioctl(f->handle, FIONREAD, &num); // how much data is there?
-#endif
+#  error Emulator mode: Need to define one of OS_WINDOWS, OS_LINUX, or OS_OSX 
+#endif /* def WIN32 */
   return num;
 }
 
+int RTOS::fifoNReadyForReading(unsigned key)
+{
+  std::map<unsigned, Fifo *>::iterator it = fifo_map.find(key);
+  if (it != fifo_map.end()) 
+    return fifoNReadyForReading(it->second);
+  return -1;
+}
 
 const char *RTOS::statusString(ShmStatus s)
 {

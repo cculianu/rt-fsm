@@ -5,6 +5,28 @@
  * License: GPL v2 or later.
  */
 
+#ifdef EMULATOR
+#  include "extra_mathfuncs.h"
+#  include "Version.h" /* for VersionSTR and VersionNUM macros */
+#  define NEED_RT_DEFINES
+#  include "kernel_emul.h"
+#  undef NEED_RT_DEFINES
+#  include "FSM.h"
+#  include "FSMExternalTrig.h" /* for the external triggering -- for now it's the sound stuff.. */
+#  include "FSMExternalTime.h" /* for the external time shm stuff */
+#  include "deflate_helper.h"
+#  define MODULE_NAME "RealtimeExpFSM"
+#  define NO_EMBC_TYPEDEFS
+#  include "EmbC.h"
+#  if defined(OS_LINUX) || defined(OS_OSX) 
+#    include <dlfcn.h>
+#  else
+#    include "windows_dlemul.h"
+#  endif
+#  include <unistd.h>
+
+#else /* ! EMULATOR */
+
 #include <linux/module.h> 
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -75,6 +97,8 @@ static __inline__ int __ffs(int x) { return ffs(x)-1; }
 #define NO_EMBC_TYPEDEFS
 #include "EmbC.h"
 
+#endif /* !EMULATOR */
+
 #define LOG_MSG(x...) rt_printk(KERN_INFO MODULE_NAME ": "x)
 #define WARNING(x...) rt_printk(KERN_WARNING MODULE_NAME ": WARNING - " x)
 #define ERROR(x...) rt_printk(KERN_ERR MODULE_NAME": ERROR - " x)
@@ -102,13 +126,16 @@ static int initFifos(void);
 static int initTaskPeriod(void);
 static int initRT(void);
 static int initComedi(void);
+static void resetGlobalVars(void);
 static void reconfigureIO(void); /* helper that reconfigures DIO channels 
                                     for INPUT/OUTPUT whenever the state 
                                     matrix, etc changes, computes ai_chans_in_use_mask, di_chans_in_use_mask, etc */
 static int initAISubdev(void); /* Helper for initComedi() */
 static int initAOSubdev(void); /* Helper for initComedi() */
+#ifndef EMULATOR
 static int setupComediCmd(void);
 static void restartAIAcquisition(long flags);
+#endif
 static void cleanupAOWaves(volatile struct FSMSpec *);
 struct AOWaveINTERNAL;
 static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, int bufnum);
@@ -116,8 +143,10 @@ static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, in
 /* The callback called by rtos scheduler every task period... */
 static void *doFSM (void *);
 
-/* Called whenever the /proc/RealtimeFSM proc file is read */
+/* Called whenever the /proc/RealtimeFSM proc file is read, or, if EMULATOR,
+   called to simulate reading /proc/RealtimeFSM. */
 static int myseq_show (struct seq_file *m, void *d);
+#ifndef EMULATOR
 static int myseq_open(struct inode *, struct file *);
 static struct file_operations myproc_fops =
 {
@@ -126,6 +155,7 @@ static struct file_operations myproc_fops =
   llseek:  seq_lseek,
   release: single_release
 };
+#endif
 
 module_init(init);
 module_exit(cleanup);
@@ -165,6 +195,13 @@ char *ai = DEFAULT_AI;
 #define STR(x) STR1(x)
 #endif
 
+#ifdef __KERNEL__
+#define MODULE_PARMS_BEGIN
+#define MODULE_PARMS_END
+#endif
+
+MODULE_PARMS_BEGIN
+
 module_param(minordev, int, 0444);
 MODULE_PARM_DESC(minordev, "The minor number of the comedi device to use.");
 module_param(minordev_ai, int, 0444);
@@ -183,6 +220,8 @@ module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "If true, print extra (cryptic) debugging output.  Defaults to 0.");
 module_param(ai, charp, 0444);
 MODULE_PARM_DESC(ai, "This can either be \"synch\" or \"asynch\" to determine whether we use asynch IO (comedi_cmd: faster, less compatible) or synch IO (comedi_data_read: slower, more compatible) when acquiring samples from analog channels.  Note that for asynch to work properly it needs a dedicated realtime interrupt.  Defaults to \""DEFAULT_AI"\".");
+
+MODULE_PARMS_END
 
 #define FIRST_IN_CHAN(f) (rs[(f)].states->routing.first_in_chan)
 #define NUM_IN_CHANS(f) (rs[(f)].states->routing.num_in_chans)
@@ -247,7 +286,9 @@ enum { SYNCH_MODE = 0, ASYNCH_MODE, UNKNOWN_MODE };
 #define UNLOCK_DO_ALL() do { do_chans_locked_mask = 0; } while (0)
 #define IS_DO_CHAN_LOCKED(chan) (do_chans_locked_mask&(1<<chan))
 
+#ifndef EMULATOR
 static struct proc_dir_entry *proc_ent = 0;
+#endif
 static atomic_t rt_task_stop = ATOMIC_INIT(0); /* Internal variable to stop the RT 
                                                   thread. */
 static atomic_t rt_task_running = ATOMIC_INIT(0);
@@ -442,7 +483,7 @@ struct RunState {
     struct StateHistory history;             /* Our state history record.   */
 };
 
-volatile static struct RunState rs[NUM_STATE_MACHINES];
+static volatile struct RunState rs[NUM_STATE_MACHINES];
 
   /** fsmspec->aowaves points to this struct -- analog output wave data -- 
    *  Note: to avoid memory leaks make sure initRunState() is never called when
@@ -499,8 +540,10 @@ static void updateHasSchedWaves(FSMID_t);
 static void updateDefaultExtObjNum(FSMID_t);
 
 #ifndef RTAI
+#ifndef EMULATOR
 /* just like clock_gethrtime but instead it used timespecs */
 static inline void clock_gettime(clockid_t clk, struct timespec *ts);
+#endif
 #endif
 static inline void nano2timespec(hrtime_t time, struct timespec *t);
 #ifndef RTAI
@@ -519,7 +562,9 @@ static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num);
 static const char *int64_to_cstr(int64 in);
 /* this function is reentrant! */
 static int int64_to_cstr_r(char *buf, unsigned bufsz, int64 num);
+#ifndef EMULATOR
 static unsigned long transferCircBuffer(void *dest, const void *src, unsigned long offset, unsigned long bytes, unsigned long bufsize);
+#endif
 /* Place an unsigned int into the debug fifo.  This is currently used to
    debug AI 0 reads.  Only useful for development.. */
 static inline void putDebugFifo(unsigned value);
@@ -527,7 +572,9 @@ static void printStats(void);
 static void buddyTaskHandler(void *arg);
 static void buddyTaskComediHandler(void *arg);
 static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime_t task_period_ns);
+#ifndef EMULATOR
 static void tallyCbEosCycStats(hrtime_t cyc_time);
+#endif
 static void tallyCycleTime(hrtime_t t0, hrtime_t tf);
 static char *cycleStr(void);
 /*-----------------------------------------------------------------------------*/
@@ -575,13 +622,17 @@ int init (void)
       cleanup();  
       return retval > 0 ? -retval : retval;
     }  
-  
+
+#ifdef EMULATOR  
+  fsm_seq_show_func = myseq_show;
+#else
   proc_ent = create_proc_entry(MODULE_NAME, S_IFREG|S_IRUGO, 0);
   if (proc_ent) {  /* if proc_ent is zero, we silently ignore... */
     proc_ent->owner = THIS_MODULE;
     proc_ent->uid = 0;
     proc_ent->proc_fops = &myproc_fops;
   }
+#endif
 
   LOG_MSG("started successfully at %d Hz.\n", task_rate);
   
@@ -592,8 +643,12 @@ void cleanup (void)
 {
   FSMID_t f;
 
+#ifdef EMULATOR
+  fsm_seq_show_func = 0;
+#else
   if (proc_ent)
     remove_proc_entry(MODULE_NAME, 0);
+#endif
 
   if (atomic_read(&rt_task_running)) {
     atomic_set(&rt_task_stop, 1);
@@ -667,12 +722,42 @@ void cleanup (void)
   /*stop_rt_timer(); NB: leave timer running just in case we have other threads in other modules.. */
 #endif
   printStats();
+
+  resetGlobalVars(); /* this is needed for the emulator whereby we may actually re-run the same fsm */
+}
+
+void resetGlobalVars(void)
+{
+    atomic_set(&rt_task_stop, 0);
+    atomic_set(&rt_task_running, 0);
+    memset(subdev, 0, sizeof subdev);
+    subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0, n_dio_subdevs = 0, n_chans_dio_total = 0;
+    memset(n_chans_dio, 0, sizeof n_chans_dio);
+    fsm_cycle_long_ct = 0, fsm_wakeup_jittered_ct = 0, fsm_cycles_skipped = 0, ai_n_overflows = 0;
+    cb_eos_skips = 0, cb_eos_skipped_scans = 0, cb_eos_num_scans = 0;
+    cb_eos_cyc_max = ~0ULL, cb_eos_cyc_min = 0x7fffffffffffffffLL, cb_eos_cyc_avg = 0, cb_eos_cyc_ct = 0;
+    dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;
+    ai_thresh_hi = 0,  ai_thresh_low = 0;
+    memset(ai_samples, 0, sizeof(ai_samples));
+    memset(ai_samples_volts, 0, sizeof(ai_samples));
+    cycle = 0;
+    memset(trig_cycle, 0, sizeof trig_cycle);
+    didInitRunStates = 0;
+    lat_min = 0x7fffffffffffffffLL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0, 
+        cyc_min = 0x7fffffffffffffffLL, cyc_max = ~0ULL, cyc_avg = 0, cyc_cur = 0;
+    memset(ai_thresh_hi_ct, 0, sizeof ai_thresh_hi_ct);
+    memset(ai_thresh_lo_ct, 0, sizeof ai_thresh_lo_ct);
+    memset(ao_write_ct, 0, sizeof ao_write_ct);
+    memset(di_thresh_hi_ct, 0, sizeof di_thresh_hi_ct);
+    memset(di_thresh_lo_ct, 0, sizeof di_thresh_lo_ct);
+    memset(do_write_hi_ct, 0, sizeof do_write_hi_ct);
+    memset(do_write_lo_ct, 0, sizeof do_write_lo_ct);
 }
 
 static void printStats(void)
 {
   if (debug && cb_eos_skips) 
-    DEBUG("skipped %u times, %u scans\n", cb_eos_skips, cb_eos_skipped_scans);
+      DEBUG("skipped %lu times, %lu scans\n", cb_eos_skips, cb_eos_skipped_scans);
 
   LOG_MSG("unloaded successfully after %s cycles.\n", cycleStr());
 }
@@ -708,6 +793,10 @@ static int initShm(void)
 
   extTrigShm = mbuff_attach(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
   if (!extTrigShm) {
+      extTrigShm = mbuff_alloc(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
+      if (extTrigShm) memset(extTrigShm, 0, sizeof(*extTrigShm));
+  }
+  if (!extTrigShm) {
     LOG_MSG("Could not attach to SHM %s.\n", FSM_EXT_TRIG_SHM_NAME);
     return -ENOMEM;
   } else if (!FSM_EXT_TRIG_SHM_IS_VALID(extTrigShm)) {
@@ -716,6 +805,10 @@ static int initShm(void)
   }
 
   extTimeShm = mbuff_attach(FSM_EXT_TIME_SHM_NAME, FSM_EXT_TIME_SHM_SIZE);
+  if (!extTimeShm) {
+      extTimeShm = mbuff_alloc(FSM_EXT_TIME_SHM_NAME, FSM_EXT_TIME_SHM_SIZE);
+      if (extTimeShm) memset(extTimeShm, 0, sizeof(*extTimeShm));
+  }
   if (!extTimeShm) {
     LOG_MSG("Could not attach to SHM %s.\n", FSM_EXT_TIME_SHM_NAME);
     return -ENOMEM;    
@@ -1066,8 +1159,14 @@ static int initAISubdev(void)
 
   /* Setup comedi_cmd */
   if ( AI_MODE == ASYNCH_MODE ) {
+#ifndef EMULATOR
     int err = setupComediCmd();
     if (err) return err;
+#else
+    /* force SYNCH_MODE */
+    WARNING("Asynch acquisition mode unsupported in Emulator, forcing synchronous acquisition!");
+    ai_mode = SYNCH_MODE;
+#endif
   }
 
   return 0;
@@ -1157,6 +1256,7 @@ static int initAOSubdev(void)
   return 0;
 }
 
+#ifndef EMULATOR
 static inline unsigned long transferCircBuffer(void *dest, 
                                                const void *src, 
                                                unsigned long offset, 
@@ -1382,6 +1482,7 @@ static int setupComediCmd(void)
   
   return 0;
 }
+#endif /*ndef EMULATOR*/
 
 static int initTaskPeriod(void)
 {
@@ -1522,10 +1623,12 @@ static int doSanityChecksRuntime(FSMID_t f)
   return 0;
 }
 
+#ifndef EMULATOR
 static int myseq_open(struct inode *i, struct file *f)
 {
   return single_open(f, myseq_show, 0);
 }
+#endif
 
 static int myseq_show (struct seq_file *m, void *dummy)
 { 
@@ -1935,7 +2038,7 @@ static void *doFSM (void *arg)
               char buf[22];
               strncpy(buf, uint64_to_cstr(rs[f].current_ts), 21);
               buf[21] = 0;
-              DEBUG_VERB("timer expired in state %u t_us: %u timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
+              DEBUG_VERB("timer expired in state %u t_us: %lu timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
             }
             
           }
@@ -2526,6 +2629,8 @@ static void handleFifos(FSMID_t f)
       return;
     }
       
+    DEBUG_VERB("fifo in for fsm %d got msg %d\n", (int)f, (int)msg->id);
+
     switch (msg->id) {
         
     case RESET_:
@@ -2643,7 +2748,15 @@ static void handleFifos(FSMID_t f)
       
     case SETAIMODE: /* reset AI mode to/from asynch/synch -- may (re)start the comedi cmd */
       ai_mode = msg->u.ai_mode_is_asynch ? ASYNCH_MODE : SYNCH_MODE;
+#ifndef EMULATOR
       restartAIAcquisition(0);
+#else
+      if (AI_MODE == ASYNCH_MODE) {
+          /* force SYNCH_MODE */
+          WARNING("Asynch acquisition mode unsupported in Emulator, forcing synchronous acquisition!");
+          ai_mode = SYNCH_MODE;      
+      }
+#endif
       do_reply = 1;
       break;
       
@@ -2776,7 +2889,7 @@ static void handleFifos(FSMID_t f)
         break;
 
       default:
-        rt_printk(MODULE_NAME": Got unknown msg id '%d' in handleFifos(%u)!\n", 
+        ERROR_INT("Got unknown msg id '%d' in handleFifos(%u)!\n", 
                    msg->id, f);
         do_reply = 0;
         break;
@@ -2997,12 +3110,14 @@ static void doDAQ(void)
 }
 
 #ifndef RTAI
+#ifndef EMULATOR
 /* just like clock_gethrtime but instead it used timespecs */
 static inline void clock_gettime(clockid_t clk, struct timespec *ts)
 {
   hrtime_t now = clock_gethrtime(clk);
   nano2timespec(now, ts);  
 }
+#endif
 #endif
 
 static inline void nano2timespec(hrtime_t time, struct timespec *t)
@@ -3014,7 +3129,7 @@ static inline void nano2timespec(hrtime_t time, struct timespec *t)
 #ifndef RTAI /* RTAI already has a definition of this */
 static inline unsigned long long ulldiv(unsigned long long ull, unsigned long uld, unsigned long *r)
 {
-        *r = do_div(ull, uld);
+        *r = do_div(ull, uld);        
         return ull;
 }
 #endif
@@ -3433,12 +3548,76 @@ static void buddyTaskHandler(void *arg)
     *embc = 0;/* make SURE the ptr starts off NULL, this prevents userspace from crashing us.. */
     
     if (fsm->type == FSM_TYPE_EMBC) {
-        *embc = (struct EmbC *) mbuff_attach(name, sizeof(**embc));
-        
-        if (!*embc) {
-            ERROR("Failed to attach to FSM Shm %s!\n", name);
+#ifdef EMULATOR
+#  if defined(OS_LINUX) || defined(OS_OSX) || defined(OS_WINDOWS)
+        const char soname[sizeof(fsm->name)+9];
+        int (*initfunc)(void) = 0;
+        void *(**mbuf_a)(const char *, unsigned long) = 0;
+        void (**mbuf_f)(const char *, void *) = 0;
+        int (**p_f)(const char *, ...) = 0;
+
+#ifdef OS_WINDOWS
+        snprintf(soname, sizeof(soname), "%s%s.dll", GetTmpPath(), name);
+#       define RTLD_LOCAL 0
+#else
+        snprintf(soname, sizeof(soname), "/tmp/%s.so", name);
+#endif
+        fsm->handle = dlopen(soname, RTLD_NOW|RTLD_LOCAL);
+        if (!fsm->handle) {
+            ERROR("Failed to load the FSM object `%s': %s\n", soname, dlerror());
             isok = 0;
-        } 
+        } else { /* unlink the .so here ! */
+            LOG_MSG("`%s' loaded successfully, deleting object from disk to prevent filesystem clutter\n", soname);
+            unlink(soname);
+        }
+        if (isok) {
+            initfunc = dlsym(fsm->handle, "init");
+            if (!initfunc) {
+                ERROR("Failed to find the init function in `%s': %s\n", soname, dlerror());
+                unloadDetachFSM(fsm);
+                isok = 0;
+            }                
+            mbuf_a = dlsym(fsm->handle, "mbuff_alloc");
+            if (!mbuf_a) {
+                ERROR("Failed to find the mbuff_alloc function in `%s': %s\n", soname, dlerror());
+                unloadDetachFSM(fsm);
+                isok = 0;
+            }                
+            mbuf_f = dlsym(fsm->handle, "mbuff_free");
+            if (!mbuf_f) {
+                ERROR("Failed to find the mbuff_free function in `%s': %s\n", soname, dlerror());
+                unloadDetachFSM(fsm);
+                isok = 0;
+            }
+            p_f = dlsym(fsm->handle, "rt_printk");
+            if (!mbuf_f) {
+                ERROR("Failed to find the rt_printk function in `%s': %s\n", soname, dlerror());
+                unloadDetachFSM(fsm);
+                isok = 0;
+            }
+            if (isok) {
+                *mbuf_a = mbuff_alloc;
+                *mbuf_f = mbuff_free;
+                *p_f = rt_printk;
+            }
+        }
+        if (isok && initfunc()) {
+            ERROR("init() for `%s' returned nonzero\n", soname);
+            unloadDetachFSM(fsm);
+            isok = 0;
+        }
+#  else
+#    error Need to implement loading FSM for this platform!
+#  endif
+#endif
+        if (isok) {
+            *embc = (struct EmbC *) mbuff_attach(name, sizeof(**embc));
+            
+            if (!*embc) {
+                ERROR("Failed to attach to FSM Shm %s!\n", name);
+                isok = 0;
+            } 
+        }
     }
     /* set up the error handler */
     if (isok && !initializeFSM(f, fsm)) {
@@ -3495,7 +3674,7 @@ static void buddyTaskHandler(void *arg)
             wint->cur = 0;
             memcpy((void *)(wint->samples), w->samples, ssize);
             memcpy((void *)(wint->evt_cols), w->evt_cols, esize);
-            DEBUG("FSM %u AOWave: allocated %d bytes for AOWave %s:%u\n", f, ssize+esize+sizeof(*wint), spec->name, w->id);
+            DEBUG("FSM %u AOWave: allocated %d bytes for AOWave %s:%u\n", f, (int)(ssize+esize+sizeof(*wint)), spec->name, w->id);
           } else {
             ERROR_INT("FSM %u In AOWAVE Buddy Task Handler: failed to allocate memory for an AO wave! Argh!!\n", f);
             cleanupAOWave(wint, (char *)spec->name, w->id);
@@ -3539,6 +3718,7 @@ static void buddyTaskHandler(void *arg)
 
 static void buddyTaskComediHandler(void *arg)
 {
+#ifndef EMULATOR
   int err;
   long flags = (long)arg;
   
@@ -3547,6 +3727,9 @@ static void buddyTaskComediHandler(void *arg)
     ERROR("comediCallback: failed to restart acquisition after COMEDI_CB_OVERFLOW %d: error: %d!\n", ai_n_overflows, err);
   else if (flags)
     LOG_MSG("comediCallback: restarted acquisition after %d overflows.\n", ai_n_overflows);
+#else
+  (void)arg; /* noop. */
+#endif
 }
 
 static inline long long timespec_to_nano(const struct timespec *ts)
@@ -3658,7 +3841,11 @@ static void fsmLinkProgram(FSMID_t f, struct EmbC *embc)
   embc->expn = &expn;
   embc->fac = &fac;
   embc->gamma = &gamma;
+#ifndef OS_OSX
   embc->isnan = &isnan;
+#else
+  embc->isnan = &isnan_osx_is_annoying_with_its_macros;
+#endif
   embc->powi = &powi;
   embc->sinh = &sinh;
   embc->tanh = &tanh;
@@ -3859,7 +4046,7 @@ static void swapFSMs(FSMID_t f)
   stopActiveWaves(f); /* since we are starting a new trial, force any
                          active timer waves to abort! */ 
   rs[f].states = OTHER_FSM_PTR(f); /* swap in the new fsm.. */
-  /*LOG_MSG("Cycle: %lu  Got new FSM\n", (unsigned long)cycle);*/
+  DEBUG_VERB("Cycle: %s  Got new FSM\n", cycleStr());
   updateHasSchedWaves(f); /* just updates rs.states->has_sched_waves flag*/
   updateDefaultExtObjNum(f); /* just updates rs.states->default_ext_obj_num */
   reconfigureIO(); /* to have new routing take effect.. */
@@ -3871,6 +4058,32 @@ static void swapFSMs(FSMID_t f)
 
 static void unloadDetachFSM(struct FSMSpec *fsm)
 {
+#ifdef EMULATOR
+#  if defined(OS_OSX) || defined(OS_LINUX) || defined(OS_WINDOWS)
+    if (fsm->type == FSM_TYPE_EMBC) {
+        struct EmbC **embc = &fsm->embc;
+        void (*cleanup)(void) = 0;
+        if (*embc) {
+      
+            if ((*embc)->cleanup) 
+                (*embc)->cleanup();
+      
+            /* decrease use count .. was incremented by fsmLinkProgram */
+            (*embc)->unlock(); 
+      
+            mbuff_detach(fsm->name, *embc);
+            *embc = 0; /* clean up old embc ptr, if any */
+            
+        }
+        if ((cleanup = dlsym(fsm->handle, "cleanup")))
+            cleanup();
+        dlclose(fsm->handle);
+        fsm->handle = 0;
+    }
+#  else
+#    error unloadDetachFSM() needs to be implemented for this platform!
+#  endif
+#else /* !EMULATOR */
     if (fsm->type == FSM_TYPE_EMBC) {
         struct EmbC **embc = &fsm->embc;
         char *argv[] = {
@@ -3897,12 +4110,14 @@ static void unloadDetachFSM(struct FSMSpec *fsm)
             
         }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#  if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
         call_usermodehelper(argv[0], argv, envp, 1);
-#else
+#  else
         call_usermodehelper(argv[0], argv, envp);
-#endif
+#  endif
     } 
+
+#endif /* EMULATOR/!EMULATOR*/
     
     /* NB: don't make this an else of the above if.. we call this 
        unconditionally as long as fsm->type != FSM_TYPE_NONE */
@@ -3940,7 +4155,7 @@ static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime
    const int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
    
    lat_cur = real_wakeup - ideal_wakeup; 
-   
+
    /* see if we woke up jittery/late.. if latency is > JITTER_TOLERANCE_NS *and* it's > 10% our task cycle.
       The second requirement is to avoid stupid reporting when the task cycle is like really large, 
       like on the order of ms*/
@@ -3956,6 +4171,7 @@ static void tallyJitterStats(hrtime_t real_wakeup, hrtime_t ideal_wakeup, hrtime
     lat_avg = quot;
 }
 
+#ifndef EMULATOR
 static void tallyCbEosCycStats(hrtime_t cyc_time)
 {
    hrtime_t quot;
@@ -3968,6 +4184,7 @@ static void tallyCbEosCycStats(hrtime_t cyc_time)
     do_div(quot, n);
     cb_eos_cyc_avg = quot;
 }
+#endif
 
 static char *cycleStr(void)
 {
@@ -3987,7 +4204,6 @@ static void tallyCycleTime(hrtime_t cycleT0, hrtime_t cycleTf)
     const int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
     
     cyc_cur = cycleTf-cycleT0;
-    
     if ( cyc_cur + 1000LL > task_period_ns) {
         WARNING("Cycle %s took %s ns (task period is %lu ns)!\n", cycleStr(), int64_to_cstr(cyc_cur), (unsigned long)task_period_ns);
         ++fsm_cycle_long_ct;
@@ -4036,3 +4252,19 @@ static int do_dio_config(unsigned chan, int mode)
     }
     return 0;
 }
+
+#ifdef EMULATOR
+/* implemented in fsm.c for emulator only -- see emulator/kernel_emul.h */
+void fsm_get_stats(unsigned f, struct FSMStats *stats)
+{
+    stats->cycle = cycle;
+    stats->ts = rs[f].current_ts_secs;
+    stats->state = rs[f].current_state;
+    stats->transitions = NUM_TRANSITIONS(f);
+    stats->isValid = rs[f].valid;
+    stats->isPaused = rs[f].paused;
+    stats->readyForTrial = rs[f].ready_for_trial_flg;
+    stats->activeSchedWaves = rs[f].active_wave_mask;
+    stats->activeAOWaves = rs[f].active_ao_wave_mask;
+}
+#endif

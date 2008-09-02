@@ -101,6 +101,9 @@ struct FSMSpec
   char name[64]; /**< The name of the FSM kernel module's shm to attach if 
                       FSM_TYPE_EMBC, or just a descriptive name of the fsm
                       otherwise.. */
+#ifdef EMULATOR
+  void *handle; /**< Handle to the dlopen()/dlclose() calls */
+#endif
 
   /** which struct in the union we use depends on the 'type' field above */
   union {
@@ -434,9 +437,11 @@ struct ShmMsg {
         };
     };
   };
-
+#ifdef EMULATOR
+# define NUM_STATE_MACHINES 1
+#else
 # define NUM_STATE_MACHINES 4
-
+#endif
   /** 
       The shared memory -- not every plugin needs shared memory but 
       it's a convenient way for userspace UI to communicate with your
@@ -475,7 +480,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf0010119)) /*< Magic no. for shm... 'fool0119'  */
+#define FSM_SHM_MAGIC ((int)(0xf001011b)) /*< Magic no. for shm... 'fool011b'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }

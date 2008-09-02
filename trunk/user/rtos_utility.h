@@ -23,6 +23,7 @@
 #define RTOS_UTILITY_H
 
 #include <sys/types.h>
+#include <string>
 
 namespace RTOS
 {
@@ -47,6 +48,7 @@ namespace RTOS
   
   extern void *shmAttach(const char *shm_name, size_t size, ShmStatus *s=0, bool create = false);
   extern void shmDetach(const void *shm, ShmStatus *status=0, bool destroy = false);
+
   /* true iff /dev/mbuff or /dev/rtai_shm is valid and openable for RDWR */
   extern bool shmDevFileIsValid(); 
   /* true iff /dev/mbuff or /dev/rtai_shm at least exists */
@@ -62,17 +64,18 @@ namespace RTOS
   // opens /dev/rtf[minor no] and returns its fd or -errno on error            
   // in emulator mode actually opens an IPC handle
   enum ModeFlag { Read = 1, Write = 2, ReadWrite = Read|Write };
-  extern FIFO openFifo(unsigned key_no, ModeFlag m = Read); 
+  extern FIFO openFifo(unsigned key_no, ModeFlag m = Read, std::string *errmsg = 0); 
   extern void closeFifo(FIFO);
   extern void closeFifo(unsigned key);
 #ifdef EMULATOR
   extern FIFO createFifo(unsigned & key_out, unsigned size);
 #endif
-  extern int readFifo(FIFO, void *buf, unsigned long bufsz);
-  extern int writeFifo(FIFO, const void *buf, unsigned long bufsz);
-  extern int readFifo(unsigned key, void *buf, unsigned long bufsz);
-  extern int writeFifo(unsigned key, const void *buf, unsigned long bufsz);
+  extern int readFifo(FIFO, void *buf, unsigned long bufsz, bool blocking = true);
+  extern int writeFifo(FIFO, const void *buf, unsigned long bufsz, bool blocking = true);
+  extern int readFifo(unsigned key, void *buf, unsigned long bufsz, bool blocking = true);
+  extern int writeFifo(unsigned key, const void *buf, unsigned long bufsz, bool blocking = true);
   extern int fifoNReadyForReading(FIFO);
+  extern int fifoNReadyForReading(unsigned);
 
   // /dev/rtf in RTOS mode, if emulator, \\.\pipe\fsm_pipe_no_ for win32
   // or /tmp/fsm_pipe_no_ otherwise

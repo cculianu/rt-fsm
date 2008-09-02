@@ -43,6 +43,7 @@ extern "C" {
   extern int    num_procs_of_exe(const char *exe_path);
   /* like above but discounts children that may be the result of LWP/pthreads*/
   extern int    num_procs_of_exe_no_children(const char *exe);
+#ifndef OS_OSX
   /* 
      returns a malloc'd char * string (which might be NULL on error)
      if sz != NULL then it stores the string size in sz.
@@ -68,11 +69,11 @@ extern "C" {
   /* same as above but wrappers using getpid() */
   extern char * grab_my_full_cmd_name(int *sz);
   extern char * grab_my_stripped_cmd_name(int *sz);
-
+#endif
   /* scan /proc/PID/status and grab the PPid of a proces, if any */
   extern pid_t grab_parent_of_pid(pid_t pid);
 
-
+#ifndef OS_OSX
   struct ModList
   {
     struct ModList *next;
@@ -91,6 +92,7 @@ extern "C" {
   extern void free_module_list(const struct ModList *);
   extern const struct ModList * find_module_in_modlist(const struct ModList *,
                                                        const char *);
+#endif
   
 #ifdef __cplusplus
 }

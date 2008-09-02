@@ -10,5 +10,14 @@ extern double expn(int i, double d);
 extern double log2(double d);
 extern double powi(double d, int i);
 extern double fac(int i);
+#if !defined(OS_OSX)
 extern int isnan(double x);
+#else
+#include <math.h>
+static inline int isnan_osx_is_annoying_with_its_macros(double x) { return isnan(x); }
+#endif
+#ifdef OS_WINDOWS
+#include <math.h>
+extern double gamma(double);
+#endif
 #endif

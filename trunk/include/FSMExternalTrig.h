@@ -20,12 +20,24 @@
 #ifndef FSM_EXT_TRIG_H
 #define FSM_EXT_TRIG_H
 
+#ifdef EMULATOR
+
+#include "kernel_emul.h"
+
+#else
+
 #ifndef __KERNEL__
 #   error This is a kernel header, and is not really compatible or intended to be used by userspace programs!
 #endif
 
 #include <linux/module.h>
 #include <asm/atomic.h>
+
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef int (* FSMExtTrigFn_t)(unsigned, int); 
 typedef struct FSMExtTrigShm
@@ -80,5 +92,9 @@ static inline void FSM_EXT_UNTRIG(volatile struct FSMExtTrigShm *shm, unsigned t
   return;
   FSM_EXT_UNTRIG(0, target, 0); /* Avoid compiler warnings for unused.. */
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

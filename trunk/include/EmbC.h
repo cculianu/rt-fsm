@@ -1,14 +1,26 @@
 #ifndef EmbC_H
 #define EmbC_H
 
-#ifndef NO_EMBC_TYPEDEFS
-#ifdef EMBC_GENERATED_CODE /* These typedefs already exist in most contexts */
+#if defined(OS_OSX) || defined(OS_WINDOWS)
+#define NEED_UINT
+#endif
+
+#if !defined(NO_EMBC_TYPEDEFS) || defined(NEED_UINT)
+#if defined(EMBC_GENERATED_CODE) || defined(NEED_UINT) /* These typedefs already exist in most contexts */
 typedef unsigned long ulong;
 typedef unsigned int uint;
 typedef unsigned short ushort;
 #endif
+#if !defined(OS_WINDOWS) || defined(NEED_INT64)
+#ifdef UNDEF_INT64
+#  undef uint64
+#  undef int64
+#endif
+#ifndef NO_EMBC_TYPEDEFS
 typedef unsigned long long uint64;
 typedef long long int64;
+#endif
+#endif
 #endif
 
 typedef int TRISTATE; /* A tristate value takes one of 3 states: POSITIVE, NEGATIVE, or NEUTRAL */
