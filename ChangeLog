@@ -1,6 +1,7 @@
 2008-09-02 22:21  calin.culianu
 
-	* emulator/win32/dist/EmbC.h, emulator/win32/dist/FSMEmulator.exe,
+	* [r129] emulator/win32/dist/EmbC.h,
+	  emulator/win32/dist/FSMEmulator.exe,
 	  emulator/win32/dist/FSMServer.exe,
 	  emulator/win32/dist/QtCore4.dll, emulator/win32/dist/QtGui4.dll,
 	  emulator/win32/dist/README.txt,
@@ -17,7 +18,7 @@
 
 2008-09-02 22:18  calin.culianu
 
-	* emulator/win32/dist, emulator/win32/dist/tcc,
+	* [r128] emulator/win32/dist, emulator/win32/dist/tcc,
 	  emulator/win32/dist/tcc/doc,
 	  emulator/win32/dist/tcc/doc/readme.txt,
 	  emulator/win32/dist/tcc/doc/tcc-doc.html,
@@ -106,7 +107,7 @@
 
 2008-09-02 22:09  calin.culianu
 
-	* emulator/win32/tcc, emulator/win32/tcc/doc,
+	* [r127] emulator/win32/tcc, emulator/win32/tcc/doc,
 	  emulator/win32/tcc/doc/readme.txt,
 	  emulator/win32/tcc/doc/tcc-doc.html, emulator/win32/tcc/examples,
 	  emulator/win32/tcc/examples/dll.c,
@@ -191,7 +192,7 @@
 
 2008-09-02 22:08  calin.culianu
 
-	* emulator/win32, emulator/win32/pthread.dll,
+	* [r126] emulator/win32, emulator/win32/pthread.dll,
 	  emulator/win32/pthread.h, emulator/win32/pthreadGCE2.dll,
 	  emulator/win32/regex-bcc.lib, emulator/win32/regex.h,
 	  emulator/win32/regex.lib, emulator/win32/regex2.def,
@@ -204,7 +205,7 @@
 
 2008-09-02 22:07  calin.culianu
 
-	* emulator/osx-x86, emulator/osx-x86/EmbC.h,
+	* [r125] emulator/osx-x86, emulator/osx-x86/EmbC.h,
 	  emulator/osx-x86/FSMEmulator, emulator/osx-x86/FSMServer,
 	  emulator/osx-x86/SoundServer, emulator/osx-x86/embc_so_wrapper.c,
 	  emulator/osx-x86/ffs.h, emulator/osx-x86/kernel_emul.h:
@@ -213,7 +214,7 @@
 
 2008-09-02 22:06  calin.culianu
 
-	* addons/SoundTrig/SoundServer.cpp, emulator,
+	* [r124] addons/SoundTrig/SoundServer.cpp, emulator,
 	  emulator/ComediEmul.cpp, emulator/ComediEmul.h,
 	  emulator/ComediView.cpp, emulator/ComediView.h,
 	  emulator/Common.h, emulator/ControlWin.cpp,
@@ -241,13 +242,13 @@
 
 2008-08-13 17:53  calin.culianu
 
-	* ChangeLog:
+	* [r123] ChangeLog:
 	  
 	  - Updated ChangeLog
 
 2008-08-13 17:52  calin.culianu
 
-	* ChangeLog, include/Version.h, kernel/fsm.c:
+	* [r122] ChangeLog, include/Version.h, kernel/fsm.c:
 	  
 	  - Bumped version
 	  - Fixed bug in SAMPLE_TO_VOLTS() (which was also affecting custom
@@ -256,27 +257,27 @@
 
 2008-08-08 18:47  calin.culianu
 
-	* ChangeLog:
+	* [r121] ChangeLog:
 	  
 	  - Updated ChangeLog
 
 2008-08-08 18:46  calin.culianu
 
-	* include/Version.h, kernel/fsm.c:
+	* [r120] include/Version.h, kernel/fsm.c:
 	  
 	  - Finally fixed bug in EmbC threshold detection
 	  - Bumped version
 
 2008-08-07 20:40  calin.culianu
 
-	* include/EmbC.h, include/Version.h, kernel/fsm.c:
+	* [r119] include/EmbC.h, include/Version.h, kernel/fsm.c:
 	  
 	  - Bumped version number
 	  - Fixed possible bug in EmbC thresh detect code
 
 2008-07-29 17:40  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, include/Version.h:
+	* [r118] addons/SoundTrig/LynxTrig.c, include/Version.h:
 	  
 	  - Bumped version
 	  - Added some messaging to LynxTrig advising user to reboot the
@@ -284,13 +285,13 @@
 
 2008-07-29 16:34  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp:
+	* [r117] addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp:
 	  
 	  Oops -- introduced a new bug into LynxTWO-RT -- fixed!
 
 2008-07-29 16:06  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
+	* [r116] addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/LinuxGlue.cpp:
 	  
 	  Tweaks to LynxTWO-RT driver to make it cope better with error in
@@ -299,13 +300,14 @@
 
 2008-07-25 22:15  calin.culianu
 
-	* ChangeLog:
+	* [r115] ChangeLog:
 	  
 	  - Updated ChangeLog
 
 2008-07-25 22:14  calin.culianu
 
-	* ChangeLog, INSTALL, user/FSMServer.cpp, utils/config-i686-fc8:
+	* [r114] ChangeLog, INSTALL, user/FSMServer.cpp,
+	  utils/config-i686-fc8:
 	  
 	  - Updated x86 kernel .config file to use ACPI since it was found
 	  you need ACPI enabled to get SMP on SMP systems on x86
@@ -315,7 +317,7 @@
 
 2008-07-25 17:24  calin.culianu
 
-	* include/Version.h, user/FSMServer.cpp:
+	* [r113] include/Version.h, user/FSMServer.cpp:
 	  
 	  - Bumped version
 	  - Optimized generation of Embedded C code to generate a 2D matrix
@@ -326,7 +328,7 @@
 
 2008-07-25 06:16  calin.culianu
 
-	* user/FSMServer.cpp:
+	* [r112] user/FSMServer.cpp:
 	  
 	  Ooops. The compileLock mutex was a non-static class member of the
 	  ConnectionThread class. It needs to be static because it locks
@@ -334,15 +336,15 @@
 
 2008-07-24 22:41  calin.culianu
 
-	* ChangeLog:
+	* [r111] ChangeLog:
 	  
 	  Updated ChangeLog
 
 2008-07-24 22:39  calin.culianu
 
-	* ChangeLog, Makefile, include/Version.h, runtime/Kbuild.EmbC,
-	  runtime/Makefile, runtime/Makefile_for_Kbuild.EmbC,
-	  user/FSMServer.cpp:
+	* [r110] ChangeLog, Makefile, include/Version.h,
+	  runtime/Kbuild.EmbC, runtime/Makefile,
+	  runtime/Makefile_for_Kbuild.EmbC, user/FSMServer.cpp:
 	  
 	  - Bumped Version
 	  - Optimized build mechanism for Embedded C -- made it much faster
@@ -358,14 +360,15 @@
 
 2008-07-23 17:15  calin.culianu
 
-	* rtfsm.kdevelop.pcs, rtfsm.kdevses, runtime/embc_mod_wrapper.c:
+	* [r109] rtfsm.kdevelop.pcs, rtfsm.kdevses,
+	  runtime/embc_mod_wrapper.c:
 	  
 	  found bug in embc_mod_wrapper.c -- should return -ENOMEM not
 	  ENOMEM on error
 
 2008-07-17 23:29  calin.culianu
 
-	* Client/Matlab/@RTLSM/Contents.m,
+	* [r108] Client/Matlab/@RTLSM/Contents.m,
 	  Client/Matlab/@RTLSM/GetEvents2.m, include/Version.h,
 	  kernel/fsm.c, old, old/FSM, old/FSM/128x10_4state.dat,
 	  old/FSM/128x10_cont.dat, old/FSM/128x10_in.dat,
@@ -629,7 +632,7 @@
 
 2008-07-16 02:22  calin.culianu
 
-	* addons/SoundTrig/Kbuild, addons/SoundTrig/LynxTrig.c,
+	* [r107] addons/SoundTrig/Kbuild, addons/SoundTrig/LynxTrig.c,
 	  addons/SoundTrig/SoundServer.cpp, addons/SoundTrig/SoundTrig.h,
 	  addons/SoundTrig/bigcontarea.c, addons/SoundTrig/bigcontarea.h,
 	  addons/SoundTrig/smalloc.c, addons/SoundTrig/smalloc.h,
@@ -643,7 +646,7 @@
 
 2008-07-15 22:13  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, include/Version.h,
+	* [r106] addons/SoundTrig/LynxTrig.c, include/Version.h,
 	  rtfsm.kdevelop.pcs, rtfsm.kdevses:
 	  
 	  Minor messaging tweak -- last commit before big change to change
@@ -651,33 +654,33 @@
 
 2008-06-11 14:14  calin.culianu
 
-	* TODO:
+	* [r105] TODO:
 	  
 	  Updated todo
 
 2008-06-11 14:13  calin.culianu
 
-	* include/Version.h:
+	* [r104] include/Version.h:
 	  
 	  Oops -- forgot to bump version. Bumped version number to
 	  2008.06.11 EmbC
 
 2008-06-11 14:11  calin.culianu
 
-	* ChangeLog:
+	* [r103] ChangeLog:
 	  
 	  Updated ChangeLog
 
 2008-06-11 14:03  calin.culianu
 
-	* kernel/softtask.c:
+	* [r102] kernel/softtask.c:
 	  
 	  Made softtask be really multithreaded even upon init. Just out of
 	  paranoia.
 
 2008-06-11 12:34  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, kernel/softtask.c:
+	* [r101] addons/SoundTrig/LynxTrig.c, kernel/softtask.c:
 	  
 	  Cleaned up softtask code to not use up more than 1 IRQ no matter
 	  how many softtasks are created. This buys us lots of flexibility
@@ -690,14 +693,14 @@
 
 2008-06-10 21:08  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c:
+	* [r100] addons/SoundTrig/LynxTrig.c:
 	  
 	  - Race condition possible.. maybe?: Made LOCK_TRIGGERS()
 	  implicitly lock all individual sound buffers
 
 2008-06-10 20:48  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c:
+	* [r99] addons/SoundTrig/LynxTrig.c:
 	  
 	  Changed lock granularity so that the state machine can trigger
 	  sounds
@@ -713,28 +716,28 @@
 
 2008-06-10 12:54  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, include/rtos_compat.h:
+	* [r98] addons/SoundTrig/LynxTrig.c, include/rtos_compat.h:
 	  
 	  - Fixed crash bug experienced in brody lab -- bug was due to bug
 	  in rtai's pthread_create -- added a workaround function
 
 2008-06-04 16:09  calin.culianu
 
-	* utils/installer.pl:
+	* [r97] utils/installer.pl:
 	  
 	  Fixed installer bug whereby some users su and don't have /sbin
 	  abd /usr/sbin in their paths..
 
 2008-05-25 14:43  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetScheduledWaves.m:
+	* [r96] Client/Matlab/@RTLSM/SetScheduledWaves.m:
 	  
 	  - Added compatibility mode to code so that SetScheduledWaves
 	  works with an mx7 matrix as well as an mx8 matrix
 
 2008-05-23 19:50  calin.culianu
 
-	* Documentation/arch_overview.pdf, INSTALL,
+	* [r95] Documentation/arch_overview.pdf, INSTALL,
 	  utils/i386-2.6.23-fc9.patch, utils/installer.pl,
 	  utils/rtai-3.6.patch, utils/x86_64-2.6.23-fc9.patch:
 	  
@@ -748,7 +751,7 @@
 
 2008-05-23 14:53  calin.culianu
 
-	* include/FSM.h, include/Version.h, kernel/fsm.c,
+	* [r94] include/FSM.h, include/Version.h, kernel/fsm.c,
 	  user/FSMServer.cpp:
 	  
 	  - Optimized loading of plain matrices -- they no longer generate
@@ -762,41 +765,41 @@
 
 2008-05-22 23:14  calin.culianu
 
-	* utils/installer.pl:
+	* [r93] utils/installer.pl:
 	  
 	  Tweak to make installer questions not accept a blank line at
 	  all.. so you have to hit y or n..
 
 2008-05-22 22:32  calin.culianu
 
-	* utils/config-i686-fc8, utils/config-x86_64-fc8,
+	* [r92] utils/config-i686-fc8, utils/config-x86_64-fc8,
 	  utils/installer.pl, utils/rtai_config-x86_64-fc8:
 	  
 	  Minor tweak to config files
 
 2008-05-22 20:34  calin.culianu
 
-	* utils/installer.pl:
+	* [r91] utils/installer.pl:
 	  
 	  Fixed a bug in kernel compile whereby it wasn't picking up the
 	  old .config
 
 2008-05-22 20:29  calin.culianu
 
-	* utils/installer.pl:
+	* [r90] utils/installer.pl:
 	  
 	  Minor tweak to allow installer stage 1 to re-use any cruft it
 	  finds in /tmp
 
 2008-05-22 20:25  calin.culianu
 
-	* utils/config-i686-fc8, utils/installer.pl:
+	* [r89] utils/config-i686-fc8, utils/installer.pl:
 	  
 	  Tweak to config
 
 2008-05-22 20:06  calin.culianu
 
-	* INSTALL, install.sh, load_modules.sh, rtfsm.kdevelop,
+	* [r88] INSTALL, install.sh, load_modules.sh, rtfsm.kdevelop,
 	  rtfsm.kdevelop.pcs, rtfsm.kdevses, unload_modules.sh,
 	  utils/config-i686-fc8, utils/config-x86_64-fc8,
 	  utils/installer.pl, utils/rtai_config-i686-fc8,
@@ -808,8 +811,8 @@
 
 2008-05-14 10:15  calin.culianu
 
-	* Client/Matlab/@RTLSM/ChkVersion.m, Client/Matlab/@RTLSM/RTLSM.m,
-	  user/FSMServer.cpp:
+	* [r87] Client/Matlab/@RTLSM/ChkVersion.m,
+	  Client/Matlab/@RTLSM/RTLSM.m, user/FSMServer.cpp:
 	  
 	  - Improved efficiency of socket read code
 	  - Bumped Matlab client version number
@@ -817,7 +820,7 @@
 
 2008-05-14 05:28  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m,
+	* [r86] Client/Matlab/@RTLSM/SetStateProgram.m,
 	  Client/Matlab/NetClient/FSMClient.cpp,
 	  Client/Matlab/NetClient/FSMClient.dll,
 	  Client/Matlab/NetClient/FSMClient.mexglx,
@@ -836,7 +839,7 @@
 
 2008-05-10 23:14  calin.culianu
 
-	* Client/Matlab/@RTLSM/Contents.m,
+	* [r85] Client/Matlab/@RTLSM/Contents.m,
 	  Client/Matlab/@RTLSM/GetAIMode.m,
 	  Client/Matlab/@RTLSM/SetAIMode.m, Documentation,
 	  Documentation/arch_overview.odt, addons/SoundTrig/WavFile.cpp,
@@ -851,14 +854,14 @@
 
 2008-03-29 16:22  calin.culianu
 
-	* addons/SoundTrig/WavFile.cpp:
+	* [r84] addons/SoundTrig/WavFile.cpp:
 	  
 	  Fixed small bug in wav file that would appear on big endian
 	  machines
 
 2008-03-29 15:45  calin.culianu
 
-	* addons/SoundTrig/WavFile.cpp:
+	* [r83] addons/SoundTrig/WavFile.cpp:
 	  
 	  Renamed the <anonymous namespace>::round() function that I wrote
 	  to 'rnd()' so it doesn't conflict with the C math library round()
@@ -866,7 +869,7 @@
 
 2008-03-27 22:41  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LinuxInterface.h,
+	* [r82] addons/SoundTrig/LynxTWO-RT/LinuxInterface.h,
 	  addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.cpp,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.h,
@@ -882,7 +885,7 @@
 
 2008-03-27 00:39  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
+	* [r81] addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
 	  addons/SoundTrig/LynxTrig.c:
 	  
 	  Fixed bug whereby if lynx driver fails to do the probe it thinks
@@ -891,7 +894,7 @@
 
 2008-03-22 16:22  calin.culianu
 
-	* INSTALL:
+	* [r80] INSTALL:
 	  
 	  Updated installation instructions to tell people how to use the
 	  rt sound machine
@@ -899,7 +902,7 @@
 
 2008-03-22 16:00  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetOutputRouting.m, include/Version.h,
+	* [r79] Client/Matlab/@RTLSM/SetOutputRouting.m, include/Version.h,
 	  kernel/fsm.c:
 	  
 	  - Fixed bug in matlab SetOutputRouting where you couldn't do DOUT
@@ -910,7 +913,7 @@
 
 2008-03-22 15:23  calin.culianu
 
-	* kernel/fsm.c:
+	* [r78] kernel/fsm.c:
 	  
 	  - Fixed bug where sched wave DOUT chan also had to overlap with
 	  an FSM DOUT output routing spec otherwise the DOUT chan wouldn't
@@ -937,7 +940,7 @@
 
 2008-03-19 19:34  calin.culianu
 
-	* Client/Matlab/@RTLSM/RTLSM.m,
+	* [r77] Client/Matlab/@RTLSM/RTLSM.m,
 	  Client/Matlab/@RTLSM/SetScheduledWaves.m,
 	  Client/Matlab/@RTLSM/SetStateMatrix.m,
 	  Client/Matlab/@RTLSM/SetStateProgram.m,
@@ -955,7 +958,7 @@
 
 2008-03-17 19:19  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
+	* [r76] Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
 	  include/Version.h, kernel/fsm.c:
 	  
 	  - Added string functions to Embedded C
@@ -966,14 +969,14 @@
 
 2008-03-13 22:27  calin.culianu
 
-	* kernel/fsm.c:
+	* [r75] kernel/fsm.c:
 	  
 	  - Fixed last remaining bug preventing writing to DIO channel-id's
 	  >7
 
 2008-03-13 18:23  calin.culianu
 
-	* kernel/fsm.c:
+	* [r74] kernel/fsm.c:
 	  
 	  - Made FSM be able to use more than 1 subdevice for DIO channels,
 	  fixing a bug whereby NI PCI 6025e was only using first 8 channels
@@ -983,7 +986,7 @@
 
 2008-03-13 16:18  calin.culianu
 
-	* kernel/fsm.c:
+	* [r73] kernel/fsm.c:
 	  
 	  - Made jitter computation be >60us *and* >10% of task cycle
 	  period (to avoid erroneous reporting with extremely low cycle
@@ -993,14 +996,14 @@
 
 2008-03-13 00:58  calin.culianu
 
-	* kernel/fsm.c:
+	* [r72] kernel/fsm.c:
 	  
 	  Argh, in previous revision, bypassDOut reject '0', which should
 	  be supported as it turns off bypass. Fixed this bug.
 
 2008-03-12 23:48  calin.culianu
 
-	* user/FSMServer.cpp:
+	* [r71] user/FSMServer.cpp:
 	  
 	  Fixed minor warning in embedded-C generated program for state
 	  matrices whereby
@@ -1013,14 +1016,14 @@
 
 2008-03-12 23:25  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m, include/Version.h:
+	* [r70] Client/Matlab/@RTLSM/SetStateProgram.m, include/Version.h:
 	  
 	  Bumbed version number
 	  updated documentation to SetStateProgram to include bypassDOut()
 
 2008-03-12 20:45  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
+	* [r69] addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/HalAdapter.cpp,
 	  include/EmbC.h, kernel/fsm.c:
 	  
@@ -1028,20 +1031,20 @@
 
 2008-03-12 19:32  calin.culianu
 
-	* kernel/fsm.c:
+	* [r68] kernel/fsm.c:
 	  
 	  Fixed bug where it was impossible to clear forced outputs if new
 	  fsm has no dio
 
 2008-03-12 19:30  calin.culianu
 
-	* kernel/fsm.c:
+	* [r67] kernel/fsm.c:
 	  
 	  Fixed potential bug in FORCEOUTPUT ?
 
 2008-03-12 19:13  calin.culianu
 
-	* kernel/fsm.c:
+	* [r66] kernel/fsm.c:
 	  
 	  - Got rid of 'avoid reduntant writes' feature because it appeared
 	  to be buggy anyway
@@ -1051,19 +1054,19 @@
 
 2008-03-12 17:29  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c:
+	* [r65] addons/SoundTrig/LynxTrig.c:
 	  
 	  Made rt timer start before thread creation
 
 2008-03-12 17:28  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LinuxModule.c:
+	* [r64] addons/SoundTrig/LynxTWO-RT/LinuxModule.c:
 	  
 	  - Starting rt timer in lynxtwo-rt before thread creation.
 
 2008-03-12 17:21  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LinuxInterface.h,
+	* [r63] addons/SoundTrig/LynxTWO-RT/LinuxInterface.h,
 	  addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
 	  addons/SoundTrig/LynxTrig.c:
 	  
@@ -1076,7 +1079,7 @@
 
 2008-03-11 23:59  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateMachine.m, INSTALL,
+	* [r62] Client/Matlab/@RTLSM/SetStateMachine.m, INSTALL,
 	  addons/SoundTrig/LynxTWO-RT/Kbuild,
 	  addons/SoundTrig/LynxTWO-RT/LinuxInterface.h,
 	  addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
@@ -1098,7 +1101,7 @@
 
 2008-03-11 16:02  calin.culianu
 
-	* addons/SoundTrig/ChanMapper.c,
+	* [r61] addons/SoundTrig/ChanMapper.c,
 	  addons/SoundTrig/LynxTWO-RT/LinuxModule.c,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/HalEEPROM.cpp,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/HalEnv.h,
@@ -1111,7 +1114,7 @@
 
 2008-03-08 03:09  calin.culianu
 
-	* Client/Matlab/@RTLSM/ChkConn.m,
+	* [r60] Client/Matlab/@RTLSM/ChkConn.m,
 	  Client/Matlab/@RTLSM/ChkVersion.m, Client/Matlab/@RTLSM/RTLSM.m:
 	  
 	  Oops -- bug in client version reporting to server -- fixed! We
@@ -1120,14 +1123,15 @@
 
 2008-03-08 03:02  calin.culianu
 
-	* Client/Matlab/@RTLSM/ReceiveOK.m:
+	* [r59] Client/Matlab/@RTLSM/ReceiveOK.m:
 	  
 	  - Made error messaging more informative in FSM Client
 	  'ReceiveOK.m'
 
 2008-03-08 02:52  calin.culianu
 
-	* Client/Matlab/@RTLSM/RTLSM.m, kernel/fsm.c, user/FSMServer.cpp:
+	* [r58] Client/Matlab/@RTLSM/RTLSM.m, kernel/fsm.c,
+	  user/FSMServer.cpp:
 	  
 	  - renamed fsmLinkProgram to the more descriptive initializeFSM in
 	  fsm.c
@@ -1143,7 +1147,8 @@
 
 2008-03-08 01:52  calin.culianu
 
-	* Client/Matlab/@RTLSM/ChkVersion.m, Client/Matlab/@RTLSM/RTLSM.m,
+	* [r57] Client/Matlab/@RTLSM/ChkVersion.m,
+	  Client/Matlab/@RTLSM/RTLSM.m,
 	  Client/Matlab/@RTLSM/SendAllAOWaves.m,
 	  Client/Matlab/@RTLSM/SetStateMatrix.m,
 	  Client/Matlab/@RTLSM/SetStateProgram.m, include/FSM.h,
@@ -1160,7 +1165,7 @@
 
 2008-03-07 19:33  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateMatrix.m,
+	* [r56] Client/Matlab/@RTLSM/SetStateMatrix.m,
 	  Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
 	  include/FSM.h, kernel/fsm.c, user/FSMServer.cpp:
 	  
@@ -1174,14 +1179,14 @@
 
 2008-03-07 16:19  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m:
+	* [r55] Client/Matlab/@RTLSM/SetStateProgram.m:
 	  
 	  Oops.. forgot to update matlab client docs about the existence of
 	  snprintf()
 
 2008-03-07 16:17  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
+	* [r54] Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
 	  kernel/fsm.c, user/FSMServer.cpp:
 	  
 	  - Moved costly and slow TRANSITIONS and LOGITEMS fsm commands
@@ -1194,7 +1199,7 @@
 
 2008-03-07 15:11  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m,
+	* [r53] Client/Matlab/@RTLSM/SetStateProgram.m,
 	  addons/SoundTrig/SoundServer.cpp, user/FSMServer.cpp:
 	  
 	  - Fixed bug in matlab Client for FSM whereby entryfuncs and
@@ -1204,7 +1209,7 @@
 
 2008-03-07 14:42  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
+	* [r52] Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
 	  include/Version.h, kernel/float_vsnprintf.c, kernel/fsm.c:
 	  
 	  - Oops. Fixed bug in embedded-C printf. Now we entirely replaced
@@ -1217,7 +1222,7 @@
 
 2008-03-05 22:31  calin.culianu
 
-	* include/EmbC.h, kernel/Makefile, kernel/float_vsnprintf.c,
+	* [r51] include/EmbC.h, kernel/Makefile, kernel/float_vsnprintf.c,
 	  kernel/float_vsnprintf.h, kernel/fsm.c, rtfsm.kdevelop.filelist:
 	  
 	  - Made the embedded-C environment's printf() function actually
@@ -1228,33 +1233,33 @@
 
 2008-03-05 20:59  calin.culianu
 
-	* kernel/fsm.c:
+	* [r50] kernel/fsm.c:
 	  
 	  Minor source tweaks
 
 2008-03-05 20:37  calin.culianu
 
-	* kernel/fsm.c:
+	* [r49] kernel/fsm.c:
 	  
 	  Fixed broken integer constant in readAI()
 
 2008-03-05 20:36  calin.culianu
 
-	* kernel/fsm.c:
+	* [r48] kernel/fsm.c:
 	  
 	  - Fixed bug where embedded C sometimes only sees the last scan's
 	  samples if caled from the tick() function
 
 2008-03-05 20:22  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/LynxTWO/Makefile,
+	* [r47] addons/SoundTrig/LynxTWO-RT/LynxTWO/Makefile,
 	  addons/SoundTrig/Makefile, user/Makefile:
 	  
 	  Got rid of makedepend warnings
 
 2008-03-05 20:16  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m,
+	* [r46] Client/Matlab/@RTLSM/SetStateProgram.m,
 	  addons/SoundTrig/LynxTWO-RT/Makefile, addons/SoundTrig/Makefile,
 	  addons/UserspaceExtTrig/Makefile, include/EmbC.h,
 	  kernel/Makefile, kernel/fsm.c:
@@ -1270,7 +1275,7 @@
 
 2008-03-05 13:58  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
+	* [r45] Client/Matlab/@RTLSM/SetStateProgram.m, include/EmbC.h,
 	  include/Version.h, kernel/extra_mathfuncs.c,
 	  kernel/extra_mathfuncs.h, kernel/fsm.c,
 	  runtime/embc_mod_wrapper.c, user/FSMServer.cpp:
@@ -1287,14 +1292,14 @@
 
 2008-03-02 14:52  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/Kbuild:
+	* [r44] addons/SoundTrig/LynxTWO-RT/Kbuild:
 	  
 	  Oop, forgot one Kbuild file for the x86_64 -msse/-msse2 build
 	  workaround
 
 2008-03-02 14:49  calin.culianu
 
-	* addons/SoundTrig/Kbuild, addons/SoundTrig/LynxTrig.c,
+	* [r43] addons/SoundTrig/Kbuild, addons/SoundTrig/LynxTrig.c,
 	  addons/SoundTrig/SoundServer.cpp, addons/SoundTrig/SoundTrig.h,
 	  addons/UserspaceExtTrig/Makefile, kernel/Makefile,
 	  runtime/Kernel2.6MakefileTemplate:
@@ -1305,7 +1310,7 @@
 
 2008-03-01 20:31  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/Kbuild,
+	* [r42] addons/SoundTrig/LynxTWO-RT/Kbuild,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/HalEnv.h,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO/Makefile, rtfsm.kdevelop.pcs,
 	  rtfsm.kdevses:
@@ -1314,7 +1319,7 @@
 
 2008-03-01 02:11  calin.culianu
 
-	* addons/SoundTrig/LynxTWO-RT/HalTest/AdapterPage.cpp,
+	* [r41] addons/SoundTrig/LynxTWO-RT/HalTest/AdapterPage.cpp,
 	  addons/SoundTrig/LynxTWO-RT/HalTest/Fader.cpp,
 	  addons/SoundTrig/LynxTWO-RT/HalTest/HalTestDlg.cpp,
 	  addons/SoundTrig/LynxTWO-RT/LinuxInterface.h,
@@ -1341,7 +1346,7 @@
 
 2008-02-29 23:28  calin.culianu
 
-	* Makefile, addons/SoundTrig/Kbuild,
+	* [r40] Makefile, addons/SoundTrig/Kbuild,
 	  addons/SoundTrig/LynxTWO-RT/Docs,
 	  addons/SoundTrig/LynxTWO-RT/Docs/AES16 Interface.doc,
 	  addons/SoundTrig/LynxTWO-RT/Docs/LynxTWO Interface.doc,
@@ -1472,26 +1477,26 @@
 
 2008-02-29 19:34  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c:
+	* [r39] addons/SoundTrig/LynxTrig.c:
 	  
 	  Increased number of sems and soft tasks we create
 
 2008-02-29 19:18  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, kernel/fsm.c:
+	* [r38] addons/SoundTrig/LynxTrig.c, kernel/fsm.c:
 	  
 	  Fixed resource release buf in LynxTrig.c
 	  Minor tweak to fsm.c
 
 2008-02-29 18:51  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c:
+	* [r37] addons/SoundTrig/LynxTrig.c:
 	  
 	  Minor code cleanup
 
 2008-02-29 18:37  calin.culianu
 
-	* addons/SoundTrig/Kbuild, addons/SoundTrig/LynxTrig.c,
+	* [r36] addons/SoundTrig/Kbuild, addons/SoundTrig/LynxTrig.c,
 	  addons/SoundTrig/SoundServer.cpp, addons/SoundTrig/SoundTrig.h:
 	  
 	  - Fixed bugs in lynxtrig
@@ -1504,8 +1509,8 @@
 
 2008-02-29 13:52  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, addons/SoundTrig/SoundServer.cpp,
-	  kernel/fsm.c:
+	* [r35] addons/SoundTrig/LynxTrig.c,
+	  addons/SoundTrig/SoundServer.cpp, kernel/fsm.c:
 	  
 	  - Tweaked exception messaging in SoundServer
 	  - Made the timer not be restarted if it's already running when
@@ -1514,20 +1519,20 @@
 
 2008-02-29 12:13  calin.culianu
 
-	* addons/SoundTrig/SoundServer.cpp:
+	* [r34] addons/SoundTrig/SoundServer.cpp:
 	  
 	  Minor messaging tweak
 
 2008-02-29 12:04  calin.culianu
 
-	* addons/SoundTrig/LynxTrig.c, addons/SoundTrig/Makefile,
+	* [r33] addons/SoundTrig/LynxTrig.c, addons/SoundTrig/Makefile,
 	  rtfsm.kdevelop.filelist:
 	  
 	  Fixed some slight 64-bit uncleanliness
 
 2008-02-28 23:46  calin.culianu
 
-	* Makefile, addons/SoundTrig/ChanMapper.c,
+	* [r32] Makefile, addons/SoundTrig/ChanMapper.c,
 	  addons/SoundTrig/ChanMapper.h, addons/SoundTrig/Kbuild,
 	  addons/SoundTrig/LynxTWO-RT,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO-RT.h,
@@ -1548,10 +1553,10 @@
 
 2008-02-28 02:16  calin.culianu
 
-	* Client/Matlab/NetClient/FSMClient.dll, addons/SoundTrig/Makefile,
-	  addons/SoundTrig/SoundServer.cpp, rtfsm.kdevelop.filelist,
-	  runtime/Kernel2.6MakefileTemplate, user/FSMServer.cpp,
-	  user/Makefile, user/Util.cpp, user/Util.h:
+	* [r31] Client/Matlab/NetClient/FSMClient.dll,
+	  addons/SoundTrig/Makefile, addons/SoundTrig/SoundServer.cpp,
+	  rtfsm.kdevelop.filelist, runtime/Kernel2.6MakefileTemplate,
+	  user/FSMServer.cpp, user/Makefile, user/Util.cpp, user/Util.h:
 	  
 	  - Cleaned up Kernel2.6MakefileTemplate
 	  - Refactored some useful code out of FSMServer.cpp and put it in
@@ -1562,14 +1567,15 @@
 
 2008-02-27 22:19  calin.culianu
 
-	* addons/SoundTrig/Makefile.LynxTrig,
+	* [r30] addons/SoundTrig/Makefile.LynxTrig,
 	  addons/UserspaceExtTrig/Makefile, kernel/Makefile:
 	  
 	  Fixes to makefiles
 
 2008-02-27 20:21  calin.culianu
 
-	* addons/SoundTrig/Client/Matlab/@RTLSoundMachine/LoadSound.m:
+	* [r29]
+	  addons/SoundTrig/Client/Matlab/@RTLSoundMachine/LoadSound.m:
 	  
 	  - Modified LoadSound.m to once-again support non-200kHz sample
 	  rates..
@@ -1578,56 +1584,56 @@
 
 2008-02-27 20:04  calin.culianu
 
-	* INSTALL:
+	* [r28] INSTALL:
 	  
 	  Added one more step to instructions since in Fedora
 	  /usr/local/lib is missing from /etc/ld.so.conf
 
 2008-02-27 19:57  calin.culianu
 
-	* Makefile:
+	* [r27] Makefile:
 	  
 	  Fixed bug in makefile
 
 2008-02-27 19:55  calin.culianu
 
-	* utils/SendMatrix.c:
+	* [r26] utils/SendMatrix.c:
 	  
 	  Small 64bit tweak
 
 2008-02-27 19:53  calin.culianu
 
-	* kernel/fsm.c:
+	* [r25] kernel/fsm.c:
 	  
 	  More 64-bit tweaks
 
 2008-02-27 19:48  calin.culianu
 
-	* user/scanproc.c:
+	* [r24] user/scanproc.c:
 	  
 	  Small tweak
 
 2008-02-27 19:44  calin.culianu
 
-	* utils/GetMatrix.c:
+	* [r23] utils/GetMatrix.c:
 	  
 	  More 64-bit stuff
 
 2008-02-27 19:43  calin.culianu
 
-	* user/scanproc.c:
+	* [r22] user/scanproc.c:
 	  
 	  More 64-bit tweaks
 
 2008-02-27 19:36  calin.culianu
 
-	* user/FSMServer.cpp:
+	* [r21] user/FSMServer.cpp:
 	  
 	  Tweak for 64-bit cleanliness
 
 2008-02-27 18:41  calin.culianu
 
-	* Client/Matlab/NetClient/FSMClient.mexglx,
+	* [r20] Client/Matlab/NetClient/FSMClient.mexglx,
 	  Client/Matlab/NetClient/NetClient.h,
 	  addons/SoundTrig/SoundServer.cpp, addons/SoundTrig/WavFile.cpp:
 	  
@@ -1641,13 +1647,13 @@
 
 2008-02-27 03:19  calin.culianu
 
-	* addons/SoundTrig/SoundServer.cpp:
+	* [r19] addons/SoundTrig/SoundServer.cpp:
 	  
 	  More minor tweaks
 
 2008-02-27 03:06  calin.culianu
 
-	* addons/SoundTrig/SoundServer.cpp,
+	* [r18] addons/SoundTrig/SoundServer.cpp,
 	  addons/UserspaceExtTrig/module.c:
 	  
 	  Minor tweaks, and 1 bugfix to soundserver userspace triggering
@@ -1655,20 +1661,20 @@
 
 2008-02-27 02:53  calin.culianu
 
-	* Makefile:
+	* [r17] Makefile:
 	  
 	  Added soundserver to makefile
 
 2008-02-27 02:46  calin.culianu
 
-	* addons/SoundTrig/SoundServer.cpp:
+	* [r16] addons/SoundTrig/SoundServer.cpp:
 	  
 	  - First run of implementation of the sound server userspace
 	  triggering
 
 2008-02-26 23:40  calin.culianu
 
-	* addons/SoundTrig/Makefile, addons/SoundTrig/WavFile.cpp,
+	* [r15] addons/SoundTrig/Makefile, addons/SoundTrig/WavFile.cpp,
 	  addons/SoundTrig/WavFile.h, rtfsm.kdevelop.filelist,
 	  utils/WavFile.cpp, utils/WavFile.h:
 	  
@@ -1677,7 +1683,7 @@
 
 2008-02-26 23:34  calin.culianu
 
-	* Client/Matlab/@RTLSM/RTLSM.m,
+	* [r14] Client/Matlab/@RTLSM/RTLSM.m,
 	  Client/Matlab/@RTLSM/SetOutputRouting.m, Makefile, addons,
 	  addons/SoundTrig, addons/SoundTrig/Client,
 	  addons/SoundTrig/Client/Matlab,
@@ -1734,26 +1740,26 @@
 
 2008-02-22 18:56  calin.culianu
 
-	* INSTALL:
+	* [r13] INSTALL:
 	  
 	  Slight tweak to install doc
 
 2008-02-22 18:34  calin.culianu
 
-	* AUTHORS, INSTALL, README, TODO, include/Version.h:
+	* [r12] AUTHORS, INSTALL, README, TODO, include/Version.h:
 	  
 	  Bumped version number
 	  Wrote some quickie docs
 
 2008-02-22 17:12  calin.culianu
 
-	* kernel/fsm.c:
+	* [r11] kernel/fsm.c:
 	  
 	  Minor tweak to procfs output
 
 2008-02-22 16:58  calin.culianu
 
-	* kernel/Makefile, kernel/extra_mathfuncs.c,
+	* [r10] kernel/Makefile, kernel/extra_mathfuncs.c,
 	  kernel/extra_mathfuncs.h, kernel/fsm.c, rtfsm.kdevelop.filelist:
 	  
 	  - Added 'extra_mathfuncs.[ch]' to implement some of the missing
@@ -1765,31 +1771,31 @@
 
 2008-02-22 02:18  calin.culianu
 
-	* kernel/fsm.c:
+	* [r9] kernel/fsm.c:
 	  
 	  Added task period to proc stats
 
 2008-02-22 02:13  calin.culianu
 
-	* kernel/fsm.c:
+	* [r8] kernel/fsm.c:
 	  
 	  Addded 'cycle cost' stats to fsm proc output
 
 2008-02-22 01:53  calin.culianu
 
-	* kernel/fsm.c:
+	* [r7] kernel/fsm.c:
 	  
 	  Fixed broken stats printing of FSM
 
 2008-02-22 01:13  calin.culianu
 
-	* kernel/fsm.c, rtfsm.kdevelop.pcs, rtfsm.kdevses:
+	* [r6] kernel/fsm.c, rtfsm.kdevelop.pcs, rtfsm.kdevses:
 	  
 	  Added some additional statistics on latency to proc
 
 2008-02-22 00:05  calin.culianu
 
-	* rtfsm.kdevelop, rtfsm.kdevelop.pcs, rtfsm.kdevses,
+	* [r5] rtfsm.kdevelop, rtfsm.kdevelop.pcs, rtfsm.kdevses,
 	  user/FSMServer.cpp:
 	  
 	  Tweak to allow FSMServer to be more tolerant when parsing int
@@ -1797,14 +1803,14 @@
 
 2008-02-21 23:24  calin.culianu
 
-	* Client/Matlab/@RTLSM/SetStateProgram.m, user/FSMServer.cpp:
+	* [r4] Client/Matlab/@RTLSM/SetStateProgram.m, user/FSMServer.cpp:
 	  
 	  Fixed bug in SetStateProgram whereby input spec string was being
 	  incorrectly generated
 
 2008-02-21 22:41  calin.culianu
 
-	* user/FSMServer.cpp:
+	* [r3] user/FSMServer.cpp:
 	  
 	  Fixed bug where server was expecting a non-url-encoded input spec
 	  whereas
@@ -1812,7 +1818,7 @@
 
 2008-02-21 21:55  calin.culianu
 
-	* AUTHORS, COPYING, ChangeLog, Client, Client/Matlab,
+	* [r2] AUTHORS, COPYING, ChangeLog, Client, Client/Matlab,
 	  Client/Matlab/@RTLSM, Client/Matlab/@RTLSM/BypassDout.m,
 	  Client/Matlab/@RTLSM/ChkConn.m,
 	  Client/Matlab/@RTLSM/ClearScheduledWaves.m,
@@ -1909,7 +1915,7 @@
 
 2008-02-18 19:02  
 
-	* .:
+	* [r1] .:
 	  
 	  Initial directory structure.
 
