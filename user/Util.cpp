@@ -5,6 +5,11 @@
 #include <iostream>
 #include <ctype.h>
 #include <sys/time.h> /* for struct timeval and gettimeofday -- for non-Unix we need to figure out a way to handle this */
+#ifdef OS_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 pthread_mutex_t Log::mut = PTHREAD_MUTEX_INITIALIZER;
 std::ostream * volatile Log::logstream = 0; // in case we want to log other than std::cerr..
 
@@ -113,3 +118,20 @@ double Timer::elapsed() const
 
 // static
 double Timer::now() { struct timeval ts; ::gettimeofday(&ts, 0); return double(ts.tv_sec) + ts.tv_usec/1e6; }
+
+const std::string & TmpPath()
+{
+    static std::string tmp = "";
+    if (!tmp.length()) {
+#if defined(OS_WINDOWS)
+        char buf[256];    
+        GetTempPathA(sizeof(buf), buf);
+        buf[sizeof(buf)-1] = 0;
+        tmp = buf;
+#else
+        tmp = "/tmp/";
+#endif
+    }
+    return tmp;
+}
+

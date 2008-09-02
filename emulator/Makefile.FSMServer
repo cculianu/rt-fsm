@@ -1,0 +1,52 @@
+ifndef OS
+        $(error Please define the OS make variable to one of: OS_LINUX, OS_OSX, OS_WINDOWS)
+endif
+
+SRC = ../user/FSMServer.cpp ../user/rtos_utility.cpp ../user/Util.cpp ../kernel/deflate_helper.c  
+PRG_OBJS = FSMServer.o rtos_utility.o deflate_helper.o Util.o 
+PRG = FSMServer
+CXX=g++
+CC=gcc
+CXXFLAGS=-g -DEMULATOR -D$(OS) -W -Wall -g -I../include -I ../user -I ../kernel
+LDFLAGS=-lz -lpthread
+ifeq ($(OS),OS_WINDOWS)
+        CXXFLAGS += -I ./win32
+        LDFLAGS += -L ./win32
+        PRG = FSMServer.exe
+else
+        SRC += ../user/scanproc.c 
+        PRG_OBJS += scanproc.o
+endif
+
+.cpp.o:
+	$(CXX) $(CXXFLAGS) -c $<
+
+all: .deps $(PRG) 
+
+scanproc.o: ../user/scanproc.c
+	$(CC) $(CXXFLAGS) -c -o $@ $<
+
+deflate_helper.o: ../kernel/deflate_helper.c
+	$(CC) $(CXXFLAGS) -c -o $@ $<
+
+Util.o: ../user/Util.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+rtos_utility.o: ../user/rtos_utility.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+FSMServer.o: ../user/FSMServer.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(PRG): $(PRG_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(PRG_OBJS)
+
+.deps: 
+	-cp -f Makefile.FSMServer.bak Makefile.FSMServer || true
+	-makedepend -f Makefile.FSMServer -- $(CXXFLAGS) --  $(SRC) 2> mkdep.out || cat mkdep.out 1>&2
+	-rm -f mkdep.out
+	touch .deps
+
+clean:
+	-cp -f Makefile.FSMServer.bak Makefile.FSMServer || true
+	rm -f *~ *.o Makefile.FSMServer.bak .deps $(PRG)

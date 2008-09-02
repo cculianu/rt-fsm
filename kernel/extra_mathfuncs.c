@@ -18,7 +18,11 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 #include "extra_mathfuncs.h"
+#if !defined(OS_OSX) && !defined(OS_WINDOWS)
 #include <ieee754.h>
+/*#elif defined(OS_WINDOWS)
+  #include <ieeefp.h>*/
+#endif
 #define IBMPC 1
 #define DENORMAL 1
 extern double pow(double, double); /**< provided by rtmath */
@@ -28,8 +32,10 @@ extern double exp ( double ); /**< provided by rtmath */
 extern double fabs ( double ); /**< provided by rtmath */
 extern double frexp ( double, int * );
 extern double ldexp ( double, int );
+#if !defined(OS_OSX) && !defined(OS_WINDOWS)
 extern int isnan(double);
 extern int signbit ( double );
+#endif
 #define mtherr(a,b) do {  } while(0)
 static const unsigned short MACHEP_[4] = {0x0000,0x0000,0x0000,0x3ca0};
 #define MACHEP (*(const double *)MACHEP_)
@@ -39,20 +45,28 @@ static const unsigned short MINLOG_[4] = {0x3052,0xd52d,0x4910,0xc087};
 #define MINLOG (*(const double *)MINLOG_)
 static const unsigned short MAXNUM_[4] = {0xffff,0xffff,0xffff,0x7fef};
 #define MAXNUM (*(const double *)MAXNUM_)
+#ifndef OS_OSX
 static const unsigned short INFINITY_[4] = {0x0000,0x0000,0x0000,0x7ff0};
 #define INFINITY (*(const double *)INFINITY_)
 static const unsigned short NAN_[4] = {0x0000,0x0000,0x0000,0x7ffc};
 #define NAN (*(const double *)NAN_)
+#endif
 static const unsigned short NEGZERO_[4] = {0x0000,0x0000,0x0000,0x8000};
 #define NEGZERO (*(const double *)NEGZERO_)
 static const unsigned short LOGE2_[4]  = {0x39ef,0xfefa,0x2e42,0x3fe6};
 #define LOGE2 (*(const double *)LOGE2_)
 
+#ifdef OS_WINDOWS
+double gamma(double x) { return lgamma(x); }
+#endif
+
+#if !defined(OS_OSX) && !defined(OS_WINDOWS)
 int isnan(double d)
 {
     union ieee754_double *u = (union ieee754_double *)&d; 
     return u->ieee_nan.exponent == 2047 && (u->ieee.mantissa0 || u->ieee.mantissa1);
 }
+#endif
 
 double fac(int i) 
 { 

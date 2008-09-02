@@ -1,0 +1,57 @@
+ifndef OS
+        $(error Please define the OS make variable to one of: OS_LINUX, OS_OSX, OS_WINDOWS)
+endif
+
+SRC = ../addons/SoundTrig/SoundServer.cpp ../user/rtos_utility.cpp ../user/Util.cpp ../addons/SoundTrig/WavFile.cpp 
+PRG_OBJS = SoundServer.o rtos_utility.o Util.o WavFile.o
+PRG = SoundServer
+CXX=g++
+CC=gcc
+CXXFLAGS=-g -DEMULATOR -D$(OS) -W -Wall -g -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
+
+ifeq ($(OS),OS_LINUX)
+        SRC +=   ../user/scanproc.c 
+        PRG_OBJS += scanproc.o
+endif
+ifeq ($(OS),OS_OSX)
+        SRC +=   ../user/scanproc.c 
+        PRG_OBJS += scanproc.o
+endif
+ifeq ($(OS),OS_WINDOWS)
+        CXXFLAGS += -I ./win32
+endif
+
+.cpp.o:
+	$(CXX) $(CXXFLAGS) -c $<
+
+all: .deps $(PRG) 
+
+scanproc.o: ../user/scanproc.c
+	$(CC) $(CXXFLAGS) -c -o $@ $<
+
+Util.o: ../user/Util.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+rtos_utility.o: ../user/rtos_utility.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+SoundServer.o: ../addons/SoundTrig/SoundServer.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+WavFile.o: ../addons/SoundTrig/WavFile.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(PRG): $(PRG_OBJS)
+	$(CXX) $(CXXFLAGS) -lpthread -o $@ $(PRG_OBJS)
+
+.deps: 
+	-cp -f Makefile.SoundServer.bak Makefile.SoundServer || true
+	-makedepend -f Makefile.SoundServer -- $(CXXFLAGS) --  $(SRC) 2> mkdep.out || cat mkdep.out 1>&2
+	-rm -f mkdep.out
+	touch .deps
+
+clean:
+	-cp -f Makefile.SoundServer.bak Makefile.SoundServer || true
+	rm -f *~ *.o Makefile.SoundServer.bak .deps $(PRG)
+ 
+

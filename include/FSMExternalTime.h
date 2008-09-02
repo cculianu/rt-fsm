@@ -1,8 +1,16 @@
 #ifndef FSMExternalTime_H
 #define FSMExternalTime_H
 
+#ifdef EMULATOR
+
+#include "kernel_emul.h"
+
+#else
+
 #ifndef __KERNEL__
 #   error This is a kernel header, and is not really compatible or intended to be used by userspace programs!
+#endif
+
 #endif
 
 #define FSM_EXT_TIME_SHM_NAME "FTimeSHM"

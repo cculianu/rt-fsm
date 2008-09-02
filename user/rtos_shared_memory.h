@@ -207,6 +207,11 @@ static inline void num2nam(unsigned long num, char *name)
 #define RTAI_IOCTL_CMD_FREE   188
 #define RTAI_IOCTL_CMD_GET_SZ 189
 
+#if defined(OS_OSX) && !defined(MAP_LOCKED)
+#define MAP_LOCKED_EMUL
+#define MAP_LOCKED 0
+#endif
+
 static inline void *rtai_malloc_adr(void *start_address, unsigned long name,  unsigned long size)
 {
         void *adr = 0;
@@ -230,6 +235,10 @@ static inline void *rtai_malloc_adr(void *start_address, unsigned long name,  un
  
         return adr;
 }
+#if defined(MAP_LOCKED_EMUL)
+#undef MAP_LOCKED 
+#undef MAP_LOCKED_EMUL
+#endif
 
 static inline void *rtai_malloc(unsigned long name, unsigned long size)
 {

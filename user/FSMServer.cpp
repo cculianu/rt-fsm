@@ -4,34 +4,43 @@
 #ifndef _REENTRANT
 #define _REENTRANT
 #endif
-#include "FSM.h"
-#include "rtos_utility.h"
-#include "deflate_helper.h"
-#include "scanproc.h"
-#include "Version.h"
-#include "Mutex.h"
-#include "Util.h"
 
+#ifdef OS_WINDOWS
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  include <winsock2.h>
+#  define SHUT_RDWR SD_BOTH
+#  define MSG_NOSIGNAL 0
+   typedef int socklen_t;
+   static int inet_aton(const char *cp, struct in_addr *inp);
+   static const char * WSAGetLastErrorStr(int err_num = -1);
+#  define GetLastNetErrStr() (WSAGetLastErrorStr(WSAGetLastError()))
+#else
+#  include <sys/socket.h>
+#  include <sys/ioctl.h>
+#  include <netinet/in.h>
+#  include <netinet/ip.h> /* superset of previous */
+#  include <netinet/tcp.h> 
+#  include <netdb.h> /* for gethostbyname, etc */
+#  include <arpa/inet.h>
+#  define closesocket(x) close(x)
+#  define GetLastNetErrStr() (strerror(errno))
+#endif
 #include <unistd.h>
-#include <sys/socket.h>
+
+#include <regex.h>
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <time.h>
-#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <errno.h>
-#include <netinet/in.h>
-#include <netinet/ip.h> /* superset of previous */
-#include <netinet/tcp.h> 
-#include <netdb.h> /* for gethostbyname, etc */
 #include <signal.h>
-#include <arpa/inet.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <pthread.h>
 #include <limits.h>
-#include <regex.h>
 
 #include <cstdlib>
 #include <iostream>
@@ -47,7 +56,17 @@
 #include <set>
 #include <fstream>
 
-#if defined(OS_CYGWIN) || defined(OS_OSX)
+#include "FSM.h"
+#include "rtos_utility.h"
+#include "deflate_helper.h"
+#if defined(OS_LINUX) || defined(OS_OSX)
+#include "scanproc.h"
+#endif
+#include "Version.h"
+#include "Mutex.h"
+#include "Util.h"
+
+#if defined(OS_CYGWIN) || defined(OS_OSX) || defined(OS_WINDOWS)
 namespace {
   /* Cygwin (and OSX?) lacks this function, so we will emulate it using 
      a static mutex */
@@ -170,7 +189,6 @@ namespace
   std::string MakefileTemplatePath() { return IsKernel26() ? (IsFastEmbCBuilds() ? "runtime/EmbC.build/Makefile_for_Kbuild.EmbC" : "runtime/Kernel2.6MakefileTemplate") : ""; }
   std::string Makefile() { return (IsKernel26() && IsFastEmbCBuilds()) ? "Makefile_for_Kbuild.EmbC" : ""; }
   std::string LdPath() { return "ld"; }
-  std::string TmpPath() { return "/tmp/"; } // TODO handle Win32 tmp path..?
   std::string InsMod() { return "/sbin/insmod"; }
   std::string RmProg() { return "rm -f"; }
   bool FileExists(const std::string &f);
@@ -202,7 +220,9 @@ struct FSMSpecific
       fifo_nrt_output(RTOS::INVALID_FIFO),
       transBuf(2048), // store 2048 strate transitions in memory from transNotify thread
       daqBuf(128*2048), // store 128000 scans in memory from daq thread
+#ifndef OS_WINDOWS
       transNotifyThread(0), daqReadThread(0),
+#endif
       daqNumChans(0), daqMaxData(1), aoMaxData(1),
       daqRangeMin(0.), daqRangeMax(5.)
   {
@@ -343,7 +363,7 @@ pthread_mutex_t ConnectionThread::compileLock = PTHREAD_MUTEX_INITIALIZER;
 ConnectionThread::ConnectionThread() : sock(-1), thread_running(false), thread_ran(false), sockbuf_len(0) { myid = id++; fsm_id = 0; shm_num = 0; client_ver = 0; sockbuf[0] = 0; }
 ConnectionThread::~ConnectionThread()
 { 
-  if (sock > -1)  ::shutdown(sock, SHUT_RDWR), ::close(sock), sock = -1;
+  if (sock > -1)  shutdown(sock, SHUT_RDWR), closesocket(sock), sock = -1;
   if (isRunning())  pthread_join(handle, NULL), thread_running = false;
   Log() <<  "deleted." << std::endl;
 }
@@ -425,19 +445,20 @@ static void openFifos()
 {
   for (int f = 0; f < NUM_STATE_MACHINES; ++f) {
     FSMSpecific & fsm = fsms[f];
-    fsm.fifo_in = RTOS::openFifo(shm->fifo_out[f]);
-    if (fsm.fifo_in == RTOS::INVALID_FIFO) throw Exception ("Could not open RTF fifo_in for reading");
+    std::string errmsg;
+    fsm.fifo_in = RTOS::openFifo(shm->fifo_out[f], RTOS::Read, &errmsg);
+    if (fsm.fifo_in == RTOS::INVALID_FIFO) throw Exception (std::string("Could not open RTF fifo_in for reading: ") + errmsg);
     // Clear any pending/stale data in case we crashed last time and
     // couldn't read all data off reply fifo
     fifoReadAllAvail(fsm.fifo_in);
-    fsm.fifo_out = RTOS::openFifo(shm->fifo_in[f], RTOS::Write);
-    if (fsm.fifo_out == RTOS::INVALID_FIFO) throw Exception ("Could not open RTF fifo_out for writing");
-    fsm.fifo_trans = RTOS::openFifo(shm->fifo_trans[f], RTOS::Read);
-    if (fsm.fifo_trans == RTOS::INVALID_FIFO) throw Exception ("Could not open RTF fifo_trans for reading");
-    fsm.fifo_daq = RTOS::openFifo(shm->fifo_daq[f], RTOS::Read);
-    if (fsm.fifo_daq == RTOS::INVALID_FIFO) throw Exception ("Could not open RTF fifo_daq for reading");
-    fsm.fifo_nrt_output = RTOS::openFifo(shm->fifo_nrt_output[f], RTOS::Read);
-    if (fsm.fifo_nrt_output == RTOS::INVALID_FIFO) throw Exception ("Could not open RTF fifo_nrt_output for reading");
+    fsm.fifo_out = RTOS::openFifo(shm->fifo_in[f], RTOS::Write, &errmsg);
+    if (fsm.fifo_out == RTOS::INVALID_FIFO) throw Exception (std::string("Could not open RTF fifo_out for writing: ") + errmsg);
+    fsm.fifo_trans = RTOS::openFifo(shm->fifo_trans[f], RTOS::Read, &errmsg);
+    if (fsm.fifo_trans == RTOS::INVALID_FIFO) throw Exception (std::string("Could not open RTF fifo_trans for reading: ") + errmsg);
+    fsm.fifo_daq = RTOS::openFifo(shm->fifo_daq[f], RTOS::Read, &errmsg);
+    if (fsm.fifo_daq == RTOS::INVALID_FIFO) throw Exception (std::string("Could not open RTF fifo_daq for reading: ") + errmsg);
+    fsm.fifo_nrt_output = RTOS::openFifo(shm->fifo_nrt_output[f], RTOS::Read, &errmsg);
+    if (fsm.fifo_nrt_output == RTOS::INVALID_FIFO) throw Exception (std::string("Could not open RTF fifo_nrt_output for reading: ") + errmsg);
   }
 }
 
@@ -481,10 +502,71 @@ static void createNRTReadThreads()
   }
 }
 
+#ifdef OS_WINDOWS
+static void doWsaStartup()
+{
+    WORD wVersionRequested;
+    WSADATA wsaData;
+    int err;
+
+/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
+    wVersionRequested = MAKEWORD(2, 2);
+
+    err = WSAStartup(wVersionRequested, &wsaData);
+    if (err != 0) {
+        /* Tell the user that we could not find a usable */
+        /* Winsock DLL.                                  */
+        printf("WSAStartup failed with error: %d\n", err);
+        _exit(1);
+    }
+}
+#endif
+
+
+static void cleanupTmpFiles()
+{
+  std::cerr << "Deleting old/crufty FSM files from TEMP dir..\n";
+#ifdef OS_WINDOWS
+  std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\fsm*_*.c").c_str());
+  std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\fsm*_*.def").c_str());
+  std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\fsm*_*.dll").c_str());
+#else
+  std::system((std::string("rm -fr '") + TmpPath() + "'/fsm*_*.c").c_str());
+  std::system((std::string("rm -fr '") + TmpPath() + "'/fsm*_*.so").c_str());
+#endif
+}
+
+static bool isSingleInstance()
+{
+#if defined(OS_LINUX) || defined(OS_OSX)
+    return ::num_procs_of_my_exe_no_children() <= 1;
+#elif defined(OS_OSX)
+    return true;
+#elif defined(OS_WINDOWS)
+    HANDLE mut = CreateMutexA(NULL, FALSE, "Global\\FSMServer.exe.Mutex");
+    if (mut) {
+        DWORD res = WaitForSingleObject(mut, 1000);
+        switch (res) {
+        case WAIT_ABANDONED:
+        case WAIT_OBJECT_0:
+            return true;
+        default:
+            return false;
+        }
+    }
+    // note: handle stays open, which is ok, because when process terminates it will auto-close
+#endif
+    return true;
+}
+
 static void init()
 {
-  if (::num_procs_of_my_exe_no_children() > 1) 
-    throw Exception("It appears another copy of this program is already running!\n");
+  if (!isSingleInstance())
+      throw Exception("It appears another copy of this program is already running!\n");
+#ifdef OS_WINDOWS
+  doWsaStartup();
+#endif
+  cleanupTmpFiles();
 #if !defined(EMULATOR)  
   if (::geteuid() != 0)
     throw Exception("Need to be root or setuid-root to run this program as it requires the ability to load kernel modules!");
@@ -510,9 +592,12 @@ static void init()
   
 static void cleanup(void)
 {
-  if (listen_fd >= 0) { ::close(listen_fd);  listen_fd = -1; }
+  if (listen_fd >= 0) { shutdown(listen_fd, SHUT_RDWR), closesocket(listen_fd);  listen_fd = -1; }
   closeFifos();
   if (shm) { RTOS::shmDetach((void *)shm); shm = 0; }
+#ifdef OS_WINDOWS
+  WSACleanup();
+#endif
 }
 
 
@@ -548,9 +633,10 @@ static void handleArgs(int argc, char *argv[])
 
 static void sighandler(int sig)
 {
-    
+#ifndef OS_WINDOWS    
   if (sig == SIGPIPE) return; // ignore SIGPIPE..
-    
+#endif
+
   /*try {
     sendToRT(PAUSEUNPAUSE);
     } catch (...) {}*/
@@ -592,10 +678,10 @@ static void doServer(void)
 {
   //do the server listen, etc..
     
-  listen_fd = ::socket(PF_INET, SOCK_STREAM, 0);
+  listen_fd = socket(PF_INET, SOCK_STREAM, 0);
 
   if (listen_fd < 0) 
-    throw Exception(std::string("socket: ") + strerror(errno));
+    throw Exception(std::string("socket: ") + GetLastNetErrStr());
 
   struct sockaddr_in inaddr;
   socklen_t addr_sz = sizeof(inaddr);
@@ -608,23 +694,25 @@ static void doServer(void)
     Log() << "EmbC compiler override: " << CompilerPath() << std::endl;
   Log() << "Listening for connections on port: " << listenPort << std::endl; 
 
-  int parm = 1;
-  if (::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &parm, sizeof(parm)) )
-    Log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
   
-  if ( ::bind(listen_fd, (struct sockaddr *)&inaddr, addr_sz) != 0 ) 
-    throw Exception(std::string("bind: ") + strerror(errno));
+  const int parm_int = 1, parmsz = sizeof(parm_int);
+  const char *parm = (const char *)&parm_int;
+  if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, parm, parmsz) )
+    Log() << "Error: setsockopt returned " << GetLastNetErrStr() << std::endl; 
   
-  if ( ::listen(listen_fd, 1) != 0 ) 
-    throw Exception(std::string("listen: ") + strerror(errno));
+  if ( bind(listen_fd, (struct sockaddr *)&inaddr, addr_sz) != 0 ) 
+    throw Exception(std::string("bind: ") + GetLastNetErrStr());
+  
+  if ( listen(listen_fd, 1) != 0 ) 
+    throw Exception(std::string("listen: ") + GetLastNetErrStr());
 
   while (1) {
     int sock;
-    if ( (sock = ::accept(listen_fd, (struct sockaddr *)&inaddr, &addr_sz)) < 0 ) 
-      throw Exception(std::string("accept: ") + strerror(errno));
+    if ( (sock = accept(listen_fd, (struct sockaddr *)&inaddr, &addr_sz)) < 0 ) 
+      throw Exception(std::string("accept: ") + GetLastNetErrStr());
 
-    if (::setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &parm, sizeof(parm)) )
-      Log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
+    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, parm, parmsz) )
+      Log() << "Error: setsockopt returned " << GetLastNetErrStr() << std::endl; 
     
     ConnectionThread *conn = new ConnectionThread;
     pthread_mutex_lock(&connectedThreadsLock);
@@ -646,13 +734,15 @@ int main(int argc, char *argv[])
   // install our signal handler that tries to pause the rt-process and
   // quit the program
   signal(SIGINT, sighandler);
+  signal(SIGTERM, sighandler);
+#ifndef OS_WINDOWS
   signal(SIGPIPE, sighandler);
   signal(SIGQUIT, sighandler);
   signal(SIGHUP, sighandler);
-  signal(SIGTERM, sighandler);
+#endif
 
   try {
-  
+ 
     handleArgs(argc, argv);
 
     init();
@@ -1187,8 +1277,8 @@ void *ConnectionThread::threadFunc(void)
   Log() << "Connection to host " << remoteHost << " ended after " << connectionTimer.elapsed() << " seconds." << std::endl; 
     
 
-  ::shutdown(sock, SHUT_RDWR);
-  ::close(sock);
+  shutdown(sock, SHUT_RDWR);
+  closesocket(sock);
   sock = -1;
   thread_running = false;
   Log() << " thread exit." << std::endl; 
@@ -1262,7 +1352,7 @@ int ConnectionThread::sockSend(const std::string & str)
 
 int ConnectionThread::sockSend(const void *buf, size_t len, bool is_binary, int flags)
 {
-  const char *charbuf = static_cast<const char *>(buf);
+  const char * const charbuf = static_cast<const char *>(buf);
   if (!is_binary) {
     std::stringstream ss;
     ss << "Sending: " << charbuf; 
@@ -1271,9 +1361,9 @@ int ConnectionThread::sockSend(const void *buf, size_t len, bool is_binary, int 
   } else {
     Log() << "Sending binary data of length " << len << std::endl;   
   }
-  int ret = ::send(sock, buf, len, flags);
+  int ret = send(sock, charbuf, len, flags);
   if (ret < 0) {
-    Log() << "ERROR returned from send: " << strerror(errno) << std::endl; 
+    Log() << "ERROR returned from send: " << GetLastNetErrStr() << std::endl; 
   } else if (ret != (int)len) {
     Log() << "::send() returned the wrong size; expected " << len << " got " << ret << std::endl; 
   }
@@ -1296,7 +1386,7 @@ std::string ConnectionThread::sockReceiveLine(bool suppressLineLog)
   // keep looping until we fill the buffer, or we get a \n
   // eg: slen < MAXLINE and (if nread then buf[slen-1] must not equal \n)
   while ( !(nlpos = strFind(sockbuf, sockbuf_len, '\n')) && sockbuf_len < (MAX_LINE-1) ) {
-    ret = ::recv(sock, sockbuf+sockbuf_len, (MAX_LINE-1)-sockbuf_len, 0);
+    ret = recv(sock, sockbuf+sockbuf_len, (MAX_LINE-1)-sockbuf_len, 0);
     if (ret <= 0) break;
     sockbuf_len += ret;
     sockbuf[sockbuf_len] = 0; // add NUL, nust to be paranoid
@@ -1308,10 +1398,10 @@ std::string ConnectionThread::sockReceiveLine(bool suppressLineLog)
   long num = nlpos-sockbuf+1;
   rets.assign(sockbuf, num); // assign to string
   if (num < (long)sockbuf_len)  // now deal with cruft left over in the sockbuf.. move everything over
-    ::memmove(sockbuf, nlpos+1, sockbuf_len-num);
+    memmove(sockbuf, nlpos+1, sockbuf_len-num);
   sockbuf_len -= num;
   // now, trim trailing spaces
-  while(rets.length() && ::isspace(*rets.rbegin())) 
+  while(rets.length() && isspace(*rets.rbegin())) 
       rets.erase(rets.length()-1, 1); 
   
   if (!suppressLineLog)
@@ -1326,17 +1416,17 @@ int ConnectionThread::sockReceiveData(void *buf, int size, bool is_binary)
   
   // first flush out our line-read buffer since it may have data we were interested in
   if (n2cpy) {
-    ::memcpy(buf, sockbuf, n2cpy);
-    ::memmove(sockbuf, sockbuf+n2cpy, sockbuf_len-n2cpy);
+    memcpy(buf, sockbuf, n2cpy);
+    memmove(sockbuf, sockbuf+n2cpy, sockbuf_len-n2cpy);
     sockbuf_len -= n2cpy;
     nread += n2cpy;
   }
   
   while (nread < size) {
-    int ret = ::recv(sock, (char *)(buf) + nread, size - nread, 0);
+    int ret = recv(sock, (char *)(buf) + nread, size - nread, 0);
     
     if (ret < 0) {
-      Log() << "ERROR returned from recv: " << strerror(errno) << std::endl; 
+      Log() << "ERROR returned from recv: " << GetLastNetErrStr() << std::endl; 
       return ret;
     } else if (ret == 0) {
       Log() << "ERROR in recv, connection probably closed." << std::endl; 
@@ -1353,7 +1443,7 @@ int ConnectionThread::sockReceiveData(void *buf, int size, bool is_binary)
   } else {
     Log() << "Got: " << nread << " bytes." << std::endl; 
     if (nread != size) {
-      Log() << "INFO ::recv() returned the wrong size; expected " << size << " got " << nread << std::endl; 
+      Log() << "INFO recv() returned the wrong size; expected " << size << " got " << nread << std::endl; 
     }
   }
   return nread;
@@ -1405,7 +1495,7 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
   }
 
   msg.id = FSM;
-  ::memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero
+  memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero
   // setup matrix here..
   msg.u.fsm.n_rows = m.rows(); // note this will get set to inpRow later in this function via the alias nRows...
   msg.u.fsm.n_cols = m.cols();
@@ -1673,7 +1763,7 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
     Log() << "The generated, compressed FSM program text is too large! Size is: " << defSz << " whereas size limit is: " << FSM_PROGRAM_SIZE << "!\n"; 
     return false;
   }
-  ::memcpy(msg.u.fsm.program.program_z, defBuf.get(), defSz);
+  memcpy(msg.u.fsm.program.program_z, defBuf.get(), defSz);
   msg.u.fsm.program.program_len = sz;
   msg.u.fsm.program.program_z_len = defSz;
   // compress the FSM raw matrix text as a URLEncoded stringtable, put it in msg.u.fsm.matrix_z
@@ -1689,16 +1779,14 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
     Log() << "The generated, compressed raw matrix text is too large! Size is: " << defSz << " whereas size limit is: " << FSM_MATRIX_SIZE << "!\n"; 
     return false;
   }
-  ::memcpy(msg.u.fsm.program.matrix_z, defBuf.get(), defSz);
+  memcpy(msg.u.fsm.program.matrix_z, defBuf.get(), defSz);
   freeDHBuf(defBuf.release());
   msg.u.fsm.program.matrix_len = sz;
   msg.u.fsm.program.matrix_z_len = defSz;
-  ::strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
+  strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
   msg.u.fsm.name[sizeof(msg.u.fsm.name)-1] = 0;
   msg.u.fsm.wait_for_jump_to_state_0_to_swap_fsm = state0_fsm_swap_flg;
-#ifndef EMULATOR
   if (!doCompileLoadProgram(fsm_shm_name, fsm_prog)) return false;
-#endif
   sendToRT(msg);
   return true;
 }
@@ -1716,12 +1804,61 @@ bool ConnectionThread::doCompileLoadProgram(const std::string & prog_name, const
     ret = false;
   }
   if (debug)
+#ifndef EMULATOR
     Log() << "DEBUG MODE, build dir '" << TmpPath() << prog_name << ".build' not unlinked.\n";
+#else
+    Log() << "DEBUG MODE, build dir '" << TmpPath() << prog_name << ".c' not unlinked.\n";
+#endif
   else
     unlinkModule(prog_name);  
   return ret;
 }
-                   
+
+
+#ifdef EMULATOR
+#if defined(OS_LINUX) || defined(OS_OSX) || defined(OS_WINDOWS)
+bool ConnectionThread::compileProgram(const std::string & prog_name, const std::string & prog_text) const
+{
+    std::string fname = TmpPath() + prog_name + ".c", 
+#ifdef OS_WINDOWS
+        soname = TmpPath() + prog_name + ".dll", 
+#else
+        soname = TmpPath() + prog_name + ".so", 
+#endif
+        wname = "embc_so_wrapper.c";
+    std::ofstream of(fname.c_str(), std::ios::out|std::ios::trunc);
+    
+    of.write(prog_text.c_str(), prog_text.length());
+    of.close();
+#if defined(OS_WINDOWS)
+    struct stat st;
+    if (!::stat((std::string("../")+wname).c_str(), &st))
+        wname = std::string("../")+wname;
+    return System(std::string("tcc\\tcc -DOS_WINDOWS -DNEED_INT64 -DUNDEF_INT64 -W -O2 -shared -rdynamic -I. -I ../../include -o \"") + soname + "\" \"" + fname + "\" \"" + wname + "\"");
+#elif defined(OS_LINUX) 
+    return System(std::string("gcc -DOS_LINUX -W -O2 -shared -fPIC -export-dynamic -I../include  -o '") + soname + "' '" + fname + "' '" + wname + "'");
+#elif defined(OS_OSX)
+    return System(std::string("gcc -DOS_OSX -W -dynamiclib -fPIC -I../include -I. -I../../include -o '") + soname + "' '" + fname + "' '" + wname + "'");
+#endif
+}
+
+bool ConnectionThread::unlinkModule(const std::string & program_name) const
+{
+    std::string fname = TmpPath() + program_name + ".c";
+    return System("rm -fr '" + fname + "'");
+}
+
+bool ConnectionThread::loadModule(const std::string & program_name) const
+{
+    (void)program_name;
+    /*std::string modname = TmpPath() + program_name + ".so";*/
+    /* NOOP for emulator */
+  return true;
+}
+#elif defined(OS_WINDOWS)
+#error doCompileLoadProgram needs to be implemented for Windows!
+#endif
+#else               
 bool ConnectionThread::compileProgram(const std::string & fsm_name, const std::string & program_text) const
 {
   bool ret = false;
@@ -1791,9 +1928,9 @@ bool ConnectionThread::unlinkModule(const std::string & program_name) const
   if ( IsKernel24() ) {
     std::string modname = TmpPath() + program_name, cfile = TmpPath() + program_name + ".c", objfile = TmpPath() + program_name + ".o";
     int ret = 0;
-    ret |= ::unlink(modname.c_str());
-    ret |= ::unlink(cfile.c_str());
-    ret |= ::unlink(objfile.c_str());
+    ret |= remove(modname.c_str());
+    ret |= remove(cfile.c_str());
+    ret |= remove(objfile.c_str());
     return ret == 0;
   } else if ( IsKernel26() ) {
       if (IsFastEmbCBuilds()) {
@@ -1806,6 +1943,7 @@ bool ConnectionThread::unlinkModule(const std::string & program_name) const
     Log() << "ERROR: Unsupported Kernel version in ConnectionThread::unlinkModule()!";
   return false;
 }
+#endif
 
 bool ConnectionThread::matrixToRT(const Matrix & m, 
                                   unsigned numEvents, 
@@ -1846,7 +1984,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
     return false;
   }
   msg.id = FSM;
-  ::memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero
+  memset(&msg.u.fsm, 0, sizeof(msg.u.fsm)); // zero memory since some code assumes unset values are zero
   
   // setup matrix here..
   msg.u.fsm.n_rows = m.rows(); // note this will get set to inpRow later in this function via the alias nRows...
@@ -1980,7 +2118,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   msg.u.fsm.wait_for_jump_to_state_0_to_swap_fsm = state0_fsm_swap_flg;
 
   std::string fsm_shm_name = newShmName(); // the name is not really for a shm, just descriptive/unique
-  ::strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
+  strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
   msg.u.fsm.name[sizeof(msg.u.fsm.name)-1] = 0;
 
   sendToRT(msg);
@@ -2115,8 +2253,13 @@ void ConnectionThread::doNotifyEvents(bool verbose)
   lastct = f.transBuf.count();
   pthread_mutex_unlock(&f.transNotifyLock);
   while (sock > -1 && !err) {
+#ifdef OS_WINDOWS
+    unsigned long nready;
+    ioctlsocket(sock, FIONREAD, &nready);
+#else
     int nready;
-    ::ioctl(sock, FIONREAD, &nready);
+    ioctl(sock, FIONREAD, &nready);
+#endif
     if (nready > 0) {
       // socket got data! abort it all since this is outside of protocol spec!
       char buf[nready > 1024 ? 1024 : nready];
@@ -2128,7 +2271,7 @@ void ConnectionThread::doNotifyEvents(bool verbose)
     while ((ct = f.transBuf.count()) == lastct && sock > -1) {
       struct timeval now;
       struct timespec timeout;
-      ::gettimeofday(&now, NULL);
+      gettimeofday(&now, NULL);
       // wait 1 second on the condition
       timeout.tv_sec = now.tv_sec + 1;
       timeout.tv_nsec = now.tv_usec * 1000;
@@ -2231,24 +2374,25 @@ void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP, bool isBin) const
         char hostEntAux[32768];
         unsigned datalen = 0;
         const void *data = 0;
+        const char *datachar = 0;
         std::string packetText;
         
         if (!isBin) {
             packetText = FormatPacketText(nrt->ip_packet_fmt, nrt);
-            data = packetText.c_str();
+            data = datachar = packetText.c_str();
             datalen = packetText.length();
 #ifdef EMULATOR
             Log() << "Sending to " << nrt->ip_host << ":" << nrt->ip_port << " data: '" << packetText << "'\n";
 #endif
             
         } else {
-            data = nrt->data;
+            data = datachar = (const char *)nrt->data;
             datalen = nrt->datalen;
 #ifdef EMULATOR
-            Log() << "Sending to " << nrt->ip_host << ":" << nrt->ip_port << " binary data of length " << datalen "\n";
+            Log() << "Sending to " << nrt->ip_host << ":" << nrt->ip_port << " binary data of length " << datalen << "\n";
 #endif
         }
-        int ret = ::gethostbyname2_r(nrt->ip_host, AF_INET, &he, hostEntAux, sizeof(hostEntAux),&he_result, &h_err);
+        int ret = gethostbyname2_r(nrt->ip_host, AF_INET, &he, hostEntAux, sizeof(hostEntAux),&he_result, &h_err);
 
         if (ret) {
           Log() << "ERROR In doNRT_IP() got error (ret=" << ret << ") in hostname lookup for " << nrt->ip_host << ": h_errno=" << h_err << "\n"; 
@@ -2258,15 +2402,16 @@ void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP, bool isBin) const
         if (isUDP) theSock = socket(PF_INET, SOCK_DGRAM, 0);
         else theSock = socket(PF_INET, SOCK_STREAM, 0);
         if (theSock < 0) {
-          Log() << "ERROR In doNRT_IP() got error (errno=" << strerror(errno) << ") in socket() call\n"; 
+          Log() << "ERROR In doNRT_IP() got error (errno=" << GetLastNetErrStr() << ") in socket() call\n"; 
           return; 
         }
         if (!isUDP) {
           long flag = 1;
-          setsockopt(theSock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+          const char * const flagptr = (const char *)&flag;
+          setsockopt(theSock, SOL_SOCKET, SO_REUSEADDR, flagptr, sizeof(flag));
           flag = 1;
           // turn off nagle for less latency
-          setsockopt(theSock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+          setsockopt(theSock, IPPROTO_TCP, TCP_NODELAY, flagptr, sizeof(flag));
         }
         struct sockaddr_in addr;
         addr.sin_family = AF_INET;
@@ -2274,20 +2419,20 @@ void FSMSpecific::doNRT_IP(const NRTOutput *nrt, bool isUDP, bool isBin) const
         memcpy(&addr.sin_addr.s_addr, he.h_addr, sizeof(addr.sin_addr.s_addr));
         ret = connect(theSock, (struct sockaddr *)&addr, sizeof(addr)); // this call is ok for UDP as well
         if (ret) {
-          Log() << "ERROR In doNRT_IP() could not connect to " << nrt->ip_host << ":" << nrt->ip_port << " got error (errno=" << strerror(errno) << ") in connect() call\n"; 
-          ::close(theSock);
+          Log() << "ERROR In doNRT_IP() could not connect to " << nrt->ip_host << ":" << nrt->ip_port << " got error (errno=" << GetLastNetErrStr() << ") in connect() call\n"; 
+          closesocket(theSock);
           return;
         }
         if (isUDP)
           // UDP
-          ret = sendto(theSock, data, datalen, 0, (const struct sockaddr *)&addr, sizeof(addr));
+          ret = sendto(theSock, datachar, datalen, 0, (const struct sockaddr *)&addr, sizeof(addr));
         else
           // TCP
-          ret = send(theSock, data, datalen, MSG_NOSIGNAL);
+          ret = send(theSock, datachar, datalen, MSG_NOSIGNAL);
         if (ret != (int)datalen) {
-          Log() << "ERROR In doNRT_IP() sending " << datalen << " bytes to " << nrt->ip_host << ":" << nrt->ip_port << " got error (errno=" << strerror(errno) << ") in send() call\n"; 
+          Log() << "ERROR In doNRT_IP() sending " << datalen << " bytes to " << nrt->ip_host << ":" << nrt->ip_port << " got error (errno=" << GetLastNetErrStr() << ") in send() call\n"; 
         }
-        ::close(theSock);
+        closesocket(theSock);
 }
 
 namespace {
@@ -2735,7 +2880,7 @@ namespace {
   bool FileExists(const std::string & f)
   {
     struct stat st;
-    return ::stat(f.c_str(), &st) == 0;
+    return stat(f.c_str(), &st) == 0;
   }
   const std::string & KernelVersion() 
   {    
@@ -2747,14 +2892,14 @@ namespace {
       char tmp_filename[buflen];
       std::strncpy(tmp_filename, (TmpPath() + "XXXXXX").c_str(), buflen);
       tmp_filename[buflen-1] = 0;
-      int fd = ::mkstemp(tmp_filename);
+      int fd = mkstemp(tmp_filename);
       std::system((std::string("uname -r > ") + tmp_filename).c_str());
       std::ifstream inp;
       inp.open(tmp_filename);
       inp >> ret;
       inp.close();
-      ::close(fd);
-      ::unlink(tmp_filename); // we unlink after close due to wind0ze?
+      closesocket(fd);
+      remove(tmp_filename); // we unlink after close due to wind0ze?
     }
 #endif
     return ret;
@@ -2815,7 +2960,7 @@ Matrix ConnectionThread::doGetTransitionsFromRT(int & first, int & last, int & s
   return empty;
 }
 
-#if defined(OS_CYGWIN) || defined(OS_OSX)
+#if defined(OS_CYGWIN) || defined(OS_OSX) || defined(OS_WINDOWS)
 namespace {
   /* Cygwin (and OSX?) lacks this function, so we will emulate it using 
      a static mutex and the non-reentrant gethostbyname */
@@ -2861,4 +3006,91 @@ namespace {
     return 0;
   }
 }
+#endif
+
+#ifdef OS_WINDOWS
+static int inet_aton(const char *cp, struct in_addr *inp)
+{
+    unsigned long addr = inet_addr(cp);
+    inp->s_addr = addr;
+    return 0;
+}
+
+//// Statics ///////////////////////////////////////////////////////////
+
+// List of Winsock error constants mapped to an interpretation string.
+// Note that this list must remain sorted by the error constants'
+// values, because we do a binary search on the list when looking up
+// items.
+static struct ErrorEntry {
+    int nID;
+    const char * const pcMessage;
+
+  ErrorEntry(int id, const char* pc = 0) :  nID(id),  pcMessage(pc)  {}
+
+  bool operator<(const ErrorEntry& rhs)  {  return nID < rhs.nID;  }
+} gaErrorList[] = {
+    ErrorEntry(0,                  "No error"),
+    ErrorEntry(WSAEINTR,           "Interrupted system call"),
+    ErrorEntry(WSAEBADF,           "Bad file number"),
+    ErrorEntry(WSAEACCES,          "Permission denied"),
+    ErrorEntry(WSAEFAULT,          "Bad address"),
+    ErrorEntry(WSAEINVAL,          "Invalid argument"),
+    ErrorEntry(WSAEMFILE,          "Too many open sockets"),
+    ErrorEntry(WSAEWOULDBLOCK,     "Operation would block"),
+    ErrorEntry(WSAEINPROGRESS,     "Operation now in progress"),
+    ErrorEntry(WSAEALREADY,        "Operation already in progress"),
+    ErrorEntry(WSAENOTSOCK,        "Socket operation on non-socket"),
+    ErrorEntry(WSAEDESTADDRREQ,    "Destination address required"),
+    ErrorEntry(WSAEMSGSIZE,        "Message too long"),
+    ErrorEntry(WSAEPROTOTYPE,      "Protocol wrong type for socket"),
+    ErrorEntry(WSAENOPROTOOPT,     "Bad protocol option"),
+    ErrorEntry(WSAEPROTONOSUPPORT, "Protocol not supported"),
+    ErrorEntry(WSAESOCKTNOSUPPORT, "Socket type not supported"),
+    ErrorEntry(WSAEOPNOTSUPP,      "Operation not supported on socket"),
+    ErrorEntry(WSAEPFNOSUPPORT,    "Protocol family not supported"),
+    ErrorEntry(WSAEAFNOSUPPORT,    "Address family not supported"),
+    ErrorEntry(WSAEADDRINUSE,      "Address already in use"),
+    ErrorEntry(WSAEADDRNOTAVAIL,   "Can't assign requested address"),
+    ErrorEntry(WSAENETDOWN,        "Network is down"),
+    ErrorEntry(WSAENETUNREACH,     "Network is unreachable"),
+    ErrorEntry(WSAENETRESET,       "Net connection reset"),
+    ErrorEntry(WSAECONNABORTED,    "Software caused connection abort"),
+    ErrorEntry(WSAECONNRESET,      "Connection reset by peer"),
+    ErrorEntry(WSAENOBUFS,         "No buffer space available"),
+    ErrorEntry(WSAEISCONN,         "Socket is already connected"),
+    ErrorEntry(WSAENOTCONN,        "Socket is not connected"),
+    ErrorEntry(WSAESHUTDOWN,       "Can't send after socket shutdown"),
+    ErrorEntry(WSAETOOMANYREFS,    "Too many references, can't splice"),
+    ErrorEntry(WSAETIMEDOUT,       "Connection timed out"),
+    ErrorEntry(WSAECONNREFUSED,    "Connection refused"),
+    ErrorEntry(WSAELOOP,           "Too many levels of symbolic links"),
+    ErrorEntry(WSAENAMETOOLONG,    "File name too long"),
+    ErrorEntry(WSAEHOSTDOWN,       "Host is down"),
+    ErrorEntry(WSAEHOSTUNREACH,    "No route to host"),
+    ErrorEntry(WSAENOTEMPTY,       "Directory not empty"),
+    ErrorEntry(WSAEPROCLIM,        "Too many processes"),
+    ErrorEntry(WSAEUSERS,          "Too many users"),
+    ErrorEntry(WSAEDQUOT,          "Disc quota exceeded"),
+    ErrorEntry(WSAESTALE,          "Stale NFS file handle"),
+    ErrorEntry(WSAEREMOTE,         "Too many levels of remote in path"),
+    ErrorEntry(WSASYSNOTREADY,     "Network system is unavailable"),
+    ErrorEntry(WSAVERNOTSUPPORTED, "Winsock version out of range"),
+    ErrorEntry(WSANOTINITIALISED,  "WSAStartup not yet called"),
+    ErrorEntry(WSAEDISCON,         "Graceful shutdown in progress"),
+    ErrorEntry(WSAHOST_NOT_FOUND,  "Host not found"),
+    ErrorEntry(WSANO_DATA,         "No host data of that type was found")
+};
+
+static const int kNumMessages = sizeof(gaErrorList) / sizeof(ErrorEntry);
+
+static const char * WSAGetLastErrorStr(int err)
+{
+    if (err < 0) err = WSAGetLastError();
+    for (int i = 0; i < kNumMessages; ++i) {
+        if (err == gaErrorList[i].nID) return gaErrorList[i].pcMessage;
+    }
+    return "(unknown error)";
+}
+
 #endif

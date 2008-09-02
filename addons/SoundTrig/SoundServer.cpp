@@ -1,3 +1,33 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#ifndef _REENTRANT
+#define _REENTRANT
+#endif
+
+#ifdef OS_WINDOWS
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  include <winsock2.h>
+#  include <mmsystem.h>
+#  define SHUT_RDWR SD_BOTH
+#  define MSG_NOSIGNAL 0
+   typedef int socklen_t;
+   static int inet_aton(const char *cp, struct in_addr *inp);
+   static const char * WSAGetLastErrorStr(int err_num = -1);
+#  define GetLastNetErrStr() (WSAGetLastErrorStr(WSAGetLastError()))
+#else
+#  include <sys/socket.h>
+#  include <sys/ioctl.h>
+#  include <netinet/in.h>
+#  include <netinet/ip.h> /* superset of previous */
+#  include <netinet/tcp.h> 
+#  include <netdb.h> /* for gethostbyname, etc */
+#  include <arpa/inet.h>
+#  include <sys/wait.h>
+#  define closesocket(x) close(x)
+#  define GetLastNetErrStr() (strerror(errno))
+#endif
 #include "SoundTrig.h"
 #include "rtos_utility.h"
 #include "Version.h"
@@ -5,18 +35,15 @@
 #include "UserspaceExtTrig.h"
 #include "WavFile.h"
 #include "Util.h"
+#if defined(OS_LINUX) || defined(OS_OSX)
+#include "scanproc.h"
+#endif
 #include <unistd.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/time.h>
 #include <string.h>
 #include <errno.h>
-#include <netinet/in.h>
-#include <netinet/ip.h> /* superset of previous */
-#include <netinet/tcp.h> 
 #include <signal.h>
-#include <arpa/inet.h>
 #include <stdio.h>
 #include <ctype.h>
 
@@ -133,25 +160,44 @@ class UserSM : public SoundMachine
     volatile int lastEvent, ctr;
     sem_t child_sem;
     static UserSM * volatile instance;
-    
+
+#ifdef OS_WINDOWS
+    static void *playthr(void *);
+#endif
+
     struct SoundFile {
         std::string filename;
+#ifdef OS_WINDOWS
+        pthread_t thr;
+        volatile bool thrrunning;
+#else
         volatile int pid;
+#endif
         volatile unsigned playct;
         bool loops;
-        SoundFile() : pid(0), playct(0), loops(false) {}
+        SoundFile() : 
+#ifdef OS_WINDOWS
+            thrrunning(false),
+#else
+            pid(0), 
+#endif
+            playct(0), loops(false) {}
     };
     typedef std::map<unsigned, SoundFile> SoundFileMap;
     SoundFileMap soundFileMap;
     
     static void *thrWrapFRT(void *arg) { static_cast<UserSM *>(arg)->fifoReadThr(); return 0; }
+#ifndef OS_WINDOWS
     static void *thrWrapChildReaper(void *arg) { static_cast<UserSM *>(arg)->childReaper(); return 0; }
+#endif
     static void childSH(int);
     
     void stopThreads();
     void fifoReadThr(); 
     bool soundExists(unsigned id) const;
+#ifndef OS_WINDOWS
     void childReaper();
+#endif
     void trigger_nolock(unsigned card, int trig);
     
     friend class SoundMachine;
@@ -291,6 +337,9 @@ int ConnectedThread::start(int sock_fd, const std::string & rhost)
 
 SoundMachine * SoundMachine::attach()
 {
+#ifdef EMULATOR
+    return new UserSM(0);
+#else
   // first, connect to the shm buffer..
   RTOS::ShmStatus shmStatus;
   void *shm_notype;
@@ -329,16 +378,76 @@ SoundMachine * SoundMachine::attach()
       throw Exception(s.str());
   }
   return new KernelSM(shm_notype);
+#endif
 }
+
+#ifdef OS_WINDOWS
+void doWsaStartup()
+{
+    WORD wVersionRequested;
+    WSADATA wsaData;
+    int err;
+
+/* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
+    wVersionRequested = MAKEWORD(2, 2);
+
+    err = WSAStartup(wVersionRequested, &wsaData);
+    if (err != 0) {
+        /* Tell the user that we could not find a usable */
+        /* Winsock DLL.                                  */
+        printf("WSAStartup failed with error: %d\n", err);
+        _exit(1);
+    }
+}
+#endif
+
+static void cleanupTmpFiles()
+{
+  std::cerr << "Deleting old/crufty sounds from TEMP dir..\n";
+#ifdef OS_WINDOWS
+  std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\SoundServerSound_*.wav").c_str());
+  std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\SoundServerSound_*.wav.loops").c_str());
+#else
+  std::system((std::string("rm -fr '") + TmpPath() + "'/SoundServerSound_*.wav*").c_str());
+#endif
+}
+
+static bool isSingleInstance()
+{
+#if defined(OS_LINUX) || defined(OS_OSX)
+    return ::num_procs_of_my_exe_no_children() <= 1;
+#elif defined(OS_WINDOWS)
+    HANDLE mut = CreateMutexA(NULL, FALSE, "Global\\SoundServer.exe.Mutex");
+    if (mut) {
+        DWORD res = WaitForSingleObject(mut, 1000);
+        switch (res) {
+        case WAIT_ABANDONED:
+        case WAIT_OBJECT_0:
+            return true;
+        default:
+            return false;
+        }
+    }
+    // note: handle stays open, which is ok, because when process terminates it will auto-close
+#endif
+    return true;
+}
+
 
 static void init()
 {
+  if (!isSingleInstance())
+      throw Exception("It appears another copy of this program is already running!\n");
+#ifdef OS_WINDOWS
+  doWsaStartup();
+#endif
+  cleanupTmpFiles();
   sm = SoundMachine::attach();
 }
 
 static void cleanup(void)
 {
-  delete sm;
+    delete sm; sm = 0;
 
   if (listen_fd >= 0) ::close(listen_fd);
   listen_fd = -1;
@@ -350,6 +459,9 @@ static void cleanup(void)
     // NB: don't clear or delete childThreads as they may still be running!
     // let them 'reap' themselves..
   }
+#ifdef OS_WINDOWS
+  WSACleanup();
+#endif
 }
 
 
@@ -370,9 +482,11 @@ extern "C" void sighandler(int sig)
 {  
   switch (sig) {
 
+#ifndef OS_WINDOWS
   case SIGPIPE: 
     //std::cerr << "PID " << ::getpid() << " GOT SIGPIPE" << std::endl;
     break; // ignore SIGPIPE..
+#endif
 
   default:
     std::cerr << "Caught signal " << sig << " cleaning up..." << std::endl;     
@@ -511,7 +625,7 @@ void doServer(void)
   listen_fd = ::socket(PF_INET, SOCK_STREAM, 0);
 
   if (listen_fd < 0) 
-    throw Exception(std::string("socket: ") + strerror(errno));
+    throw Exception(std::string("socket: ") + GetLastNetErrStr());
 
   struct sockaddr_in inaddr;
   socklen_t addr_sz = sizeof(inaddr);
@@ -523,15 +637,17 @@ void doServer(void)
   Log() << "Sound play mode: " << (sm->mode() == SoundMachine::Kernelspace ? "Kernel (Hard RT)" : "Userspace (non-RT)") << std::endl;
   Log() << "Listening for connections on port: " << listenPort << std::endl; 
 
-  int parm = 1;
-  if (::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &parm, sizeof(parm)) )
-    Log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
+  const int parm_int = 1, parmsz = sizeof(parm_int);
+  const char *parm = (const char *)&parm_int;
+
+  if (::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, parm, parmsz) )
+    Log() << "Error: setsockopt returned " << GetLastNetErrStr() << std::endl; 
   
   if ( ::bind(listen_fd, (struct sockaddr *)&inaddr, addr_sz) != 0 ) 
-    throw Exception(std::string("bind: ") + strerror(errno));
+    throw Exception(std::string("bind: ") + GetLastNetErrStr());
   
   if ( ::listen(listen_fd, 1) != 0 ) 
-    throw Exception(std::string("listen: ") + strerror(errno));
+    throw Exception(std::string("listen: ") + GetLastNetErrStr());
 
   childThreads = new ChildThreads;
 
@@ -540,11 +656,11 @@ void doServer(void)
     if ( (sock = ::accept(listen_fd, (struct sockaddr *)&inaddr, &addr_sz)) < 0 ) {
       if (errno == EINTR) continue;
       if (listen_fd == -1) /* sighandler closed our fd */ break;
-      throw Exception(std::string("accept: ") + strerror(errno));
+      throw Exception(std::string("accept: ") + GetLastNetErrStr());
     }
 
-    if (::setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &parm, sizeof(parm)) )
-      Log() << "Error: setsockopt returned " << ::strerror(errno) << std::endl; 
+    if (::setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, parm, parmsz) )
+      Log() << "Error: setsockopt returned " << GetLastNetErrStr() << std::endl; 
     
     childThreads->push_back(ConnectedThread());
     ConnectedThread & conn = childThreads->back();
@@ -564,9 +680,11 @@ int main(int argc, const char *argv[])
 
   // install our signal handler that tries to pause the rt-process and quit the program 
   signal(SIGINT, sighandler);
+#ifndef OS_WINDOWS
   signal(SIGPIPE, sighandler);
   signal(SIGQUIT, sighandler);
   signal(SIGHUP, sighandler);
+#endif
   signal(SIGTERM, sighandler);
 
   try {
@@ -739,9 +857,9 @@ int ConnectedThread::sockSend(const void *buf, size_t len, bool is_binary, int f
   } else
     Log() << "Sending binary data of length " << len << std::endl; 
 
-  int ret = ::send(sock, buf, len, flags);
+  int ret = ::send(sock, charbuf, len, flags);
   if (ret < 0) {
-    Log() << "ERROR returned from send: " << strerror(errno) << std::endl; 
+    Log() << "ERROR returned from send: " << GetLastNetErrStr() << std::endl; 
   } else if (ret != (int)len) {
     Log() << "::send() returned the wrong size; expected " << len << " got " << ret << std::endl; 
   }
@@ -781,7 +899,7 @@ int ConnectedThread::sockReceiveData(void *buf, int size, bool is_binary)
     int ret = ::recv(sock, (char *)(buf) + nread, size - nread, 0);
     
     if (ret < 0) {
-      Log() << "ERROR returned from recv: " << strerror(errno) << std::endl; 
+      Log() << "ERROR returned from recv: " << GetLastNetErrStr() << std::endl; 
       return ret;
     } else if (ret == 0) {
       Log() << "ERROR in recv, connection probably closed." << std::endl; 
@@ -974,22 +1092,28 @@ UserSM::UserSM(void *s)
 {
     if (instance) 
         throw Exception("Multiple instances of class UserSM have been constructed.  Only 1 instance allowed globally! Argh!");
+
     sem_init(&child_sem, 0, 0);
-    if (::access("/usr/bin/play", X_OK))
-        throw Exception("Required program /usr/bin/play is missing!");
-    fifo = RTOS::openFifo(shm->fifo_out);
-    if (!fifo) throw Exception("Could not open RTF fifo_ut for reading");
-    if ( pthread_create(&thr, 0, &thrWrapFRT, (void *)this) ) {
-        throw Exception(std::string("Could not create the fifo read thread: ") + strerror(errno));
-    }
-    threadRunning = true;
-    signal(SIGCHLD, childSH);
-    if ( pthread_create(&chldThr, 0, &thrWrapChildReaper, (void *)this ) ) {
-        stopThreads();
-        int err = errno;
-        throw Exception(std::string("Could not create child reaper thread: ") + strerror(err)); 
-    }
-    chldThreadRunning = true;
+
+    if (shm) { /* !shm typically only in Emulator mode */
+        if (::access("/usr/bin/play", X_OK))
+            throw Exception("Required program /usr/bin/play is missing!");
+        fifo = RTOS::openFifo(shm->fifo_out);
+        if (!fifo) throw Exception("Could not open RTF fifo_ut for reading");
+        if ( pthread_create(&thr, 0, &thrWrapFRT, (void *)this) ) {
+            throw Exception(std::string("Could not create the fifo read thread: ") + strerror(errno));
+        }
+        threadRunning = true;
+#ifndef OS_WINDOWS
+        signal(SIGCHLD, childSH);
+        if ( pthread_create(&chldThr, 0, &thrWrapChildReaper, (void *)this ) ) {
+            stopThreads();
+            int err = errno;
+            throw Exception(std::string("Could not create child reaper thread: ") + strerror(err)); 
+        }
+        chldThreadRunning = true;
+#endif
+    } 
     instance = this;
 }
 
@@ -1011,7 +1135,9 @@ void UserSM::stopThreads()
 UserSM::~UserSM()
 {
     if (instance == this) instance = 0;
+#ifndef OS_WINDOWS
     signal(SIGCHLD, SIG_DFL);
+#endif
     stopThreads();
     if (fifo) RTOS::closeFifo(fifo);
     fifo = RTOS::INVALID_FIFO;
@@ -1059,6 +1185,48 @@ void UserSM::trigger(unsigned card, int trig)
     trigger_nolock(card, trig);
 }
 
+#ifdef OS_WINDOWS
+/*static*/ void *UserSM::playthr(void *arg)
+{
+    SoundFile *sf = reinterpret_cast<SoundFile *>(arg);
+    sf->thrrunning = true;
+    pthread_detach(pthread_self());
+    int oldstate;
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &oldstate);
+    ++sf->playct;
+    PlaySoundA(sf->filename.c_str(), 0, SND_FILENAME|SND_SYNC|(sf->loops ? SND_LOOP : 0));
+    sf->thrrunning = false;
+    return 0;
+}
+
+void UserSM::trigger_nolock(unsigned card, int trig)
+{
+    Debug() << "in trigger_nolock with card " << card << " trig " << trig << "\n";
+
+    if (card < getNCards() && soundExists(ABS(trig))) {
+        lastEvent = trig;
+        SoundFileMap::iterator it = soundFileMap.find(ABS(trig));
+        if (it->second.thrrunning) { // untrig always!
+            Debug() << "untriggering (killing thread)\n";
+            pthread_cancel(it->second.thr);
+            it->second.thrrunning = false;
+        }
+        if (trig > 0) { // (re)trigger            
+            Debug() << "creating play thread..\n";
+            int err = pthread_create(&it->second.thr, 0, playthr, &it->second);
+            if (err) { // parent                
+                Log() << "Could not trigger sound #" << trig << ", pthread error: " << strerror(errno) << std::endl;
+            }
+        }
+    } else {
+        if (trig > 0)
+            Warning() << "Kernel told us to play sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";
+        else
+            Warning() << "Kernel told us to stop sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";            
+    }
+}
+#else /* !OS_WINDOWS */
 void UserSM::trigger_nolock(unsigned card, int trig)
 {
     Debug() << "in trigger_nolock with card " << card << " trig " << trig << "\n";
@@ -1067,7 +1235,7 @@ void UserSM::trigger_nolock(unsigned card, int trig)
         lastEvent = trig;
         SoundFileMap::iterator it = soundFileMap.find(ABS(trig));
         if (it->second.pid) { // untrig always!
-            Debug() << "untriggering (killin proc)  " << it->second.pid << "\n";
+            Debug() << "untriggering (killing proc)  " << it->second.pid << "\n";
             ::kill(it->second.pid, SIGTERM);
             it->second.pid = 0;
         } 
@@ -1092,7 +1260,6 @@ void UserSM::trigger_nolock(unsigned card, int trig)
             Warning() << "Kernel told us to stop sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";            
     }
 }
-
 void UserSM::childSH(int sig)
 {
     if (!instance) return;
@@ -1131,6 +1298,7 @@ void UserSM::childReaper()
     if (chldPleaseStop)
         Debug() << "childReaper got chldPleaseStop request, ending thread..\n";
 }
+#endif
 
 
 void UserSM::reset(unsigned card)
@@ -1193,7 +1361,7 @@ bool UserSM::setSound(unsigned card, SoundBuffer & buf)
     }
     OWavFile wav;
     std::ostringstream s;
-    s << "/tmp/" << "SoundServerSound_" << getpid() << "_" << card << "_" << buf.id << ".wav";
+    s << TmpPath() << "SoundServerSound_" << getpid() << "_" << card << "_" << buf.id << ".wav";
     if (!wav.create(s.str().c_str())) {
         Log() << "Error creating wav file: " << s.str() << std::endl;
         return false;
@@ -1205,5 +1373,105 @@ bool UserSM::setSound(unsigned card, SoundBuffer & buf)
     f.loops = buf.loop_flg;
     soundFileMap[buf.id] = f;
     wav.close();
+#ifdef EMULATOR
+    std::string loopfile = s.str() + ".loops";
+    if (f.loops) {
+        // if it loops, create a special file that tells the play process 
+        // to loop the sound
+        std::ofstream of(loopfile.c_str(), std::ios::out|std::ios::trunc);
+        int c = 1;
+        of << c << "\n";
+        of.close();
+    } else {
+        ::remove(loopfile.c_str());
+    }
+#endif
     return true;
 }
+
+#ifdef OS_WINDOWS
+static int inet_aton(const char *cp, struct in_addr *inp)
+{
+    unsigned long addr = inet_addr(cp);
+    inp->s_addr = addr;
+    return 0;
+}
+
+//// Statics ///////////////////////////////////////////////////////////
+
+// List of Winsock error constants mapped to an interpretation string.
+// Note that this list must remain sorted by the error constants'
+// values, because we do a binary search on the list when looking up
+// items.
+static struct ErrorEntry {
+    int nID;
+    const char * const pcMessage;
+
+  ErrorEntry(int id, const char* pc = 0) :  nID(id),  pcMessage(pc)  {}
+
+  bool operator<(const ErrorEntry& rhs)  {  return nID < rhs.nID;  }
+} gaErrorList[] = {
+    ErrorEntry(0,                  "No error"),
+    ErrorEntry(WSAEINTR,           "Interrupted system call"),
+    ErrorEntry(WSAEBADF,           "Bad file number"),
+    ErrorEntry(WSAEACCES,          "Permission denied"),
+    ErrorEntry(WSAEFAULT,          "Bad address"),
+    ErrorEntry(WSAEINVAL,          "Invalid argument"),
+    ErrorEntry(WSAEMFILE,          "Too many open sockets"),
+    ErrorEntry(WSAEWOULDBLOCK,     "Operation would block"),
+    ErrorEntry(WSAEINPROGRESS,     "Operation now in progress"),
+    ErrorEntry(WSAEALREADY,        "Operation already in progress"),
+    ErrorEntry(WSAENOTSOCK,        "Socket operation on non-socket"),
+    ErrorEntry(WSAEDESTADDRREQ,    "Destination address required"),
+    ErrorEntry(WSAEMSGSIZE,        "Message too long"),
+    ErrorEntry(WSAEPROTOTYPE,      "Protocol wrong type for socket"),
+    ErrorEntry(WSAENOPROTOOPT,     "Bad protocol option"),
+    ErrorEntry(WSAEPROTONOSUPPORT, "Protocol not supported"),
+    ErrorEntry(WSAESOCKTNOSUPPORT, "Socket type not supported"),
+    ErrorEntry(WSAEOPNOTSUPP,      "Operation not supported on socket"),
+    ErrorEntry(WSAEPFNOSUPPORT,    "Protocol family not supported"),
+    ErrorEntry(WSAEAFNOSUPPORT,    "Address family not supported"),
+    ErrorEntry(WSAEADDRINUSE,      "Address already in use"),
+    ErrorEntry(WSAEADDRNOTAVAIL,   "Can't assign requested address"),
+    ErrorEntry(WSAENETDOWN,        "Network is down"),
+    ErrorEntry(WSAENETUNREACH,     "Network is unreachable"),
+    ErrorEntry(WSAENETRESET,       "Net connection reset"),
+    ErrorEntry(WSAECONNABORTED,    "Software caused connection abort"),
+    ErrorEntry(WSAECONNRESET,      "Connection reset by peer"),
+    ErrorEntry(WSAENOBUFS,         "No buffer space available"),
+    ErrorEntry(WSAEISCONN,         "Socket is already connected"),
+    ErrorEntry(WSAENOTCONN,        "Socket is not connected"),
+    ErrorEntry(WSAESHUTDOWN,       "Can't send after socket shutdown"),
+    ErrorEntry(WSAETOOMANYREFS,    "Too many references, can't splice"),
+    ErrorEntry(WSAETIMEDOUT,       "Connection timed out"),
+    ErrorEntry(WSAECONNREFUSED,    "Connection refused"),
+    ErrorEntry(WSAELOOP,           "Too many levels of symbolic links"),
+    ErrorEntry(WSAENAMETOOLONG,    "File name too long"),
+    ErrorEntry(WSAEHOSTDOWN,       "Host is down"),
+    ErrorEntry(WSAEHOSTUNREACH,    "No route to host"),
+    ErrorEntry(WSAENOTEMPTY,       "Directory not empty"),
+    ErrorEntry(WSAEPROCLIM,        "Too many processes"),
+    ErrorEntry(WSAEUSERS,          "Too many users"),
+    ErrorEntry(WSAEDQUOT,          "Disc quota exceeded"),
+    ErrorEntry(WSAESTALE,          "Stale NFS file handle"),
+    ErrorEntry(WSAEREMOTE,         "Too many levels of remote in path"),
+    ErrorEntry(WSASYSNOTREADY,     "Network system is unavailable"),
+    ErrorEntry(WSAVERNOTSUPPORTED, "Winsock version out of range"),
+    ErrorEntry(WSANOTINITIALISED,  "WSAStartup not yet called"),
+    ErrorEntry(WSAEDISCON,         "Graceful shutdown in progress"),
+    ErrorEntry(WSAHOST_NOT_FOUND,  "Host not found"),
+    ErrorEntry(WSANO_DATA,         "No host data of that type was found")
+};
+
+static const int kNumMessages = sizeof(gaErrorList) / sizeof(ErrorEntry);
+
+static const char * WSAGetLastErrorStr(int err)
+{
+    if (err < 0) err = WSAGetLastError();
+    for (int i = 0; i < kNumMessages; ++i) {
+        if (err == gaErrorList[i].nID) return gaErrorList[i].pcMessage;
+    }
+    return "(unknown error)";
+}
+
+#endif

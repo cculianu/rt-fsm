@@ -43,6 +43,9 @@ template <class T> std::string ToString(const T & t)
   return o.str();
 }
 
+/// returns the platform-specific temp path
+const std::string & TmpPath();
+
 template <class T> T FromString(const std::string & s, bool *ok = 0)
 {
   std::istringstream is(s);
