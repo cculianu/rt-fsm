@@ -5,7 +5,7 @@
 TEMPLATE = app
 TARGET = FSMEmulator
 DEPENDPATH += .
-INCLUDEPATH += . ../include ../user ../kernel
+INCLUDEPATH += . ../include ../user ../kernel ../addons/SoundTrig
 DEFINES += EMULATOR 
 CONFIG += debug 
 

@@ -1,5 +1,14 @@
 ifndef OS
-        $(error Please define the OS make variable to one of: OS_LINUX, OS_OSX, OS_WINDOWS)
+        uname=$(shell uname)
+        ifeq ($(uname),Darwin)
+                OS=OS_OSX
+        endif
+        ifeq ($(uname),Linux)
+                OS=OS_LINUX
+        endif
+        ifndef OS
+                $(error Please define the OS make variable to one of: OS_LINUX, OS_OSX, OS_WINDOWS)
+        endif
 endif
 
 SRC = ../user/FSMServer.cpp ../user/rtos_utility.cpp ../user/Util.cpp ../kernel/deflate_helper.c  
@@ -17,11 +26,14 @@ else
         SRC += ../user/scanproc.c 
         PRG_OBJS += scanproc.o
 endif
+ifeq ($(OS),OS_LINUX)
+        LDFLAGS += -lrt
+endif
 
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c $<
 
-all: .deps $(PRG) 
+all: $(PRG) 
 
 scanproc.o: ../user/scanproc.c
 	$(CC) $(CXXFLAGS) -c -o $@ $<

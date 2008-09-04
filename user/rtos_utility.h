@@ -74,6 +74,9 @@ namespace RTOS
   extern int writeFifo(FIFO, const void *buf, unsigned long bufsz, bool blocking = true);
   extern int readFifo(unsigned key, void *buf, unsigned long bufsz, bool blocking = true);
   extern int writeFifo(unsigned key, const void *buf, unsigned long bufsz, bool blocking = true);
+  /// wait on a fifo using select() - return true iff read possible, false if timed out or error
+  extern bool waitReadFifo(FIFO, unsigned millisecs);
+  extern bool waitReadFifo(unsigned key, unsigned millisecs);
   extern int fifoNReadyForReading(FIFO);
   extern int fifoNReadyForReading(unsigned);
 

@@ -15,6 +15,8 @@ class QPushButton;
 class ControlWin;
 class QSound;
 struct FSMExtTrigShm;
+struct SndShm;
+class SndThr;
 
 /**
    \brief The central class to the program that more-or-less encapsulates most objects and data in the program.
@@ -105,7 +107,7 @@ private:
     void startSoundServer();
     void stopSoundServer();
     static int soundTrigFunc(unsigned, int);
-    void trigSound(int sndtrig, const QString & fname);
+    void trigSound(int sndtrig);
     void killProcs(const QString & name);
 
     //void createAppIcon();
@@ -127,6 +129,8 @@ private:
     typedef std::map<unsigned, QSound *> SoundPlayerMap;
     SoundPlayerMap soundPlayerMap;
     FSMExtTrigShm *soundTrigShm;
+    SndShm *sndShm;
+    SndThr *sndThr;
 };
 
 #endif

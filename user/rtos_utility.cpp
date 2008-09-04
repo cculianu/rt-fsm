@@ -11,15 +11,24 @@
 #endif
 #include "rtos_utility.h"
 #ifdef WIN32
-#define MAP_LOCKED 0
+#  define MAP_LOCKED 0
+#  define ERRLOG "err.log"
+//#  define PRTERR
 #endif
 #ifndef WIN32
 #  include "rtos_shared_memory.h"
-#endif
-#include <sys/types.h>
-#include <sys/stat.h>
-#ifndef WIN32
-#include <sys/ioctl.h>
+#  include <sys/types.h>
+#  include <sys/ipc.h>
+#  include <sys/types.h>
+#  include <sys/shm.h>
+#  include <sys/ioctl.h>
+#  include <sys/socket.h>
+#  include <sys/un.h>
+#  include <sys/select.h>
+#  include <pthread.h>
+#  ifdef EMULATOR
+#    define USE_UNIX_SOCKETS
+#  endif
 #endif
 #include <fcntl.h> 
 #include <unistd.h>
@@ -32,9 +41,8 @@
 #include <set>
 #include <sstream>
 #include <fstream>
+#include <sys/stat.h>
 
-#define ERRLOG "err.log"
-//#define PRTERR
 
 #if defined(WIN32)
 #  define WIN32_LEAN_AND_MEAN
@@ -47,23 +55,7 @@
 #  define MBUFF_DEV_NAME ""
 #  define MBUFF_DEV_NAME2 ""
 #elif defined(OS_LINUX)
-#  include <sys/ipc.h>
-#  include <sys/types.h>
-#  include <sys/msg.h>
-#  include <sys/shm.h>
-#elif defined(OS_OSX)
-#  include <sys/socket.h>
-#  include <sys/un.h>
-#  include <sys/ipc.h>
-#  include <sys/types.h>
-#  include <sys/shm.h>
-#  include <sys/select.h>
-#  include <pthread.h>
-#elif !defined(EMULATOR)
-#  include <sys/ipc.h>
-#  include <sys/types.h>
-#  include <sys/msg.h>
-#  include <sys/shm.h>
+#  include <time.h>
 #endif
 
 #ifndef MIN
@@ -80,27 +72,30 @@ struct RTOS::Fifo
   long handle; /* EMULATOR:
                  Windows: the hHandle of the named pipe, 
                  Linux: sysv ipc msg id for a msg queue
-                 OSX: the fd of the connectionless socket
+                 Unix: the fd of the connected socket, or the listenfd if 
+                       not connected yet
                  Non-EMULATOR:
                  the file descriptor of the /dev/rtfXX opened for reading or 
                  writing */
   int key;    /* the minor specified at open time */
   std::string name; /* On Windows the \\.\pipe\PIPENAME string, 
-                       On OSX: the path of the named pipe
-                       On Linux: nothing */
-  unsigned size, refct;
+                       On UNIX: the path of the named pipe */
+  unsigned size;
+  volatile unsigned refct;
   volatile bool destroy, needcon;
   unsigned ctr;
 #ifdef WIN32
   HANDLE thrd;
   static DWORD WINAPI winPipeListener(void *);
 #endif
-#ifdef OS_OSX
+#ifdef USE_UNIX_SOCKETS
   pthread_t thrd;
   pthread_cond_t cond;
   pthread_mutex_t mut;
-  static void *osxListenThr(void *);
-  bool osxAccept(bool);
+  static void *unixListenThr(void *);
+  bool unixAccept();
+  int unixChkCon(bool);
+  void unixCreateListener();
 #endif
   Fifo() : handle(-1), 
            key(-1), size(0), refct(0), destroy(false), needcon(false), ctr(0)
@@ -108,14 +103,14 @@ struct RTOS::Fifo
 , thrd(0) 
 #endif
 {
-#ifdef OS_OSX
+#ifdef USE_UNIX_SOCKETS
     pthread_cond_init(&cond,0);
     pthread_mutex_init(&mut,0);
 #endif
 }
  ~Fifo() 
  {
-#ifdef OS_OSX
+#ifdef USE_UNIX_SOCKETS
     pthread_cond_destroy(&cond);
     pthread_mutex_destroy(&mut);
 #endif
@@ -490,7 +485,7 @@ RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode, std::string *errmsg)
           }
       }
   }
-#  elif defined(OS_OSX)
+#  elif defined(USE_UNIX_SOCKETS)
   if (!f->name.length()) {
       std::ostringstream os;
       os << fifoFilePrefix() << key;
@@ -515,18 +510,6 @@ RTOS::FIFO RTOS::openFifo(unsigned key, ModeFlag mode, std::string *errmsg)
               if (errmsg) *errmsg = strerror(err);
           }
       }
-  }
-#  else // LINUX: unix sysv ipc msg queue
-  if (!f->name.length()) {
-    std::ostringstream os;
-    os << "sysv msg q: " << key;
-    f->name = os.str();
-    f->destroy = false;
-    f->handle = ::msgget(key, 0777); 
-    if (f->handle < 0) {
-        if (errmsg) *errmsg = strerror(errno);
-        f->handle = -1;
-    }
   }
 #  endif  
 
@@ -588,34 +571,82 @@ DWORD WINAPI RTOS::Fifo::winPipeListener(void *arg)
 }
 #endif
 
-#ifdef OS_OSX
+#ifdef USE_UNIX_SOCKETS
 
-void *RTOS::Fifo::osxListenThr(void *arg)
+void RTOS::Fifo::unixCreateListener()
+{
+    destroy = true;
+    needcon = true;
+    int ret = pthread_create(&thrd, 0, unixListenThr, this);
+    if ( ret ) fprintf(stderr, "pthread_create: %s\n", strerror(ret));    
+}
+
+void *RTOS::Fifo::unixListenThr(void *arg)
 {
     RTOS::Fifo *f = reinterpret_cast<RTOS::Fifo *>(arg);
-    pthread_detach(pthread_self());
-    int dummy;
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &dummy);
-    while (!f->osxAccept(true)) {
+    int oldtype, oldstate, dummy;
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &oldtype);
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+    while (!f->unixAccept()) {
         pthread_testcancel();
     }
+    pthread_detach(pthread_self()); // at this point we got a conn so detach to avoid needing to be reaped
+    pthread_setcanceltype(oldtype, &dummy);
+    pthread_setcancelstate(oldstate, &dummy);
     return 0;
 }
 
-bool RTOS::Fifo::osxAccept(bool block)
+int RTOS::Fifo::unixChkCon(bool block)
+{
+  if (needcon) {
+      if (!block) return 0;
+      pthread_mutex_lock(&mut);      
+      while (needcon && refct) {
+          struct timespec ts;
+#ifdef OS_OSX
+          struct timeval tv;
+          struct timezone tz;
+          gettimeofday(&tv, &tz);
+          TIMEVAL_TO_TIMESPEC(&tv, &ts);
+#else
+          clock_gettime(CLOCK_REALTIME, &ts);
+#endif
+          ts.tv_nsec += 100000000; // 100 ms polltime
+          if (ts.tv_nsec >= 1000000000) ts.tv_nsec -= 1000000000, ts.tv_sec++;
+          int ret = pthread_cond_timedwait(&cond, &mut, &ts);
+          if (ret && ret != ETIMEDOUT) {
+              fprintf(stderr, "pthread_cond_timedwait: %s\n", strerror(ret));
+              pthread_mutex_unlock(&mut);
+              return -1;
+          }
+      }
+      pthread_mutex_unlock(&mut);
+      if (!refct) return -1;
+  }
+  return 1;
+}
+
+bool RTOS::Fifo::unixAccept()
 {
     int listen_fd = handle;
-    int fl = 0;
-    if (!block) {
-        fl = fcntl(listen_fd, F_GETFL, 0);
-        fcntl(listen_fd, F_SETFL, fl|O_NONBLOCK);
+    fd_set fds;
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000; // 100msec
+    FD_ZERO(&fds);
+    FD_SET(listen_fd, &fds);        
+    int ret = select(listen_fd+1, &fds, 0, 0, &tv);
+    if (ret == 0) return false;
+    else if (ret < 0) {
+        if (!refct) pthread_cancel(pthread_self());
+        else if (errno != EINTR)
+            perror("select");
+        return false;
     }
+    // at this point, select told us we have a new conn
     struct sockaddr_un addr;
     socklen_t len = sizeof(addr);
-    int dummy;
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &dummy);
     handle = accept(listen_fd, (struct sockaddr *)&addr, &len);
-    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &dummy);
     if (handle > -1) {
         close(listen_fd);
         listen_fd = -1;
@@ -624,14 +655,10 @@ bool RTOS::Fifo::osxAccept(bool block)
         pthread_cond_broadcast(&cond);
         pthread_mutex_unlock(&mut);
         return true;
-    } else if (!block && (errno == EWOULDBLOCK || errno == EAGAIN)) {
-        handle = listen_fd;
     } else {
-        perror("accept");
+        if (!refct || errno == EINVAL) pthread_cancel(pthread_self());
+        else perror("accept");
         handle = listen_fd;        
-    }
-    if (!block) {
-        fcntl(listen_fd, F_SETFL, fl);
     }
     return false;
 }
@@ -669,7 +696,7 @@ RTOS::FIFO RTOS::createFifo(unsigned & key_out, unsigned size)
       
   
 #else  //!WIN32
-#  ifdef OS_OSX
+#  ifdef USE_UNIX_SOCKETS
   f->handle = socket(PF_UNIX, SOCK_STREAM, 0);
   if (f->handle >= 0) {
       static unsigned fifo_ids = 11211; // zip code of Williamsburg, Brooklyn
@@ -691,23 +718,9 @@ RTOS::FIFO RTOS::createFifo(unsigned & key_out, unsigned size)
               close(f->handle);
               f->handle = -1;
           } else {
-              f->destroy = true;
-              f->needcon = true;
-              pthread_create(&f->thrd, 0, RTOS::Fifo::osxListenThr, f);
+              f->unixCreateListener();
           }
       }
-  }
-#  elif defined(OS_LINUX) // Linux
-  static int fifo_ids = 11211; // zip code of williamsburg, brooklyn :)
-  key_out = fifo_ids++;
-  std::ostringstream os;
-  os << "sys v msg q: " << key_out;
-  f->name = os.str();
-  f->handle = ::msgget(key_out, IPC_CREAT|0777);
-  f->destroy = true;
-  if (f->handle < 0) {    
-    closeFifo(f); 
-    return INVALID_FIFO;
   }
 #  else
 #    error Define one of OS_WINDOWS, OS_LINUX, or OS_OSX
@@ -738,18 +751,13 @@ void RTOS::closeFifo(FIFO f)
       if (f->thrd) TerminateThread(f->thrd, 0), f->thrd = 0;
       CloseHandle((HANDLE)f->handle);
   }
-#  elif defined(OS_LINUX)
-  if (!f->refct) { 
-      struct msqid_ds dummy;
-      if (f->destroy) 
-          msgctl(f->handle, IPC_RMID, &dummy);
-    f->handle = -1;
-  }
-#  else // OS_OSX
+#  elif defined(USE_UNIX_SOCKETS)
   if (!f->refct) { 
       if (f->needcon && f->destroy) {
           pthread_cancel(f->thrd);
           pthread_cond_broadcast(&f->cond);
+          void *dummy = 0;
+          pthread_join(f->thrd, &dummy);
       }
       close(f->handle);
       if (f->destroy) remove(f->name.c_str());
@@ -818,26 +826,32 @@ int RTOS::writeFifo(FIFO f, const void *buf, unsigned long bufsz, bool block)
   if (!block) {      
       SetNamedPipeHandleState((HANDLE)f->handle, &oldstate, 0, 0);
   }
-#elif defined(OS_OSX)
-  if (f->needcon) {
-      if (!block) return 0;
-      pthread_mutex_lock(&f->mut);      
-      while (f->needcon && f->refct) {
-          pthread_cond_wait(&f->cond, &f->mut);
-      }
-      pthread_mutex_unlock(&f->mut);
-      if (!f->refct) return -1;
-  }
-  int fl = 0;
+#elif defined(USE_UNIX_SOCKETS)
+  int tmp, fl = -1;
+  long sz;
+  bool tryagain, lostconn;
+ try_again:
+  tmp = f->unixChkCon(block);
+  if (tmp < 1)  return tmp;
   if (!block) {
-      fl = fcntl(f->handle, F_GETFL, 0);
+      if (fl < 0) fl = fcntl(f->handle, F_GETFL, 0);
       fcntl(f->handle, F_SETFL, fl|O_NONBLOCK);
   }
-  long sz;
-  bool tryagain;
   do {
-      tryagain = false;
-      sz = send(f->handle, buf, bufsz, 0);      
+      lostconn = tryagain = false;
+#ifdef OS_OSX
+      sz = recv(f->handle, &tmp, 0, 0);
+      if (sz < 0 && errno == ENOTSOCK) lostconn = true;
+      else sz = send(f->handle, buf, bufsz, 0);
+#endif
+#ifdef OS_LINUX
+      sz = send(f->handle, buf, bufsz, MSG_NOSIGNAL);
+      if (sz < 0 && errno == EPIPE) lostconn = true;
+#endif
+      if (f->destroy && lostconn) {
+          if (!f->needcon) f->unixCreateListener();
+          goto try_again;
+      }
       if (sz < 0) {
           int err = errno;
           perror("send");
@@ -858,24 +872,6 @@ int RTOS::writeFifo(FIFO f, const void *buf, unsigned long bufsz, bool block)
   if (!block) {
       fcntl(f->handle, F_SETFL, fl);
   }
-#elif defined(OS_LINUX)
-  struct msgbuf {
-      long mtype;
-      char mtext[1];
-  };
-  char mbuf[64*1024]; // 64kb buffer
-  struct msgbuf *mb = reinterpret_cast<struct msgbuf *>(mbuf);
-  do { mb->mtype = ++f->ctr; } while(!mb->mtype);  
-  unsigned n = MIN(bufsz, sizeof(mbuf)-sizeof(long));
-  memcpy(mb->mtext, buf, n);
-  int msgflg = 0;
-  if (!block) msgflg |= IPC_NOWAIT;
-  ret = msgsnd(f->handle, mb, n, msgflg);
-  if (ret == 0) ret = n;
-  if (ret < 0 && !block && errno == EAGAIN) ret = 0;
-//   if (ret < 0) {
-//       fprintf(stderr, "error in RTOS::writeFifo: %s\n", strerror(errno));
-//   }
 #else
 #  error Emulator mode: Need to define one of OS_WINDOWS, OS_LINUX, or OS_OSX
 #endif  
@@ -939,22 +935,20 @@ int RTOS::readFifo(FIFO f, void *buf, unsigned long bufsz, bool block)
   if (!block) {
       SetNamedPipeHandleState((HANDLE)f->handle, &oldstate, 0, 0);
   }
-#elif defined(OS_OSX)
-  if (f->needcon) {
-      if (!block) return 0;
-      pthread_mutex_lock(&f->mut);      
-      while (f->needcon && f->refct) {
-          pthread_cond_wait(&f->cond, &f->mut);
-      }
-      pthread_mutex_unlock(&f->mut);
-      if (!f->refct) return -1;
-  }
-  int fl = 0;
+#elif defined(USE_UNIX_SOCKETS)
+  int tmp, fl = -1, sz;
+ try_again:
+  tmp = f->unixChkCon(block);
+  if (tmp < 1)  return tmp;
   if (!block) {
-      fl = fcntl(f->handle, F_GETFL, 0);
+      if (fl < 0) fl = fcntl(f->handle, F_GETFL, 0);
       fcntl(f->handle, F_SETFL, fl|O_NONBLOCK);
   }
-  int sz = recv(f->handle, buf, bufsz, 0);
+  sz = recv(f->handle, buf, bufsz, 0);
+  if (!sz && bufsz && f->destroy) { // connection lost
+      if (!f->needcon) f->unixCreateListener();
+      goto try_again;
+  }
   if (sz < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && !block) ret = 0;
   else if (sz > -1) ret = sz;
   else {
@@ -962,23 +956,6 @@ int RTOS::readFifo(FIFO f, void *buf, unsigned long bufsz, bool block)
   }
   if (!block) {
       fcntl(f->handle, F_SETFL, fl);
-  }
-#elif defined(OS_LINUX)
-  struct msgbuf {
-      long mtype;
-      char mtext[1];
-  };
-  char mbuf[64*1024]; // 64kb buffer
-  struct msgbuf *mb = reinterpret_cast<struct msgbuf *>(mbuf);
-  mb->mtype = 0;
-  int msgflg = MSG_NOERROR;
-  if (!block) msgflg |= IPC_NOWAIT;
-  unsigned n = MIN(bufsz,sizeof(mbuf)-sizeof(long));
-  ret = msgrcv(f->handle, mb, n, 0, msgflg);
-  if (ret > -1) memcpy(buf, mb->mtext, MIN(((unsigned)ret), bufsz));
-  else if (ret < 0 && !block && errno == ENOMSG) ret = 0;
-  else {
-      printf("error reading fifo %d: %s\n", f->key, strerror(errno));
   }
 #else 
 #  error Emulator mode: Need to define one of OS_WINDOWS, OS_LINUX, or OS_OSX 
@@ -1012,8 +989,9 @@ void RTOS::closeFifo(unsigned key)
 int RTOS::fifoNReadyForReading(FIFO f)
 {
   int num = -1;
-#if !defined(EMULATOR) || defined(OS_OSX)
-  ioctl(f->handle, FIONREAD, &num); // how much data is there?
+#if !defined(EMULATOR) || defined(USE_UNIX_SOCKETS)
+  if ( ioctl(f->handle, FIONREAD, &num) )  // how much data is there?
+      perror("ioctl");
 #elif defined(WIN32)
   DWORD avail;
   if (f->needcon) {
@@ -1035,11 +1013,6 @@ int RTOS::fifoNReadyForReading(FIFO f)
       fclose(fo);      
 #  endif
   }
-#elif defined(OS_LINUX)
-  struct msqid_ds md;
-  memset(&md, 0, sizeof(md));
-  msgctl(f->handle, IPC_STAT, &md);
-  num = md.msg_cbytes;
 #else
 #  error Emulator mode: Need to define one of OS_WINDOWS, OS_LINUX, or OS_OSX 
 #endif /* def WIN32 */
@@ -1082,6 +1055,43 @@ const char *RTOS::statusString(ShmStatus s)
   }
   return "Success.";
 }
+
+
+  /// wait on a fifo using select() - return true iff read possible, false if timed out or error
+bool RTOS::waitReadFifo(unsigned key, unsigned millisecs)
+{
+    std::map<unsigned, Fifo *>::iterator it = fifo_map.find(key);
+    if (it != fifo_map.end()) 
+        return waitReadFifo(it->second, millisecs);
+    return false;
+}
+
+bool RTOS::waitReadFifo(FIFO f, unsigned millisecs)
+{
+#ifdef WIN32    
+    int ret = fifoNReadyForReading(f);
+    if (ret == 0) {
+        Sleep(millisecs);
+        ret = fifoNReadyForReading(f);
+    }
+    return ret > 0;
+#else
+    if (f->handle < 0) return false;
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(f->handle, &fds);
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = millisecs*1000;
+    while (tv.tv_usec >= 1000000) ++tv.tv_sec, tv.tv_usec -= 1000000;
+    int ret = select(f->handle+1, &fds, 0, 0, &tv);
+    if (ret < 0) {
+        perror("select");
+    }
+    return ret > 0;
+#endif
+}
+
 
 namespace 
 {
