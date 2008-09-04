@@ -1,3 +1,43 @@
+2008-09-04 20:06  calin.culianu
+
+	* [r132] Client/Matlab/NetClient/FSMClient.mexmaci,
+	  addons/SoundTrig/Client/Matlab/SoundTrigClient/SoundTrigClient.mexmaci,
+	  addons/SoundTrig/LynxTrig.c, addons/SoundTrig/SoundServer.cpp,
+	  addons/SoundTrig/SoundTrig.h, emulator/EmulApp.cpp,
+	  emulator/EmulApp.h, emulator/Makefile[DEL],
+	  emulator/Makefile.FSMServer, emulator/Makefile.SoundServer,
+	  emulator/compile-win32-release.bat, emulator/emulator.pro,
+	  emulator/osx-x86/FSMEmulator, emulator/osx-x86/FSMServer,
+	  emulator/osx-x86/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h,
+	  user/rtos_utility.cpp, user/rtos_utility.h:
+	  
+	  - Added compile-win32-release.bat to simplify compiling win32
+	  releases
+	  - Added MEX files: SoundTrigClient and FSMClient for OSX
+	  platforms
+	  - Bugfixes and segfault fixes for Unix
+	  - Bumped version number
+	  - Fixed glitchy sound play
+	  - Removed dependency of the SoundServer on the unix PLAY program
+	  (emulator mode only)
+	  - Cleanups of rtos_utility.cpp FIFO code for Unix (it's still
+	  really messy and fragile but seems to work ok in practice)
+
+2008-09-02 22:26  calin.culianu
+
+	* [r131] ChangeLog:
+	  
+	  Updated ChangeLog
+
+2008-09-02 22:24  calin.culianu
+
+	* [r130] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-02 22:21  calin.culianu
 
 	* [r129] emulator/win32/dist/EmbC.h,
@@ -1537,7 +1577,7 @@
 	  addons/SoundTrig/LynxTWO-RT,
 	  addons/SoundTrig/LynxTWO-RT/LynxTWO-RT.h,
 	  addons/SoundTrig/LynxTrig.c, addons/SoundTrig/Makefile,
-	  addons/SoundTrig/Makefile.LynxTrig,
+	  addons/SoundTrig/Makefile.LynxTrig[DEL],
 	  addons/SoundTrig/SoundServer.cpp, addons/SoundTrig/SoundTrig.h,
 	  addons/UserspaceExtTrig/Makefile,
 	  addons/UserspaceExtTrig/module.c, include/rtos_compat.h,
@@ -1674,9 +1714,10 @@
 
 2008-02-26 23:40  calin.culianu
 
-	* [r15] addons/SoundTrig/Makefile, addons/SoundTrig/WavFile.cpp,
-	  addons/SoundTrig/WavFile.h, rtfsm.kdevelop.filelist,
-	  utils/WavFile.cpp, utils/WavFile.h:
+	* [r15] addons/SoundTrig/Makefile,
+	  addons/SoundTrig/WavFile.cpp[CPY],
+	  addons/SoundTrig/WavFile.h[CPY], rtfsm.kdevelop.filelist,
+	  utils/WavFile.cpp[DEL], utils/WavFile.h[DEL]:
 	  
 	  - Moved wavfile class around into the sound server
 	  - Added a makefile for the SoundServer
@@ -1726,7 +1767,7 @@
 	  addons/SoundTrig/SoundServer.cpp, addons/SoundTrig/SoundTrig.h,
 	  addons/UserspaceExtTrig, addons/UserspaceExtTrig/Makefile,
 	  addons/UserspaceExtTrig/UserspaceExtTrig.h,
-	  addons/UserspaceExtTrig/module.c, both, include/FSM.h,
+	  addons/UserspaceExtTrig/module.c, both[DEL], include/FSM.h,
 	  include/FSMExternalTime.h, include/FSMExternalTrig.h,
 	  include/Version.h, include/rtos_compat.h, kernel/Makefile,
 	  kernel/fsm.c, rtfsm.kdevelop, rtfsm.kdevelop.filelist,
