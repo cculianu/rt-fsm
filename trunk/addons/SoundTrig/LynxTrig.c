@@ -131,7 +131,7 @@ static struct file_operations myproc_fops =
 
 /* Spawns one of the below threads in software triggers mode, or 
    calls the function directly in hardware triggers mode.. 
-   Pass a command of the type seen in enum FifoMsgID */
+   Pass a command of the type seen in enum SndFifoMsgID */
 enum {
   PLAY_CMD = SOUNDTRIG_MSG_ID_MAX+1,
   STOP_CMD,
@@ -152,7 +152,7 @@ module_exit(cleanup);
 /*---------------------------------------------------------------------------- 
   Some private 'global' variables...
 -----------------------------------------------------------------------------*/
-static volatile struct Shm *shm = 0;
+static volatile struct SndShm *shm = 0;
 static volatile struct FSMExtTrigShm *virtShm = 0;
 
 /** array of L22Dev_t for all the devices we have open */
@@ -653,7 +653,7 @@ static int initShm(void)
 {
   unsigned i;
 
-  shm = (volatile struct Shm *) mbuff_alloc(SND_SHM_NAME, SND_SHM_SIZE);
+  shm = (volatile struct SndShm *) mbuff_alloc(SND_SHM_NAME, SND_SHM_SIZE);
   if (! shm)  {
     ERROR("Could not mbuff_alloc the shared memory structure.  Aborting!\n");
     return -ENOMEM;
@@ -690,10 +690,10 @@ static int initFifos(void)
 
   for (i = 0; i < n_l22dev; ++i) {
     /* Open up fifos here.. */
-    err = rtf_find_free(&minor, sizeof(FIFO_SZ));
+    err = rtf_find_free(&minor, sizeof(SND_FIFO_SZ));
     if (err < 0) return 1;
     shm->fifo_out[i] = minor;
-    err = rtf_find_free(&minor, sizeof(FIFO_SZ));
+    err = rtf_find_free(&minor, sizeof(SND_FIFO_SZ));
     if (err < 0) return 1;
     shm->fifo_in[i] = minor;
 
@@ -1049,7 +1049,7 @@ static int handleFifos_MapCardID(unsigned int fifo_no) /* gets called as rtf han
    it is called as a non-realtime rt-fifo handler in Linux context.          */
 static int handleFifos(CardID_t c)
 {
-  FifoNotify_t dummy = 1;
+  SndFifoNotify_t dummy = 1;
   int errcode;
 
 
@@ -1061,7 +1061,7 @@ static int handleFifos(CardID_t c)
 
   if (errcode == sizeof(dummy)) {
       /* Ok, a message is ready, so take it from the SHM */
-      struct FifoMsg *msg = (struct FifoMsg *)&shm->msg[c];
+      struct SndFifoMsg *msg = (struct SndFifoMsg *)&shm->msg[c];
       
       DEBUG("handleFifos(%u)\n", (unsigned)c);
 #ifdef RTAI
@@ -1174,7 +1174,7 @@ static int handleFifos(CardID_t c)
               buf->trig_play_ct = buf->trig_stop_ct = 0;
               buf->xfer_pos = 0;
               /* begin the data xfer too.. */
-              n2copy = MIN(FIFO_DATA_SZ, MIN(msg->u.sound.datalen, buf->len-buf->xfer_pos));
+              n2copy = MIN(SND_FIFO_DATA_SZ, MIN(msg->u.sound.datalen, buf->len-buf->xfer_pos));
               memcpy(((char *)buf->data)+buf->xfer_pos, msg->u.sound.databuf, n2copy);
               buf->xfer_pos += n2copy;
               /* clear the rest of the sound for now.. */
@@ -1218,7 +1218,7 @@ static int handleFifos(CardID_t c)
             unsigned n2copy;
             LOCK_SNDBUF(c,id);
             buf = &rs[c].audio_buffers[id];
-            n2copy = MIN(FIFO_DATA_SZ, MIN(msg->u.sound.datalen, buf->len-buf->xfer_pos));
+            n2copy = MIN(SND_FIFO_DATA_SZ, MIN(msg->u.sound.datalen, buf->len-buf->xfer_pos));
             memcpy(((char *)buf->data)+buf->xfer_pos, msg->u.sound.databuf, n2copy);
             buf->xfer_pos += n2copy;
             msg->u.sound.transfer_ok = 1;

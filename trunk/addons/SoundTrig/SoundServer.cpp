@@ -119,12 +119,12 @@ SoundMachine::~SoundMachine()
 class KernelSM : public SoundMachine
 {
     RTOS::FIFO fifo_in[MAX_CARDS], fifo_out[MAX_CARDS];
-    Shm *shm;
+    SndShm *shm;
     mutable Mutex mut;
     
     // Functions to send commands to the realtime process via the rt-fifos
-    void sendToRT(unsigned card, FifoMsgID cmd) const; // send a simple command, one of RESET, PAUSEUNPAUSE, INVALIDATE. Upon return we know the command completed.
-    void sendToRT(unsigned card, FifoMsg & msg) const; // send a complex command, wait for a reply which gets put back into 'msg'.  Upon return we know the command completed.
+    void sendToRT(unsigned card, SndFifoMsgID cmd) const; // send a simple command, one of RESET, PAUSEUNPAUSE, INVALIDATE. Upon return we know the command completed.
+    void sendToRT(unsigned card, SndFifoMsg & msg) const; // send a complex command, wait for a reply which gets put back into 'msg'.  Upon return we know the command completed.
     
     friend class SoundMachine;
     
@@ -151,7 +151,7 @@ public:
 class UserSM : public SoundMachine
 {
     UTShm *shm;
-    RTOS::FIFO fifo;
+    RTOS::FIFO fifo, fifo2;
     pthread_t thr, chldThr;
     mutable Mutex mut;
     Timer timer;
@@ -161,25 +161,29 @@ class UserSM : public SoundMachine
     sem_t child_sem;
     static UserSM * volatile instance;
 
-#ifdef OS_WINDOWS
+#if !defined(EMULATOR) && defined(OS_WINDOWS)
     static void *playthr(void *);
 #endif
 
     struct SoundFile {
         std::string filename;
+#ifndef EMULATOR
 #ifdef OS_WINDOWS
         pthread_t thr;
         volatile bool thrrunning;
 #else
         volatile int pid;
 #endif
+#endif
         volatile unsigned playct;
         bool loops;
         SoundFile() : 
+#ifndef EMULATOR
 #ifdef OS_WINDOWS
             thrrunning(false),
 #else
             pid(0), 
+#endif
 #endif
             playct(0), loops(false) {}
     };
@@ -187,16 +191,20 @@ class UserSM : public SoundMachine
     SoundFileMap soundFileMap;
     
     static void *thrWrapFRT(void *arg) { static_cast<UserSM *>(arg)->fifoReadThr(); return 0; }
+#ifndef EMULATOR
 #ifndef OS_WINDOWS
     static void *thrWrapChildReaper(void *arg) { static_cast<UserSM *>(arg)->childReaper(); return 0; }
-#endif
     static void childSH(int);
+#endif
+#endif
     
     void stopThreads();
     void fifoReadThr(); 
     bool soundExists(unsigned id) const;
+#ifndef EMULATOR
 #ifndef OS_WINDOWS
     void childReaper();
+#endif
 #endif
     void trigger_nolock(unsigned card, int trig);
     
@@ -363,11 +371,11 @@ SoundMachine * SoundMachine::attach()
       throw Exception(std::string("Cannot attach to shm ") + SND_SHM_NAME
                         + ", error was: " + RTOS::statusString(shmStatus));
     
-  Shm *shm = static_cast<Shm *>(shm_notype);
+  SndShm *shm = static_cast<SndShm *>(shm_notype);
   if (shm->magic != SND_SHM_MAGIC) {
       std::stringstream s;
                   s << "Attached to shared memory buffer at " << shm_notype << " but the magic number is invaid! (" << reinterpret_cast<void *>(shm->magic) << " != " << reinterpret_cast<void *>(SND_SHM_MAGIC) << ")\n";
-      s << "Shm Dump:\n";
+      s << "SndShm Dump:\n";
       char *ptr = reinterpret_cast<char *>(shm_notype);
       for (unsigned i = 0; i < 16; ++i) {
         s << reinterpret_cast<void *>(ptr[i]) << " ";
@@ -550,7 +558,7 @@ void KernelSM::allocSBMem(SoundBuffer & sb)
     sb.nam = s.str();
     s.str("");
     { // workaround for 64-bit breakage of userspace shm alloc.  We need to request the shm in the kernel
-      std::auto_ptr<FifoMsg> msg(new FifoMsg);
+      std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
       msg->id = ALLOCSOUND;
       strncpy(msg->u.sound.name, sb.name(), SNDNAME_SZ);
       msg->u.sound.name[SNDNAME_SZ-1] = 0;
@@ -599,7 +607,7 @@ void KernelSM::freeSBMem(SoundBuffer & sb) const
 {
     if (sb.mem) {
         if (!sb.sentOk) { // issue a FREESOUND to kernel if the sound was not transferred ok to kernel
-            std::auto_ptr<FifoMsg> msg(new FifoMsg);
+            std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
             msg->id = FREESOUND;
             strncpy(msg->u.sound.name, sb.name(), SNDNAME_SZ);
             msg->u.sound.name[SNDNAME_SZ-1] = 0;
@@ -926,7 +934,7 @@ bool KernelSM::setSound(unsigned card, SoundBuffer & s)
 {
   Log() << "Soundfile is: bytes: " << s.size() << " chans: " << s.chans << "  sample_size: " << s.sample_size << "  rate: " << s.rate << std::endl; 
 
-  std::auto_ptr<FifoMsg> msg(new FifoMsg);
+  std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
   msg->id = SOUND;
 
   Timer timer;
@@ -941,7 +949,7 @@ bool KernelSM::setSound(unsigned card, SoundBuffer & s)
   msg->u.sound.rate = s.rate;
   msg->u.sound.stop_ramp_tau_ms = s.stop_ramp_tau_ms;
   msg->u.sound.is_looped = s.loop_flg;
-  n2copy = MIN(FIFO_DATA_SZ, s.size());
+  n2copy = MIN(SND_FIFO_DATA_SZ, s.size());
   msg->u.sound.datalen = n2copy;
   memcpy(msg->u.sound.databuf, &s[0], n2copy);
   sendToRT(card, *msg);
@@ -950,7 +958,7 @@ bool KernelSM::setSound(unsigned card, SoundBuffer & s)
   if (!msg->u.sound.transfer_ok) return false;
   unsigned ncopied = n2copy;
   while (ncopied < s.size()) {
-      n2copy = MIN(FIFO_DATA_SZ, s.size()-ncopied);
+      n2copy = MIN(SND_FIFO_DATA_SZ, s.size()-ncopied);
       memcpy(msg->u.sound.databuf, &s[ncopied], n2copy);
       msg->u.sound.id = s.id;
       msg->id = SOUNDXFER;
@@ -967,7 +975,7 @@ bool KernelSM::setSound(unsigned card, SoundBuffer & s)
 }
 
 KernelSM::KernelSM(void *s)
-    : SoundMachine(Kernelspace, s), shm(static_cast<Shm *>(s))
+    : SoundMachine(Kernelspace, s), shm(static_cast<SndShm *>(s))
 {
    for (unsigned i = 0; i < shm->num_cards; ++i) {
      fifo_in[i] = RTOS::openFifo(shm->fifo_out[i]);
@@ -988,7 +996,7 @@ KernelSM::~KernelSM()
   shm = 0;
 }
 
-void KernelSM::sendToRT(unsigned card, FifoMsg & msg) const
+void KernelSM::sendToRT(unsigned card, SndFifoMsg & msg) const
 {
   // lock SHM here??
   MutexLocker ml(mut);
@@ -996,9 +1004,9 @@ void KernelSM::sendToRT(unsigned card, FifoMsg & msg) const
   if (shm->magic != SND_SHM_MAGIC)
       throw FatalException("ARGH! The rt-shm was cleared from underneath us!  Did we lose the kernel module?");
   
-  std::memcpy(const_cast<FifoMsg *>(&shm->msg[card]), &msg, sizeof(FifoMsg));
+  std::memcpy(const_cast<SndFifoMsg *>(&shm->msg[card]), &msg, sizeof(SndFifoMsg));
 
-  FifoNotify_t dummy = 1;    
+  SndFifoNotify_t dummy = 1;    
     
   if ( RTOS::writeFifo(fifo_out[card], &dummy, sizeof(dummy)) != sizeof(dummy) )
     throw Exception("INTERNAL ERROR: Could not write a complete message to the fifo!");
@@ -1007,7 +1015,7 @@ void KernelSM::sendToRT(unsigned card, FifoMsg & msg) const
   // now wait synchronously for a reply from the rt-process.. 
   if ( (err = RTOS::readFifo(fifo_in[card], &dummy, sizeof(dummy))) == sizeof(dummy) ) { 
     /* copy the reply from the shm back to the user-supplied msg buffer.. */
-    std::memcpy(&msg, const_cast<struct FifoMsg *>(&shm->msg[card]), sizeof(FifoMsg));
+    std::memcpy(&msg, const_cast<struct SndFifoMsg *>(&shm->msg[card]), sizeof(SndFifoMsg));
   } else if (err < 0) { 
     throw Exception(std::string("INTERNAL ERROR: Reading of input fifo got an error: ") + strerror(errno));
   } else {
@@ -1017,9 +1025,9 @@ void KernelSM::sendToRT(unsigned card, FifoMsg & msg) const
   // unlock SHM here??
 }
 
-void KernelSM::sendToRT(unsigned card, FifoMsgID cmd) const
+void KernelSM::sendToRT(unsigned card, SndFifoMsgID cmd) const
 {
-  std::auto_ptr<FifoMsg> msg(new FifoMsg);
+  std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
 
   switch (cmd) {
   case INITIALIZE:
@@ -1029,7 +1037,7 @@ void KernelSM::sendToRT(unsigned card, FifoMsgID cmd) const
     sendToRT(card, *msg);
     break;
   default:
-    throw Exception("INTERNAL ERRROR: sendToRT(unsigned, FifoMsgID) called with an inappropriate command ID!");
+    throw Exception("INTERNAL ERRROR: sendToRT(unsigned, SndFifoMsgID) called with an inappropriate command ID!");
     break;
   }
 }
@@ -1053,7 +1061,7 @@ void KernelSM::run(unsigned card)
 
 void KernelSM::trigger(unsigned card, int trig)
 {
-    std::auto_ptr<FifoMsg> msg(new FifoMsg);
+    std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
     msg->id = FORCEEVENT;
     msg->u.forced_event = trig;
     sendToRT(card, *msg);
@@ -1061,7 +1069,7 @@ void KernelSM::trigger(unsigned card, int trig)
 
 bool KernelSM::isRunning(unsigned card) const
 {
-    std::auto_ptr<FifoMsg> msg(new FifoMsg);
+    std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
     msg->id = GETPAUSE;
     sendToRT(card, *msg);
     return !msg->u.is_paused;
@@ -1069,7 +1077,7 @@ bool KernelSM::isRunning(unsigned card) const
 
 double KernelSM::getTime(unsigned card) const
 {
-    std::auto_ptr<FifoMsg> msg(new FifoMsg);
+    std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
     msg->id = GETRUNTIME;
     sendToRT(card, *msg);
     return double(msg->u.runtime_us)/1e6;
@@ -1077,7 +1085,7 @@ double KernelSM::getTime(unsigned card) const
 
 int KernelSM::getLastEvent(unsigned card) const
 {
-    std::auto_ptr<FifoMsg> msg(new FifoMsg);
+    std::auto_ptr<SndFifoMsg> msg(new SndFifoMsg);
     msg->id = GETLASTEVENT;
     sendToRT(card, *msg);
     return msg->u.last_event;
@@ -1087,7 +1095,9 @@ int KernelSM::getLastEvent(unsigned card) const
 UserSM * volatile UserSM::instance = 0;
 
 UserSM::UserSM(void *s)
-    : SoundMachine(Userspace, s), shm(static_cast<UTShm *>(s)),
+    : SoundMachine(Userspace, s), 
+      shm(static_cast<UTShm *>(s)), 
+      fifo(RTOS::INVALID_FIFO), fifo2(RTOS::INVALID_FIFO),
       threadRunning(false), chldThreadRunning(false), chldPleaseStop(false), cardRunning(true), lastEvent(0), ctr(0)
 {
     if (instance) 
@@ -1095,6 +1105,7 @@ UserSM::UserSM(void *s)
 
     sem_init(&child_sem, 0, 0);
 
+#ifndef EMULATOR
     if (shm) { /* !shm typically only in Emulator mode */
         if (::access("/usr/bin/play", X_OK))
             throw Exception("Required program /usr/bin/play is missing!");
@@ -1113,7 +1124,8 @@ UserSM::UserSM(void *s)
         }
         chldThreadRunning = true;
 #endif
-    } 
+    }
+#endif 
     instance = this;
 }
 
@@ -1139,8 +1151,9 @@ UserSM::~UserSM()
     signal(SIGCHLD, SIG_DFL);
 #endif
     stopThreads();
-    if (fifo) RTOS::closeFifo(fifo);
-    fifo = RTOS::INVALID_FIFO;
+    if (fifo != RTOS::INVALID_FIFO) RTOS::closeFifo(fifo);
+    if (fifo2 != RTOS::INVALID_FIFO) RTOS::closeFifo(fifo2);
+    fifo = fifo2 = RTOS::INVALID_FIFO;
     reset(0);
     sem_destroy(&child_sem);
 }
@@ -1184,8 +1197,34 @@ void UserSM::trigger(unsigned card, int trig)
     MutexLocker ml(mut);
     trigger_nolock(card, trig);
 }
+#ifdef EMULATOR
+void UserSM::trigger_nolock(unsigned card, int trig)
+{
+    RTOS::ShmStatus status;
+    SndShm *sndShm = (SndShm *)RTOS::shmAttach(SND_SHM_NAME, SND_SHM_SIZE, &status);
+    lastEvent = trig;
+    if (sndShm) {
+        if (card < sndShm->num_cards) {
+            RTOS::FIFO & out = fifo;
+            RTOS::FIFO & in = fifo2;
+            if (out == RTOS::INVALID_FIFO)
+                out = RTOS::openFifo(sndShm->fifo_in[card], RTOS::Write);
+            if (in == RTOS::INVALID_FIFO)                    
+                in = RTOS::openFifo(sndShm->fifo_out[card], RTOS::Read);
+            if (out != RTOS::INVALID_FIFO && in != RTOS::INVALID_FIFO) {
+                SndFifoNotify_t dummy = 1;
+                sndShm->msg[card].id = FORCEEVENT;
+                sndShm->msg[card].u.forced_event = trig;
+                if ( RTOS::writeFifo(out, &dummy, sizeof(dummy), true) == sizeof(dummy) ) 
+                    RTOS::readFifo(in, &dummy, sizeof(dummy), true);
+            }
+        }
+        RTOS::shmDetach(sndShm);
+    }
+}
+#else
 
-#ifdef OS_WINDOWS
+#  ifdef OS_WINDOWS
 /*static*/ void *UserSM::playthr(void *arg)
 {
     SoundFile *sf = reinterpret_cast<SoundFile *>(arg);
@@ -1226,7 +1265,7 @@ void UserSM::trigger_nolock(unsigned card, int trig)
             Warning() << "Kernel told us to stop sound id (" << card << "," << ABS(trig) << ") which doesn't seem to exist!\n";            
     }
 }
-#else /* !OS_WINDOWS */
+#  else /* !OS_WINDOWS */
 void UserSM::trigger_nolock(unsigned card, int trig)
 {
     Debug() << "in trigger_nolock with card " << card << " trig " << trig << "\n";
@@ -1298,8 +1337,8 @@ void UserSM::childReaper()
     if (chldPleaseStop)
         Debug() << "childReaper got chldPleaseStop request, ending thread..\n";
 }
-#endif
-
+#  endif /* !OS_WINDOWS */
+#endif /* !EMULATOR */
 
 void UserSM::reset(unsigned card)
 {
