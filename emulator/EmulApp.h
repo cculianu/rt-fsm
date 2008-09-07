@@ -17,6 +17,7 @@ class QSound;
 struct FSMExtTrigShm;
 struct SndShm;
 class SndThr;
+class SoundPlayer;
 
 /**
    \brief The central class to the program that more-or-less encapsulates most objects and data in the program.
@@ -30,6 +31,7 @@ class EmulApp : public QApplication
     Q_OBJECT
 
     friend int main(int, char **);
+    friend class SndThr;
 
     EmulApp(int & argc, char ** argv);  ///< only main can construct us
 public:
@@ -109,6 +111,7 @@ private:
     static int soundTrigFunc(unsigned, int);
     void trigSound(int sndtrig);
     void killProcs(const QString & name);
+    void destroyAllSounds();
 
     //void createAppIcon();
 
@@ -126,11 +129,15 @@ private:
     ModuleParmView *mp;
     QPushButton *applyParamsBut, *revertParamsBut;
     ControlWin *controlwin;
-    typedef std::map<unsigned, QSound *> SoundPlayerMap;
+    typedef std::map<unsigned, SoundPlayer *> SoundPlayerMap;
     SoundPlayerMap soundPlayerMap;
     FSMExtTrigShm *soundTrigShm;
     SndShm *sndShm;
     SndThr *sndThr;
+
+protected: 
+    /// read/written by class SndThr and also by EmulApp::trigSound(int)
+    volatile int lastSndEvt;
 };
 
 #endif

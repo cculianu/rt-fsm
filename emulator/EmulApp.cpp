@@ -49,13 +49,15 @@
 #include <QFile>
 #include "FSMExternalTrig.h"
 #include "rtos_utility.h"
-#include <QSound>
 #include <QProcess>
 #if defined(OS_LINUX) || defined(OS_OSX)
 #include "scanproc.h"
 #endif
 #include "SoundTrig.h"
 #include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
+#include "SoundPlayer.h"
 
 Q_DECLARE_METATYPE(unsigned);
 
@@ -89,12 +91,19 @@ namespace {
         int timeout;
     };
 
+    struct SoundTrigListener
+    {
+        virtual ~SoundTrigListener() {}
+        virtual void triggered(int trig) = 0;
+    };
+
     class SoundTrigEvent : public QEvent
     {
     public:
-        SoundTrigEvent(int trig)
-            : QEvent((QEvent::Type)EmulApp::SoundTrigEventType), trig(trig) {}
+        SoundTrigEvent(int trig, SoundTrigListener *listener = 0)
+            : QEvent((QEvent::Type)EmulApp::SoundTrigEventType), trig(trig), listener(listener) {}
         int trig;
+        SoundTrigListener *listener;
     };
 
     class QuitEvent : public QEvent
@@ -128,20 +137,23 @@ namespace {
 
 };
 
-class SndThr : public QThread
+class SndThr : public QThread, public SoundTrigListener
 {
-    volatile bool pleaseStop;
+    volatile bool pleaseStop, trigDone;
     EmulApp *app;
     SndShm *sndShm;
+    QMutex mut;
+    QWaitCondition cond;
 public:
     SndThr(EmulApp *parent, SndShm *shm);
     ~SndThr();
+    void triggered(int trig);
 protected:
     void run();
 };
 
 SndThr::SndThr(EmulApp *parent, SndShm *s)
-    : QThread(parent), pleaseStop(false), app(parent), sndShm(s)
+    : QThread(parent), pleaseStop(false), trigDone(false), app(parent), sndShm(s)
 {}
 
 SndThr::~SndThr()
@@ -157,20 +169,49 @@ void SndThr::run()
         if (RTOS::waitReadFifo(sndShm->fifo_in[0], 100)) {
             SndFifoNotify_t dummy;
             if (RTOS::readFifo(sndShm->fifo_in[0], &dummy, sizeof(dummy), false) == sizeof(dummy)) {
-                int trig = sndShm->msg[0].u.forced_event;
-                Debug() << "Got sound trigger " << trig << " in EmulApp manual trigger thread.";
-                QCoreApplication::postEvent(app, new SoundTrigEvent(trig));
-                dummy = 1;
-                RTOS::writeFifo(sndShm->fifo_out[0], &dummy, sizeof(dummy), true);
+                bool do_reply = false;
+                switch(sndShm->msg[0].id) {
+                case GETLASTEVENT:
+                    sndShm->msg[0].u.last_event = app->lastSndEvt;
+                    do_reply = true;
+                    break;
+                case FORCEEVENT: {
+                    int trig = app->lastSndEvt = sndShm->msg[0].u.forced_event;
+                    Debug() << "Got sound trigger " << trig << " in EmulApp manual trigger thread.";
+                    trigDone = false;
+                    QCoreApplication::postEvent(app, new SoundTrigEvent(trig, this));                    
+                    mut.lock();
+                    if (!trigDone) {
+                        cond.wait(&mut); // wait forever for the trigdone!
+                    }
+                    mut.unlock();
+                    do_reply = true;
+                }
+                    break;
+                }
+                if (do_reply) {
+                    dummy = 1;                    
+                    RTOS::writeFifo(sndShm->fifo_out[0], &dummy, sizeof(dummy), true);
+                }
             }
         }
     }
 }
 
+void SndThr::triggered(int trig)
+{
+    (void)trig;
+    mut.lock();
+    trigDone = true;
+    mut.unlock();
+    //Debug() << "EmulApp manual trigger thread will be woken up for trigger " << trig;
+    cond.wakeAll();
+}
+
 EmulApp * EmulApp::singleton = 0;
 
 EmulApp::EmulApp(int & argc, char ** argv)
-    : QApplication(argc, argv, true), fsmPrintFunctor(0), debug(false), initializing(true), nLinesInLog(0), nLinesInLogMax(1000), fsmRunning(false), fsmServerProc(0), soundServerProc(0), soundTrigShm(0), sndShm(0), sndThr(0)
+    : QApplication(argc, argv, true), fsmPrintFunctor(0), debug(false), initializing(true), nLinesInLog(0), nLinesInLogMax(1000), fsmRunning(false), fsmServerProc(0), soundServerProc(0), soundTrigShm(0), sndShm(0), sndThr(0), lastSndEvt(0)
 {
     if (!isSingleInstance()) {
         QMessageBox::critical(0, "FSM Emulator - Error", "Another copy of this program is already running!");
@@ -181,6 +222,7 @@ EmulApp::EmulApp(int & argc, char ** argv)
         std::exit(1);
     }
     singleton = this;
+    setApplicationName("FSMEmulator");
     try {
 
         if (!::init) ::init = new Init;
@@ -293,11 +335,6 @@ EmulApp::~EmulApp()
     stopFSMServer();
     stopFSM();    
 
-    // NB: Qt docs are wrong and we need to manually stop sound?
-    SoundPlayerMap::iterator it;
-    for (it = soundPlayerMap.begin(); it != soundPlayerMap.end(); ++it)
-        if (it->second) it->second->stop();
-
     if (soundTrigShm) {
         memset(soundTrigShm, 0, sizeof *soundTrigShm);
         RTOS::shmDetach(soundTrigShm, 0, true);
@@ -382,6 +419,7 @@ bool EmulApp::eventFilter(QObject *watched, QEvent *event)
         if (type == SoundTrigEventType) {
             SoundTrigEvent *evt = dynamic_cast<SoundTrigEvent *>(event);
             if (evt) trigSound(evt->trig);
+            if (evt->listener) evt->listener->triggered(evt->trig);
             return true;
         }
     }
@@ -688,8 +726,19 @@ void EmulApp::startSoundServer()
     
 }
 
+void EmulApp::destroyAllSounds()
+{
+    SoundPlayerMap::iterator it;
+    for (it = soundPlayerMap.begin(); it != soundPlayerMap.end(); ++it) {
+        it->second->stop();
+        delete it->second;
+    }
+    soundPlayerMap.clear();
+}
+
 void EmulApp::stopSoundServer()
 {
+    destroyAllSounds();
     controlwin->resetAllSoundStats();
     if (!soundServerProc) return;
     soundServerProc->blockSignals(true);
@@ -764,6 +813,7 @@ void EmulApp::trigSound(int sndtrig)
 {
     const bool dostop = sndtrig < 0;    
     const unsigned snd = dostop ? -sndtrig : sndtrig;
+    lastSndEvt = sndtrig;
 #ifdef Q_OS_WIN
     const int pid = soundServerProc->pid()->dwProcessId;
 #else
@@ -771,32 +821,30 @@ void EmulApp::trigSound(int sndtrig)
 #endif
     QString fname = TmpPath() + "SoundServerSound_" + QString::number(pid) + "_" + QString::number(0) + "_" + QString::number(snd) + ".wav";
 
-    if (isDebugMode()) {
-        Debug() << "Got sound trig " << sndtrig << " for filename `" << fname << "'";
-    }
+    Debug() << "Got sound trig " << sndtrig << " for filename `" << fname << "'";
     SoundPlayerMap::iterator it = soundPlayerMap.find(snd);
-    if (dostop && it != soundPlayerMap.end()) {
-        it->second->stop();
-        controlwin->untriggeredSound(snd);
-#ifdef Q_OS_DARWIN
-        // on darwin it appears we need to actually delete the QSound object
-        // to stop the sound!
-        delete it->second;
-        soundPlayerMap.erase(snd);
-#endif
-    } else {
-        QSound *qs = 0;
-        if (it == soundPlayerMap.end() 
-            || (qs = it->second)->fileName() != fname ) {
-            // filename has to match.. if not.. there was a restart and the filename was reset, so delete and re-create the QSound object..
-            if (qs) delete qs;
-            qs = new QSound(fname, this);
-            soundPlayerMap[snd] = qs;
+    SoundPlayer *sp = 0;
+    if (it == soundPlayerMap.end() 
+        || (sp = it->second)->fileName() != fname ) {
+        // filename has to match.. if not.. there was a restart and the filename was reset, so delete and re-create the QSound object..
+        if (sp) {
+            Debug() << "Deleting sp.  sp->fileName() = " << sp->fileName();
+            sp->stop();
+            delete sp;
         }
-        int loopct = 1;
-        if (QFile::exists(fname + ".loops")) loopct = -1;
-        qs->setLoops(loopct);
-        qs->play();
+        sp = new SoundPlayer(fname, this);
+        soundPlayerMap[snd] = sp;
+    } 
+    // at this point qs is assigned to a valid QSound
+    sp->setLoops(QFile::exists(fname + ".loops"));
+    if (dostop) {
+        //Debug() << "sound " << snd << " stop";
+        sp->stop();
+        controlwin->untriggeredSound(snd);
+    } else {
+        //Debug() << "sound " << snd << " play";
+        sp->stop();
+        sp->play();
         controlwin->triggeredSound(snd);
     }
     
@@ -805,6 +853,7 @@ void EmulApp::trigSound(int sndtrig)
 /*static*/ int EmulApp::soundTrigFunc(unsigned card, int trig)
 {
     (void)card; // ignored..
+    //Debug() << "EmulApp::soundTrigFunc(" << card << ", " << trig << ")";
     QCoreApplication::postEvent(EmulApp::instance(), new SoundTrigEvent(trig));
     return 1;
 }
@@ -896,3 +945,4 @@ void EmulApp::processDied()
 {    
     processError(QProcess::Crashed);
 }
+
