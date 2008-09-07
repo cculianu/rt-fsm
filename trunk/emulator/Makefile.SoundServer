@@ -16,7 +16,11 @@ PRG_OBJS = SoundServer.o rtos_utility.o Util.o WavFile.o
 PRG = SoundServer
 CXX=g++
 CC=gcc
-CXXFLAGS=-g -DEMULATOR -D$(OS) -W -Wall -g -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
+ifeq ($(config),release)
+  CXXFLAGS = -Os -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
+else
+  CXXFLAGS = -g -DEMULATOR -D$(OS) -W -Wall  -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
+endif
 LDFLAGS=-lpthread
 ifeq ($(OS),OS_LINUX)
         SRC +=   ../user/scanproc.c 
@@ -56,13 +60,14 @@ WavFile.o: ../addons/SoundTrig/WavFile.cpp
 $(PRG): $(PRG_OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(PRG_OBJS)
 
-.deps: 
-	-cp -f Makefile.SoundServer.bak Makefile.SoundServer || true
-	-makedepend -f Makefile.SoundServer -- $(CXXFLAGS) --  $(SRC) 2> mkdep.out || cat mkdep.out 1>&2
-	-rm -f mkdep.out
-	touch .deps
+#.deps: 
+#	-cp -f Makefile.SoundServer.bak Makefile.SoundServer || true
+#	-makedepend -f Makefile.SoundServer -- $(CXXFLAGS) --  $(SRC) 2> mkdep.out || cat mkdep.out 1>&2
+#	-rm -f mkdep.out
+#	touch .deps
 
 clean:
-	-cp -f Makefile.SoundServer.bak Makefile.SoundServer || true
-	rm -f *~ *.o Makefile.SoundServer.bak .deps $(PRG)
+#	-cp -f Makefile.SoundServer.bak Makefile.SoundServer || true
+#	rm -f *~ *.o Makefile.SoundServer.bak .deps $(PRG)
+	rm -f *~ *.o .deps $(PRG)
  

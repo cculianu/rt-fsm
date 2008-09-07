@@ -197,7 +197,7 @@ bool OWavFile::write(const void *v,
     for (unsigned chan = 0; chan < p->nchans; ++chan) {
       unsigned idx = unsigned(Round(i))*p->nchans+chan;
       uint32 samp;
-      double datum;
+      double datum = 0.;
       switch (bits) {
         case 8:  datum = d[idx]; break;
         case 16: datum = ((int16 *)d)[idx]; break;

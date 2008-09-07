@@ -16,7 +16,11 @@ PRG_OBJS = FSMServer.o rtos_utility.o deflate_helper.o Util.o
 PRG = FSMServer
 CXX=g++
 CC=gcc
-CXXFLAGS=-g -DEMULATOR -D$(OS) -W -Wall -g -I../include -I ../user -I ../kernel
+ifeq ($(config),release)
+  CXXFLAGS = -Os -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../kernel
+else
+  CXXFLAGS = -g -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../kernel
+endif
 LDFLAGS=-lz -lpthread
 ifeq ($(OS),OS_WINDOWS)
         CXXFLAGS += -I ./win32
@@ -53,12 +57,13 @@ FSMServer.o: ../user/FSMServer.cpp
 $(PRG): $(PRG_OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(PRG_OBJS)
 
-.deps: 
-	-cp -f Makefile.FSMServer.bak Makefile.FSMServer || true
-	-makedepend -f Makefile.FSMServer -- $(CXXFLAGS) --  $(SRC) 2> mkdep.out || cat mkdep.out 1>&2
-	-rm -f mkdep.out
-	touch .deps
+#.deps: 
+#	-cp -f Makefile.FSMServer.bak Makefile.FSMServer || true
+#	-makedepend -f Makefile.FSMServer -- $(CXXFLAGS) --  $(SRC) 2> mkdep.out || cat mkdep.out 1>&2
+#	-rm -f mkdep.out
+#	touch .deps
 
 clean:
-	-cp -f Makefile.FSMServer.bak Makefile.FSMServer || true
-	rm -f *~ *.o Makefile.FSMServer.bak .deps $(PRG)
+#	-cp -f Makefile.FSMServer.bak Makefile.FSMServer || true
+#	rm -f *~ *.o Makefile.FSMServer.bak .deps $(PRG)
+	rm -f *~ *.o .deps $(PRG)

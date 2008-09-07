@@ -7,14 +7,12 @@
 #include <stdio.h> /* for now, all rt_printks go to stdout.. */
 #include <string.h>
 #include "ComediEmul.h"
-#ifdef OS_OSX
-#include <sys/time.h>
-#endif
 #include <sstream>
 #include <semaphore.h>
 #ifdef OS_WINDOWS
 #include <windows.h>
 #endif
+#include <sys/time.h>
 
 namespace Emul {
 
@@ -518,32 +516,34 @@ hrtime_t gethrtime(void)
     return static_cast<hrtime_t>(Emul::getTime());
 }
 
+static long long timeNowNS()
+{
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    return static_cast<long long>(tv.tv_sec) * 1000000000LL + static_cast<long long>(tv.tv_usec)*1000LL;
+}
+
 int clock_nanosleep_emul(int clkid, int flags, const struct timespec *req, struct timespec *rem)
 {
     (void)clkid; (void) flags; (void)req; (void)rem;
     /* NB: this function is really severely limited: it unconditionally 
        waits for 1 clock cycle regardless of what's passed-in */ 
+
+    // try and sleep as close to 1 task cycle as possible, by remembering
+    // the last time we woke and sleep by "timeleft this period" amount..
     
-    /*hrtime_t wakeup = static_cast<hrtime_t>(req->tv_sec*1000000000LL) + req->tv_nsec, now = Emul::getTime();
-    if (!(flags & TIMER_ABSTIME)) {
-        wakeup += now;
-    } 
-    while (now < wakeup) {
-    */
-    if (!Emul::fastFSM) 
-        Emul::nanosleep(1000000000/Emul::taskRate());
-    Emul::heartBeat();
-    /*now = Emul::getTime();
+    static long long lastWake = 0;
+    if (!Emul::fastFSM) {
+        long tick = 1000000000/Emul::taskRate(), amount = tick;
+        if (lastWake) {
+            amount -= timeNowNS()-lastWake;
+            if (amount < 0) amount = 0;
+            if (amount > tick) amount = tick;
+        }
+        Emul::nanosleep(amount);
     }
-    (void)rem;*/
-    /*
-    Emul::Sleeper s;
-    s.wakeup = Emul::time2TickCount(wakeup);
-    pthread_mutex_lock(&Emul::sleeperLock);
-    Emul::sleepers.insert(Emul::SleeperMap::value_type(s.wakeup, &s));
-    pthread_mutex_unlock(&Emul::sleeperLock);
-    sem_wait(&s.sem); // wait for sem to hit 1, that is, for us to be told by the heartbeat that we can proceed
-    */
+    lastWake = timeNowNS();
+    Emul::heartBeat();
     return 0;
 }
 

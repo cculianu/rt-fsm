@@ -374,7 +374,7 @@ extern "C"
   { 
     pthread_detach(pthread_self());
     ConnectionThread *me = static_cast<ConnectionThread *>(arg);
-    void * ret;
+    void * ret = 0;
     try {
         ret = me->threadFunc();  
     } catch (const FatalException & e) {
@@ -2111,7 +2111,10 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
     for (j = 0; j < (int)m.cols(); ++j) {
       double val = m.at(i, j);
       if (j == (int)TIMEOUT_TIME_COL(&msg.u.fsm)) val *= 1e6;
-      FSM_MATRIX_AT(&msg.u.fsm, i, j) = static_cast<unsigned>(val);
+      // NB: this cast to int then to unsigned is required because on OSX
+      // for some reason casting from a negative double to unsigned always
+      // returns 0, whereas castin to int then unsigned does not
+      FSM_MATRIX_AT(&msg.u.fsm, i, j) = static_cast<unsigned>(static_cast<int>(val));
     }
   }
 
