@@ -1,3 +1,31 @@
+2008-09-07 16:50  calin.culianu
+
+	* [r134] addons/SoundTrig/SoundServer.cpp,
+	  addons/SoundTrig/WavFile.cpp, emulator/EmulApp.cpp,
+	  emulator/EmulApp.h, emulator/Makefile.FSMServer,
+	  emulator/Makefile.SoundServer, emulator/SoundPlayer.cpp,
+	  emulator/SoundPlayer.h, emulator/emulator.pro,
+	  emulator/kernel_emul.cpp, emulator/osx-x86/FSMEmulator,
+	  emulator/osx-x86/FSMServer, emulator/osx-x86/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h,
+	  user/FSMServer.cpp:
+	  
+	  - Fixed buggy/crashy sound playing on OSX by making sounds play
+	  via
+	  the Phonon framework (OSX only)
+	  - Cleaned-up soundplaying/triggering code to work more reliably
+	  - Minor tweaks to timing code to make FSM time closer to real
+	  time
+	  - Minor sourcecode tweaks to fix compiletime warnings.
+
+2008-09-04 20:11  calin.culianu
+
+	* [r133] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-04 20:06  calin.culianu
 
 	* [r132] Client/Matlab/NetClient/FSMClient.mexmaci,
