@@ -1,3 +1,32 @@
+2008-09-09 02:06  calin.culianu
+
+	* [r136] addons/SoundTrig/SoundServer.cpp,
+	  addons/SoundTrig/SoundTrig.h, addons/SoundTrig/WavFile.cpp,
+	  emulator/ControlWin.cpp, emulator/EmulApp.cpp,
+	  emulator/EmulApp.h, emulator/SoundPlayer.cpp,
+	  emulator/SoundPlayer.h, emulator/osx-x86/FSMEmulator,
+	  emulator/osx-x86/FSMServer, emulator/osx-x86/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h,
+	  user/rtos_utility.cpp:
+	  
+	  - Reduced CPU load
+	  - Fixed bug whereby sounds stopped triggering if you did "Restart
+	  FSM"
+	  - Fixed a bug whereby sound files are 'stale' and not properly
+	  updated after subsequent loadsound calls
+	  - Fixed distortion due to poor downsampling code: made
+	  downsampling code use linear interpolation in order to create
+	  more perfect wave files
+	  - Hopefully fixed looping issues on Mac
+
+2008-09-07 16:51  calin.culianu
+
+	* [r135] ChangeLog:
+	  
+	  Updated ChangeLog.
+
 2008-09-07 16:50  calin.culianu
 
 	* [r134] addons/SoundTrig/SoundServer.cpp,
