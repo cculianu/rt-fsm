@@ -432,9 +432,8 @@ static void cleanupTmpFiles()
   std::cerr << "Deleting old/crufty sounds from TEMP dir..\n";
 #ifdef OS_WINDOWS
   std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\SoundServerSound_*.wav").c_str());
-  std::system((std::string("del /F /Q \"") + TmpPath() + "\"\\SoundServerSound_*.wav.loops").c_str());
 #else
-  std::system((std::string("rm -fr '") + TmpPath() + "'/SoundServerSound_*.wav*").c_str());
+  std::system((std::string("rm -fr '") + TmpPath() + "'/SoundServerSound_*.wav").c_str());
 #endif
 }
 
@@ -1583,17 +1582,6 @@ bool AbstractUserSM::setSound(unsigned card, SoundBuffer & buf)
     f.loops = buf.loop_flg;
     soundFileMap[buf.id] = f;
     wav.close();
-    std::string loopfile = s.str() + ".loops";
-    if (f.loops) {
-        // if it loops, create a special file that tells the play process 
-        // to loop the sound
-        std::ofstream of(loopfile.c_str(), std::ios::out|std::ios::trunc);
-        int c = 1;
-        of << c << "\n";
-        of.close();
-    } else {
-        ::remove(loopfile.c_str());
-    }
     return true;
 }
 

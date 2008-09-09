@@ -58,6 +58,8 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include "SoundPlayer.h"
+#include <QMenuBar>
+#include <QMenu>
 
 Q_DECLARE_METATYPE(unsigned);
 
@@ -115,10 +117,11 @@ namespace {
     class SoundEvent : public QEvent
     {
     public:
-        SoundEvent(unsigned id, QString name, SoundListener *listener = 0)
-            : QEvent((QEvent::Type)EmulApp::SoundEventType), id(id), name(name), listener(listener) {}
+        SoundEvent(unsigned id, QString name, bool loops, SoundListener *listener = 0)
+            : QEvent((QEvent::Type)EmulApp::SoundEventType), id(id), name(name), loops(loops), listener(listener) {}
         unsigned id;
         QString name;
+        bool loops;
         SoundListener *listener;
     };
 
@@ -241,9 +244,10 @@ void SndThr::run()
                 case SOUND: { // notified of a new sound.. note the sound now lives on the filesystem
                     unsigned id = sndShm->msg[0].u.sound.id;
                     QString fname(sndShm->msg[0].u.sound.databuf);
+                    bool islooped = sndShm->msg[0].u.sound.is_looped;
                     Debug() << "Got new sound " << id << ": `" << fname << "' in EmulApp SndThr.";
                     sndDone = false;
-                    QCoreApplication::postEvent(app, new SoundEvent(id, fname, this));                    
+                    QCoreApplication::postEvent(app, new SoundEvent(id, fname, islooped, this));                    
                     mut2.lock();
                     if (!sndDone) {
                         cond2.wait(&mut2); // wait forever for the trigdone!
@@ -320,8 +324,6 @@ EmulApp::EmulApp(int & argc, char ** argv)
 #endif
         mainwin->move(0,mainwin->frameSize().height()+delta);
         mainwin->show();
-
-        //createAppIcon();
         
         // do sound trig shm stuff..
         RTOS::ShmStatus shmStatus;
@@ -369,14 +371,19 @@ EmulApp::EmulApp(int & argc, char ** argv)
         // construct the control window
         controlwin = new ControlWin(0);
         controlwin->show();
+
+        setupAppIcon();
+        buildAppMenus();
         
         initializing = false;
+
         Log() << "Application initialized";    
 
         QTimer *timer = new QTimer(this);
         connect(timer, SIGNAL(timeout()), this, SLOT(updateStatusBar()));
         timer->setSingleShot(false);
         timer->start(247); // update status bar every 247ms.. i like this non-round-numbre.. ;)
+
     } catch (const Exception & e) {
         Error() << e.what() << "\n";
         QMessageBox::critical(0, "FSM Emulator - Exception Caught", e.what());
@@ -471,7 +478,7 @@ bool EmulApp::eventFilter(QObject *watched, QEvent *event)
         }
         if (type == SoundEventType) {
             SoundEvent *evt = dynamic_cast<SoundEvent *>(event);
-            if (evt) gotSound(evt->id, evt->name);
+            if (evt) gotSound(evt->id, evt->name, evt->loops);
             if (evt->listener) evt->listener->gotSound(evt->id);
             return true;
         }
@@ -577,30 +584,17 @@ void EmulApp::about()
 }
 
 
-/*
-void EmulApp::createAppIcon()
+void EmulApp::setupAppIcon()
 {
-    QPixmap pm(QSize(128, 128));
-    pm.fill(Qt::transparent);
-    QRadialGradient gradient(50, 50, 50, 50, 50);
-    gradient.setColorAt(0, QColor::fromRgbF(1, 0, 0, 1));
-    gradient.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
-    QPainter painter(&pm);
-    painter.fillRect(0, 0, 128, 128, gradient);
-    painter.end();
-    mainwin->setWindowIcon(QIcon(pm));
+#include "FSM.xpm"    
+    QPixmap pm(FSM_xpm);
+    QIcon ic(pm);
     
-    pm.fill(Qt::transparent);
-    painter.begin(&pm);
-    
-    gradient.setColorAt(0, QColor::fromRgbF(0, 0, 1, 1));
-    gradient.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
-
-    painter.fillRect(0, 0, 128, 128, gradient);
-
-    glWindow->setWindowIcon(QIcon(pm));
+    mainwin->setWindowIcon(ic);    
+    controlwin->setWindowIcon(ic);
+    pfv->setWindowIcon(ic);
+    mpv->setWindowIcon(ic);
 }
-*/
 
 struct EmulApp::FSMPrintFunctor : public Emul::PrintFunctor
 {
@@ -695,7 +689,12 @@ void EmulApp::startFSMServer()
     if (isDebugMode()) args.push_back("-d");
 #ifdef Q_OS_WIN
     fsmServerProc->start("FSMServer.exe", args, QIODevice::ReadOnly);
-#else /* LINUX/DARWIN */
+#elif defined(Q_OS_DARWIN)
+    if (QFile::exists("FSMEmulator.app/Contents/MacOS/FSMServer"))
+        fsmServerProc->start("FSMEmulator.app/Contents/MacOS/FSMServer", args, QIODevice::ReadOnly);
+    else
+        fsmServerProc->start("./FSMServer", args, QIODevice::ReadOnly);
+#else /* LINUX */
     fsmServerProc->start("./FSMServer", args, QIODevice::ReadOnly);
 #endif
     Log() << "Starting FSMServer...\n";    
@@ -757,7 +756,12 @@ void EmulApp::startSoundServer()
     QStringList args;
 #ifdef Q_OS_WIN
     soundServerProc->start("SoundServer.exe", args, QIODevice::ReadOnly);
-#else /* LINUX/DARWIN */
+#elif defined(Q_OS_DARWIN)
+    if (QFile::exists("FSMEmulator.app/Contents/MacOS/SoundServer"))
+        soundServerProc->start("FSMEmulator.app/Contents/MacOS/SoundServer", args, QIODevice::ReadOnly);
+    else
+        soundServerProc->start("./SoundServer", args, QIODevice::ReadOnly);
+#else /* LINUX */
     soundServerProc->start("./SoundServer", args, QIODevice::ReadOnly);
 #endif
     Log() << "Starting SoundServer...\n";    
@@ -867,7 +871,7 @@ void EmulApp::modParamsChanged()
 }
 
 
-void EmulApp::gotSound(unsigned id, const QString & fname)
+void EmulApp::gotSound(unsigned id, const QString & fname, bool loop_flg)
 {
     Debug() << "Got new sound " << id << " for filename `" << fname << "'";
     SoundPlayerMap::iterator it = soundPlayerMap.find(id);
@@ -879,7 +883,7 @@ void EmulApp::gotSound(unsigned id, const QString & fname)
     sp = new SoundPlayer(fname, this);
     soundPlayerMap[id] = sp;
     // at this point sp is assigned to a valid SoundPlayer
-    sp->setLoops(QFile::exists(fname + ".loops"));
+    sp->setLoops(loop_flg);
 }
 
 void EmulApp::trigSound(int sndtrig)
@@ -1004,3 +1008,25 @@ void EmulApp::processDied()
     processError(QProcess::Crashed);
 }
 
+
+void EmulApp::buildAppMenus()
+{
+#ifdef Q_OS_DARWIN
+    QMenuBar *mb = new QMenuBar(0); // on OSX we make the 'default menubar' (a parentless menubar) here.. so that it's app-global
+#else
+    QMenuBar *mb = mainwin->menuBar(); // on other platforms it's just part of the mainwin
+#endif
+    QMenu *m = mb->addMenu("&File");
+    m->addAction("&Restart FSM", this, SLOT(restartFSMAndServer()));
+    m->addSeparator();
+    m->addAction("&Quit", this, SLOT(quit()));
+    m = mb->addMenu("&Window");
+    m->addAction("&Control Window", this, SLOT(showControlWin()));
+    m->addSeparator();
+    m->addAction("&ProcFile Viewer Window", this, SLOT(showProcFileViewer()));
+    m->addAction("&ModParms Viewer Window", this, SLOT(showModParmsViewer()));
+
+    m = mb->addMenu("&Help");
+    m->addAction("&About", this, SLOT(about()));
+    m->addAction("About &Qt", this, SLOT(aboutQt()));
+}

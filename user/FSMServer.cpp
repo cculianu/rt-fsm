@@ -1838,7 +1838,13 @@ bool ConnectionThread::compileProgram(const std::string & prog_name, const std::
 #elif defined(OS_LINUX) 
     return System(std::string("gcc -DOS_LINUX -W -O2 -shared -fPIC -export-dynamic -I../include  -o '") + soname + "' '" + fname + "' '" + wname + "'");
 #elif defined(OS_OSX)
-    return System(std::string("gcc -DOS_OSX -W -dynamiclib -fPIC -I../include -I. -I../../include -o '") + soname + "' '" + fname + "' '" + wname + "'");
+    std::string additional_includes = "";
+    if (FileExists(std::string("FSMEmulator.app/Contents/Resources/") + wname)) {
+        wname = std::string("FSMEmulator.app/Contents/Resources/") + wname;
+        additional_includes = "-I FSMEmulator.app/Contents/Resources";
+    }
+                            
+    return System(std::string("gcc -DOS_OSX -W -dynamiclib -fPIC -I../include -I. -I../../include " + additional_includes + " -o '") + soname + "' '" + fname + "' '" + wname + "'");
 #endif
 }
 
