@@ -1,3 +1,99 @@
+2008-09-09 20:47  calin.culianu
+
+	* [r138] addons/SoundTrig/SoundServer.cpp, emulator/EmulApp.cpp,
+	  emulator/EmulApp.h, emulator/FSM.icns, emulator/FSM.xpm,
+	  emulator/MainWindow.cpp, emulator/compile.sh,
+	  emulator/osx-x86/EmbC.h[DEL], emulator/osx-x86/FSMEmulator[DEL],
+	  emulator/osx-x86/FSMEmulator.app,
+	  emulator/osx-x86/FSMEmulator.app/Contents,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Contents,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Contents/Info.plist,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/QtCore,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/QtCore.prl,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Versions,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Versions/4,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Versions/4.0,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Versions/4/QtCore,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtCore.framework/Versions/Current,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Contents,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Contents/Info.plist,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/QtDBus,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/QtDBus.prl,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Versions,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Versions/4,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Versions/4.0,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Versions/4/QtDBus,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework/Versions/Current,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Contents,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Contents/Info.plist,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/QtGui,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/QtGui.prl,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Versions,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Versions/4,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Versions/4.0,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Versions/4/QtGui,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtGui.framework/Versions/Current,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Contents,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Contents/Info.plist,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/QtXml,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/QtXml.prl,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Versions,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Versions/4,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Versions/4.0,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Versions/4/QtXml,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework/Versions/Current,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Contents,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Contents/Info.plist,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Versions,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Versions/4,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Versions/4.0,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Versions/4/phonon,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/Versions/Current,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/phonon,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework/phonon.prl,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Info.plist,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/PkgInfo,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/EmbC.h,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/FSM.icns,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/embc_so_wrapper.c,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/ffs.h,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/kernel_emul.h,
+	  emulator/osx-x86/FSMServer[DEL],
+	  emulator/osx-x86/SoundServer[DEL],
+	  emulator/osx-x86/embc_so_wrapper.c[DEL],
+	  emulator/osx-x86/ffs.h[DEL], emulator/osx-x86/kernel_emul.h[DEL],
+	  emulator/relink_libs_osx.sh, emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h,
+	  kernel/fsm.c, user/FSMServer.cpp:
+	  
+	  - Packages app for OSX as application bundle with a private Qt
+	  framework
+	  - Added app icon
+	  - Restructured osx-x86 tree
+	  - Made the menu work more consistently on OSX
+	  - Cleanup of sound code to pass the 'loops flag' via SHM rather
+	  than via the .loops file on the filesystem
+	  - Made the FSMServer app-bundle-aware on OSX (it looks for its
+	  files in FSMEmulator.app/Contents/Resources)
+
+2008-09-09 02:08  calin.culianu
+
+	* [r137] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-09 02:06  calin.culianu
 
 	* [r136] addons/SoundTrig/SoundServer.cpp,
