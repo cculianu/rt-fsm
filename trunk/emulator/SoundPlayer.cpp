@@ -22,20 +22,27 @@ SoundPlayer::SoundPlayer(const QString & fname,
     p->s = Phonon::createPlayer(Phonon::MusicCategory, Phonon::MediaSource(fname));
     p->fname = fname;
     p->loops = loops;
-    connect(p->s, SIGNAL(aboutToFinish()), this, SLOT(aboutToFinish()));
+    connect(p->s, SIGNAL(currentSourceChanged(const Phonon::MediaSource &)), this, SLOT(enqueueNextSource()));
 }
 
 QString SoundPlayer::fileName() const { return p->fname; }
-void SoundPlayer::play() { p->s->play(); }
+void SoundPlayer::play() 
+{ 
+    p->s->clearQueue();
+    // re-enqueue the sound source for infinite looping
+    p->s->setCurrentSource(p->fname);
+    enqueueNextSource();
+    p->s->play(); 
+}
 void SoundPlayer::stop() { p->s->stop(); }
 void SoundPlayer::setLoops(bool loops) { p->loops = loops; }
 bool SoundPlayer::loops() const { return p->loops; }
 
-void SoundPlayer::aboutToFinish()
+void SoundPlayer::enqueueNextSource()
 {
     if (p->loops) {
         // re-enqueue the sound source for infinite looping
-        p->s->enqueue(p->s->currentSource());
+        p->s->enqueue(p->fname);
     }
 }
 

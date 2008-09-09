@@ -20,7 +20,7 @@ public:
     bool loops() const;
 #ifdef Q_OS_DARWIN
 protected slots:
-    void aboutToFinish();
+    void enqueueNextSource();
 #endif
 private:
     struct Impl;

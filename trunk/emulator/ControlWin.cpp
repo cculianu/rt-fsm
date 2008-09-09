@@ -86,7 +86,7 @@ ControlWin::ControlWin(QWidget *p, Qt::WindowFlags f)
     connect(timer_ctls, SIGNAL(timeout()), this, SLOT(updateMiscStats()));
 
     timer_ctls->setSingleShot(false);
-    timer_ctls->setInterval(100);// update comedi view every 100ms.. 
+    timer_ctls->setInterval(200);// update comedi view every 200ms.. 
     timer_ctls->start(); 
 }
 

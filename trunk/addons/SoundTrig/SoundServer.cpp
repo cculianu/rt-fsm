@@ -243,6 +243,9 @@ public:
 
     /// reimplemented -- overrides from AbstraceUserSM
     int getLastEvent(unsigned card) const;        
+    /// reimplemented -- overrides from AbstraceUserSM, calls AbstractUserSM then notifies emulator a new sound was loaded so emulator can re-load the soundfile from disk
+    bool setSound(unsigned card, SoundBuffer &);
+
 };
         
 
@@ -546,13 +549,15 @@ struct SoundBuffer
   
   int id, chans, sample_size, rate, stop_ramp_tau_ms, loop_flg, card;
   const char *name() const { return nam.c_str(); }
-  
+
+  const char *file() const { return fil.c_str(); }
+
   unsigned char & operator[](int i) { return mem[i]; }
   const unsigned char & operator[](int i) const { return mem[i]; }
  private:
   unsigned long len_bytes;
   unsigned char *mem;
-  std::string nam;
+  std::string nam, fil;
   
   friend class KernelSM;
   friend class AbstractUserSM;
@@ -1430,8 +1435,7 @@ int EmulSM::getLastEvent(unsigned card) const
 {
     if (card >= getNCards()) return 0;
     MutexLocker ml(mut);
-    if (sndShm) {
-        if (card < sndShm->num_cards) {            
+    if (sndShm && card < sndShm->num_cards) {            
             RTOS::FIFO & out = fifo;
             RTOS::FIFO & in = fifo2;
             if (out != RTOS::INVALID_FIFO && in != RTOS::INVALID_FIFO) {
@@ -1441,9 +1445,43 @@ int EmulSM::getLastEvent(unsigned card) const
                 if ( RTOS::writeFifo(out, &dummy, sizeof(dummy), true) == sizeof(dummy)  &&  RTOS::readFifo(in, &dummy, sizeof(dummy), true) == sizeof(dummy) )
                     lastEvent = sndShm->msg[card].u.last_event;
             }
-        }
     }
     return lastEvent;
+}
+
+bool EmulSM::setSound(unsigned card, SoundBuffer & buf)
+{
+    if (AbstractUserSM::setSound(card, buf)) {
+        MutexLocker ml(mut);
+        if (sndShm && card < sndShm->num_cards) {
+            RTOS::FIFO & out = fifo;
+            RTOS::FIFO & in = fifo2;
+            if (out != RTOS::INVALID_FIFO && in != RTOS::INVALID_FIFO) {
+                SndFifoNotify_t dummy = 1;
+                SndFifoMsg * msg = &sndShm->msg[card];
+                msg->id = SOUND;
+                strncpy(msg->u.sound.name, buf.name(), SNDNAME_SZ);
+                msg->u.sound.name[SNDNAME_SZ-1] = 0;
+                msg->u.sound.size = buf.size();
+                msg->u.sound.bits_per_sample = buf.sample_size;
+                msg->u.sound.id = buf.id;
+                msg->u.sound.chans = buf.chans;
+                msg->u.sound.rate = buf.rate;
+                msg->u.sound.stop_ramp_tau_ms = buf.stop_ramp_tau_ms;
+                msg->u.sound.is_looped = buf.loop_flg;
+                int len = snprintf(msg->u.sound.databuf, SND_FIFO_DATA_SZ, "%s", buf.file());
+                if (len > -1)
+                    msg->u.sound.datalen = len+1;
+                
+                if ( RTOS::writeFifo(out, &dummy, sizeof(dummy), true) == sizeof(dummy)  &&  RTOS::readFifo(in, &dummy, sizeof(dummy), true) == sizeof(dummy) )
+                    return true;
+                else
+                    return false;
+            }
+        }
+        return true;
+    }
+    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -1541,7 +1579,7 @@ bool AbstractUserSM::setSound(unsigned card, SoundBuffer & buf)
     if (!wav.write(&buf[0], buf.size()/(buf.sample_size/8), buf.sample_size, buf.rate))
         return false;
     SoundFile f;
-    f.filename = s.str();
+    buf.fil = f.filename = s.str();
     f.loops = buf.loop_flg;
     soundFileMap[buf.id] = f;
     wav.close();
