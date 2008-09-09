@@ -730,28 +730,28 @@ void resetGlobalVars(void)
 {
     atomic_set(&rt_task_stop, 0);
     atomic_set(&rt_task_running, 0);
-    memset(subdev, 0, sizeof subdev);
+    memset((void *)subdev, 0, sizeof subdev);
     subdev_ai = 0, subdev_ao = 0, n_chans_ai_subdev = 0, n_chans_ao_subdev = 0, maxdata_ai = 0, maxdata_ao = 0, n_dio_subdevs = 0, n_chans_dio_total = 0;
-    memset(n_chans_dio, 0, sizeof n_chans_dio);
+    memset((void *)n_chans_dio, 0, sizeof n_chans_dio);
     fsm_cycle_long_ct = 0, fsm_wakeup_jittered_ct = 0, fsm_cycles_skipped = 0, ai_n_overflows = 0;
     cb_eos_skips = 0, cb_eos_skipped_scans = 0, cb_eos_num_scans = 0;
     cb_eos_cyc_max = ~0ULL, cb_eos_cyc_min = 0x7fffffffffffffffLL, cb_eos_cyc_avg = 0, cb_eos_cyc_ct = 0;
     dio_bits = 0, dio_bits_prev = 0, ai_bits = 0, ai_bits_prev = 0;
     ai_thresh_hi = 0,  ai_thresh_low = 0;
-    memset(ai_samples, 0, sizeof(ai_samples));
-    memset(ai_samples_volts, 0, sizeof(ai_samples));
+    memset((void *)ai_samples, 0, sizeof(ai_samples));
+    memset((void *)ai_samples_volts, 0, sizeof(ai_samples));
     cycle = 0;
-    memset(trig_cycle, 0, sizeof trig_cycle);
+    memset((void *)trig_cycle, 0, sizeof trig_cycle);
     didInitRunStates = 0;
     lat_min = 0x7fffffffffffffffLL, lat_max = ~0ULL, lat_avg = 0, lat_cur = 0, 
         cyc_min = 0x7fffffffffffffffLL, cyc_max = ~0ULL, cyc_avg = 0, cyc_cur = 0;
-    memset(ai_thresh_hi_ct, 0, sizeof ai_thresh_hi_ct);
-    memset(ai_thresh_lo_ct, 0, sizeof ai_thresh_lo_ct);
-    memset(ao_write_ct, 0, sizeof ao_write_ct);
-    memset(di_thresh_hi_ct, 0, sizeof di_thresh_hi_ct);
-    memset(di_thresh_lo_ct, 0, sizeof di_thresh_lo_ct);
-    memset(do_write_hi_ct, 0, sizeof do_write_hi_ct);
-    memset(do_write_lo_ct, 0, sizeof do_write_lo_ct);
+    memset((void *)ai_thresh_hi_ct, 0, sizeof ai_thresh_hi_ct);
+    memset((void *)ai_thresh_lo_ct, 0, sizeof ai_thresh_lo_ct);
+    memset((void *)ao_write_ct, 0, sizeof ao_write_ct);
+    memset((void *)di_thresh_hi_ct, 0, sizeof di_thresh_hi_ct);
+    memset((void *)di_thresh_lo_ct, 0, sizeof di_thresh_lo_ct);
+    memset((void *)do_write_hi_ct, 0, sizeof do_write_hi_ct);
+    memset((void *)do_write_lo_ct, 0, sizeof do_write_lo_ct);
 }
 
 static void printStats(void)
@@ -794,7 +794,7 @@ static int initShm(void)
   extTrigShm = mbuff_attach(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
   if (!extTrigShm) {
       extTrigShm = mbuff_alloc(FSM_EXT_TRIG_SHM_NAME, FSM_EXT_TRIG_SHM_SIZE);
-      if (extTrigShm) memset(extTrigShm, 0, sizeof(*extTrigShm));
+      if (extTrigShm) memset((void *)extTrigShm, 0, sizeof(*extTrigShm));
   }
   if (!extTrigShm) {
     LOG_MSG("Could not attach to SHM %s.\n", FSM_EXT_TRIG_SHM_NAME);
@@ -807,7 +807,7 @@ static int initShm(void)
   extTimeShm = mbuff_attach(FSM_EXT_TIME_SHM_NAME, FSM_EXT_TIME_SHM_SIZE);
   if (!extTimeShm) {
       extTimeShm = mbuff_alloc(FSM_EXT_TIME_SHM_NAME, FSM_EXT_TIME_SHM_SIZE);
-      if (extTimeShm) memset(extTimeShm, 0, sizeof(*extTimeShm));
+      if (extTimeShm) memset((void *)extTimeShm, 0, sizeof(*extTimeShm));
   }
   if (!extTimeShm) {
     LOG_MSG("Could not attach to SHM %s.\n", FSM_EXT_TIME_SHM_NAME);
@@ -995,12 +995,12 @@ static void reconfigureIO(void)
        until an output occurs on that ip_out column */
     memset((void *)&rs[f].last_ip_outs_is_valid, 0, sizeof(rs[f].last_ip_outs_is_valid));
 
-    for (i = FIRST_IN_CHAN(f); i < AFTER_LAST_IN_CHAN(f); ++i)
+    for (i = FIRST_IN_CHAN(f); i < (int)AFTER_LAST_IN_CHAN(f); ++i)
       if (IN_CHAN_TYPE(f) == AI_TYPE)
         ai_chans_in_use_mask |= 0x1<<i;
       else
         di_chans_in_use_mask |= 0x1<<i;
-    for (i = 0; i < NUM_OUT_COLS(f); ++i) {
+    for (i = 0; i < (int)NUM_OUT_COLS(f); ++i) {
       struct OutputSpec *spec = OUTPUT_ROUTING(f,i);
       switch (spec->type) {
       case OSPEC_DOUT:
@@ -1014,7 +1014,7 @@ static void reconfigureIO(void)
     /* now take into account sched waves channels since they also can use DOUT lines sometimes
        depending on their configuration.. */
     if (FSM_PTR(f)->has_sched_waves) {
-        for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
+        for (i = 0; i < (int)FSM_MAX_SCHED_WAVES; ++i) {
             int ch = FSM_PTR(f)->routing.sched_wave_dout[i];
             if ( ch > -1 && FSM_PTR(f)->sched_waves[i].enabled ) /* does it have a  DOUT and is it enabled? */
                 /* if so, earmark it as an active DOUT chan */
@@ -1028,7 +1028,7 @@ static void reconfigureIO(void)
   DEBUG("ReconfigureIO masks: ai_chans_in_use_mask 0x%x di_chans_in_use_mask 0x%x do_chans_in_use_mask 0x%x\n", ai_chans_in_use_mask, di_chans_in_use_mask, do_chans_in_use_mask);
 
   /* Now, setup channel modes correctly */
-  for (i = 0; i < NUM_DIO_CHANS; ++i) {
+  for (i = 0; i < (int)NUM_DIO_CHANS; ++i) {
       unsigned char mode;
       unsigned char *old_mode;
       if ((0x1<<i) & di_chans_in_use_mask) mode =  COMEDI_INPUT;
@@ -1828,7 +1828,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
           /* argh this is an O(n^2) algorithm.. sorry :( */
           for (i = 0; i < ss->states->routing.num_evt_cols; ++i)
             for (j = 0; j < FSM_MAX_IN_EVENTS; ++j)
-              if (ss->states->routing.input_routing[j] == i) {
+              if (ss->states->routing.input_routing[j] == (int)i) {
                 int chan_id = j/2;
                 seq_printf(m, "%c%d ", j%2 ? '-' : '+', chan_id);
                 break;
@@ -1890,14 +1890,14 @@ static int myseq_show (struct seq_file *m, void *dummy)
           seq_printf(m, "\nFSM %02u Scheduled Wave Info\n"
                           "--------------------------\n", f);
           /* Print stats on AO Waves */
-          for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
+          for (i = 0; i < (int)FSM_MAX_SCHED_WAVES; ++i) {
             volatile struct AOWaveINTERNAL *w = ss->states->aowaves[i];
             if ( w && w->nsamples && w->samples) {
               seq_printf(m, "AO  Sched. Wave %d  %u bytes (%s)\n", i, (unsigned)(w->nsamples*(sizeof(*w->samples)+sizeof(*w->evt_cols))+sizeof(*w)), ss->active_ao_wave_mask & 0x1<<i ? "playing" : "idle");
             }
           }
           /* Print stats on DIO Sched Waves */
-          for (i = 0; i < FSM_MAX_SCHED_WAVES; ++i) {
+          for (i = 0; i < (int)FSM_MAX_SCHED_WAVES; ++i) {
             if (ss->states->sched_waves[i].enabled) {
               seq_printf(m, "DIO Sched. Wave %d  (%s)\n", i, ss->active_wave_mask & 0x1<<i ? "playing" : "idle");
               seq_printf(m, "\tPreamble: %uus  Sustain: %uus  Refraction: %uus\n", ss->states->sched_waves[i].preamble_us, ss->states->sched_waves[i].sustain_us, ss->states->sched_waves[i].refraction_us);
@@ -1937,7 +1937,7 @@ static int myseq_show (struct seq_file *m, void *dummy)
 
 static inline int triggersExpired(FSMID_t f)
 {
-  return cycle - trig_cycle[f] >= (task_rate/1000)*trigger_ms;
+  return ((int64)( cycle - trig_cycle[f] )) >= (task_rate/1000)*trigger_ms;
 }
 
 static inline void resetTriggerTimer(FSMID_t f)
@@ -2060,14 +2060,14 @@ static void *doFSM (void *arg)
              in the rs[f].events_bits bitfield array.  */
           processSchedWaves(f);
           
-          DEBUG_VERB("FSM %u After processSchedWaves(), got input events mask %08x\n", f, *(unsigned *)rs[f].events_bits);
+          DEBUG_VERB("FSM %u After processSchedWaves(), got input events mask %08lx\n", f, *(unsigned long*)rs[f].events_bits);
           
           /* Process the scheduled AO waves -- do analog output for
              samples this cycle.  If there's an event id for the samples
              outputted, will get a mask of event ids set in rs[f].events_bits.  */
           processSchedWavesAO(f);
           
-          DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08x\n", f, *(unsigned *)rs[f].events_bits);
+          DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08lx\n", f, *(unsigned long *)rs[f].events_bits);
           
         }
         
@@ -2077,7 +2077,7 @@ static void *doFSM (void *arg)
         
         /* Normal event transition code, keep popping ones off our 
            bitfield array, events_bits. */
-        for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit(rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < NUM_INPUT_EVENTS(f) && n_evt_loops < NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
+        for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit((const unsigned long *)rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < ((int)NUM_INPUT_EVENTS(f)) && n_evt_loops < (int)NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
             dispatchEvent(f, evt_id);
         }
         /*
@@ -3179,13 +3179,13 @@ static int int64_to_cstr_r(char *buf, unsigned bufsz, int64 num)
   do {
     quotient = lldiv(quotient, dividend, &remainder);
     reversebuf[ct++] = remainder + '0';
-  } while (quotient != ZEROLL && ct < sz-1);
+  } while (quotient != ZEROLL && ct < (int)(sz-1));
 
   /* append negative to negative values.. */
   if (num < 0) reversebuf[ct++] = '-';
   
   /* now reverse the reversed string... */
-  for (i = 0; i < ct && i < sz-1; i++) 
+  for (i = 0; i < ct && i < (int)(sz-1); ++i) 
     buf[i] = reversebuf[(ct-i)-1];
   
   /* add nul... */
@@ -3212,10 +3212,10 @@ static int uint64_to_cstr_r(char *buf, unsigned bufsz, uint64 num)
   do {
     remainder = do_div(quotient, dividend);
     reversebuf[ct++] = remainder + '0';
-  } while (quotient != ZEROULL && ct < sz-1);
+  } while (quotient != ZEROULL && ct < (int)(sz-1));
 
   /* now reverse the reversed string... */
-  for (i = 0; i < ct && i < sz-1; i++) 
+  for (i = 0; i < ct && i < (int)(sz-1); i++) 
     buf[i] = reversebuf[(ct-i)-1];
   
   /* add nul... */
@@ -3312,7 +3312,7 @@ static void processSchedWaves(FSMID_t f)
       /* Edge-up timer expired, set the wave high either virtually or
          physically or both. */
           int id = SW_INPUT_ROUTING(f, wave*2);
-          if (id > -1 && id <= NUM_IN_EVT_COLS(f)) {
+          if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
            /* mark the event as having occurred
               for the in-event of the matrix, if
               it's routed as an input event wave
@@ -3335,7 +3335,7 @@ static void processSchedWaves(FSMID_t f)
       /* Edge-down timer expired, set the wave high either virtually or
          physically or both. */
           int id = SW_INPUT_ROUTING(f, wave*2+1);
-          if (id > -1 && id <= NUM_IN_EVT_COLS(f)) {
+          if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
              /* mark the event as having occurred
                 for the in-event of the matrix, if
                 it's routed as an input event wave
@@ -3383,7 +3383,7 @@ static void processSchedWavesAO(FSMID_t f)
       int evt_col = w->evt_cols[w->cur];
       lsampl_t samp = w->samples[w->cur];
       writeAO(w->aoline, samp); /* NB this function does checking to make sure data write is sane */
-      if (evt_col > -1 && evt_col <= NUM_IN_EVT_COLS(f))
+      if (evt_col > -1 && evt_col <= (int)NUM_IN_EVT_COLS(f))
         set_bit(evt_col, rs[f].events_bits);
       w->cur++;
     } else { /* w->cur >= w->nsamples, so wave ended.. unschedule it. */
@@ -3550,7 +3550,7 @@ static void buddyTaskHandler(void *arg)
     if (fsm->type == FSM_TYPE_EMBC) {
 #ifdef EMULATOR
 #  if defined(OS_LINUX) || defined(OS_OSX) || defined(OS_WINDOWS)
-        const char soname[sizeof(fsm->name)+9];
+        char soname[sizeof(fsm->name)+9];
         int (*initfunc)(void) = 0;
         void *(**mbuf_a)(const char *, unsigned long) = 0;
         void (**mbuf_f)(const char *, void *) = 0;
@@ -4145,7 +4145,7 @@ static void  doSetupThatNeededFloatingPoint(void)
   ai_range_min_v = ((double)ai_krange.min) * 1e-6;
   ai_range_max_v = ((double)ai_krange.max) * 1e-6;
   
-  for (i = 0; i < MAX_AI_CHANS; ++i)
+  for (i = 0; i < (int)MAX_AI_CHANS; ++i)
       ai_samples_volts[i] = 0.0;
 }
 
@@ -4204,7 +4204,7 @@ static void tallyCycleTime(hrtime_t cycleT0, hrtime_t cycleTf)
     const int n = cycle > 100 ? 100 : ( cycle ? cycle : 1 );
     
     cyc_cur = cycleTf-cycleT0;
-    if ( cyc_cur + 1000LL > task_period_ns) {
+    if ( cyc_cur + 1000LL > (int64)task_period_ns) {
         WARNING("Cycle %s took %s ns (task period is %lu ns)!\n", cycleStr(), int64_to_cstr(cyc_cur), (unsigned long)task_period_ns);
         ++fsm_cycle_long_ct;
     }

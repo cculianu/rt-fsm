@@ -99,6 +99,8 @@ protected slots:
     void processDied();
 
 private:
+    void buildAppMenus();
+
     void loadSettings();
     void saveSettings();
     struct FSMPrintFunctor;
@@ -113,8 +115,8 @@ private:
     void trigSound(int sndtrig);
     void killProcs(const QString & name);
     void destroyAllSounds();
-    void gotSound(unsigned id, const QString & fname);
-    //void createAppIcon();
+    void gotSound(unsigned id, const QString & fname, bool loop_flg);
+    void setupAppIcon();
 
     mutable QMutex mut; ///< used to lock outDir param for now
     MainWindow *mainwin;
