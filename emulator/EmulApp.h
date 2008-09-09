@@ -62,6 +62,7 @@ public:
         StatusMsgEventType, ///< used to indicate the event contains a status message for the status bar
         QuitEventType, ///< so we can post quit events..
         SoundTrigEventType, ///< so we can post sound trigger events...        
+        SoundEventType,
     };
     /// Returns true if and only if the application is still initializing and not done with its startup.  This is mainly used by the socket connection code to make incoming connections stall until the application is finished initializing.
     bool busy() const { return initializing; }
@@ -112,7 +113,7 @@ private:
     void trigSound(int sndtrig);
     void killProcs(const QString & name);
     void destroyAllSounds();
-
+    void gotSound(unsigned id, const QString & fname);
     //void createAppIcon();
 
     mutable QMutex mut; ///< used to lock outDir param for now
@@ -132,7 +133,6 @@ private:
     typedef std::map<unsigned, SoundPlayer *> SoundPlayerMap;
     SoundPlayerMap soundPlayerMap;
     FSMExtTrigShm *soundTrigShm;
-    SndShm *sndShm;
     SndThr *sndThr;
 
 protected: 

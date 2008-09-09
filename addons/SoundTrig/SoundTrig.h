@@ -13,7 +13,7 @@ extern "C" {
 
 #define MAX_CARDS 6 /* Keep this the same as L22_MAX_DEVS in LynxTWO-RT.h! */
 #ifdef EMULATOR
-#  define SND_FIFO_DATA_SZ (64) /*64 bytes for fifo data.. this is unused anyway in emulator mode*/
+#  define SND_FIFO_DATA_SZ (512) /*512 bytes for fifo data.. this is used for storing the filename of the sound in emulator mode*/
 #else
 #  define SND_FIFO_DATA_SZ (128*1024) /* 128KB for fifo data size */
 #endif
@@ -62,7 +62,9 @@ struct SndFifoMsg {
                           normally after 1 playing. */
         int transfer_ok; /**< True is written by kernel to indicate transter was 
                             ok, otherwise writes 0 to indicate error..  */
-        char databuf[SND_FIFO_DATA_SZ]; /** used only for id == SOUNDXFER */
+        char databuf[SND_FIFO_DATA_SZ]; /**< used only for id == SOUNDXFER 
+                                           or, in emulator mode, to store
+                                           the filename of the sound */
         unsigned datalen;
 
       } sound;
@@ -118,7 +120,7 @@ struct SndFifoMsg {
 #endif
 
 #define SND_SHM_NAME "STrigShm"
-#define SND_SHM_MAGIC ((int)(0xf00d060b)) /*< Magic no. for shm... 'food060b'  */
+#define SND_SHM_MAGIC ((int)(0xf00d060c)) /*< Magic no. for shm... 'food060c'  */
 #define SND_SHM_SIZE (sizeof(struct SndShm))
 
 #ifdef __cplusplus

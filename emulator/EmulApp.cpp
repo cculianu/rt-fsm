@@ -97,6 +97,12 @@ namespace {
         virtual void triggered(int trig) = 0;
     };
 
+    struct SoundListener
+    {
+        virtual ~SoundListener() {}
+        virtual void gotSound(unsigned id) = 0;
+    };
+
     class SoundTrigEvent : public QEvent
     {
     public:
@@ -104,6 +110,16 @@ namespace {
             : QEvent((QEvent::Type)EmulApp::SoundTrigEventType), trig(trig), listener(listener) {}
         int trig;
         SoundTrigListener *listener;
+    };
+
+    class SoundEvent : public QEvent
+    {
+    public:
+        SoundEvent(unsigned id, QString name, SoundListener *listener = 0)
+            : QEvent((QEvent::Type)EmulApp::SoundEventType), id(id), name(name), listener(listener) {}
+        unsigned id;
+        QString name;
+        SoundListener *listener;
     };
 
     class QuitEvent : public QEvent
@@ -137,36 +153,70 @@ namespace {
 
 };
 
-class SndThr : public QThread, public SoundTrigListener
+class SndThr : public QThread, public SoundTrigListener, public SoundListener
+
 {
-    volatile bool pleaseStop, trigDone;
+    volatile bool pleaseStop, trigDone, sndDone;
     EmulApp *app;
     SndShm *sndShm;
-    QMutex mut;
-    QWaitCondition cond;
+    QMutex mut, mut2;
+    QWaitCondition cond, cond2;
 public:
-    SndThr(EmulApp *parent, SndShm *shm);
+    SndThr(EmulApp *parent);
     ~SndThr();
     void triggered(int trig);
+    void gotSound(unsigned id);
 protected:
     void run();
 };
 
-SndThr::SndThr(EmulApp *parent, SndShm *s)
-    : QThread(parent), pleaseStop(false), trigDone(false), app(parent), sndShm(s)
-{}
+SndThr::SndThr(EmulApp *parent)
+    : QThread(parent), pleaseStop(false), trigDone(false), sndDone(false), app(parent), sndShm(0)
+{
+        RTOS::ShmStatus shmStatus;
+        // do sound shm stuff..
+        sndShm = reinterpret_cast<SndShm *>(RTOS::shmAttach(SND_SHM_NAME, SND_SHM_SIZE, &shmStatus, true));
+        if (!sndShm) {
+            throw FatalException(QString("Cannot create shm to ") + SND_SHM_NAME + " reason was: " + RTOS::statusString(shmStatus));
+        }
+        memset(sndShm, 0, SND_SHM_SIZE);
+        sndShm->fifo_in[0] = sndShm->fifo_out[0] = -1;
+        sndShm->magic = SND_SHM_MAGIC;
+        *const_cast<unsigned *>(&sndShm->num_cards) = 1;
+        unsigned minor;
+        if (RTOS::createFifo(minor, SND_FIFO_SZ) == RTOS::INVALID_FIFO) 
+            throw FatalException(QString("Cannot create out fifo for SndShm"));
+        sndShm->fifo_out[0] = minor;
+        if (RTOS::createFifo(minor, SND_FIFO_SZ) == RTOS::INVALID_FIFO) 
+            throw FatalException(QString("Cannot create in fifo for SndShm"));
+        sndShm->fifo_in[0] = minor;
+        Debug() << "Sound Shm FIFOs -  In: " << sndShm->fifo_in[0] << "  Out: " << sndShm->fifo_out[0];
+}
 
 SndThr::~SndThr()
 {
     pleaseStop = true;
     if (!wait(2000))
         terminate();    
+    if (sndShm) {
+        if (sndShm->fifo_out[0] > -1) {
+            RTOS::closeFifo(sndShm->fifo_out[0]);
+            sndShm->fifo_out[0] = -1;
+        }
+        if (sndShm->fifo_in[0] > -1) {
+            RTOS::closeFifo(sndShm->fifo_in[0]);
+            sndShm->fifo_in[0] = -1;
+        }
+        memset((void *)sndShm, 0, sizeof(*sndShm));
+        RTOS::shmDetach(sndShm, 0, true);
+        sndShm = 0;
+    }
 }
 
 void SndThr::run()
 {
     while (!pleaseStop) {
-        if (RTOS::waitReadFifo(sndShm->fifo_in[0], 100)) {
+        if (RTOS::waitReadFifo(sndShm->fifo_in[0], 200)) {
             SndFifoNotify_t dummy;
             if (RTOS::readFifo(sndShm->fifo_in[0], &dummy, sizeof(dummy), false) == sizeof(dummy)) {
                 bool do_reply = false;
@@ -186,6 +236,20 @@ void SndThr::run()
                     }
                     mut.unlock();
                     do_reply = true;
+                }
+                    break;
+                case SOUND: { // notified of a new sound.. note the sound now lives on the filesystem
+                    unsigned id = sndShm->msg[0].u.sound.id;
+                    QString fname(sndShm->msg[0].u.sound.databuf);
+                    Debug() << "Got new sound " << id << ": `" << fname << "' in EmulApp SndThr.";
+                    sndDone = false;
+                    QCoreApplication::postEvent(app, new SoundEvent(id, fname, this));                    
+                    mut2.lock();
+                    if (!sndDone) {
+                        cond2.wait(&mut2); // wait forever for the trigdone!
+                    }
+                    mut2.unlock();
+                    do_reply = true;                    
                 }
                     break;
                 }
@@ -208,10 +272,20 @@ void SndThr::triggered(int trig)
     cond.wakeAll();
 }
 
+void SndThr::gotSound(unsigned id)
+{
+    (void)id;
+    mut2.lock();
+    sndDone = true;
+    mut2.unlock();
+    //Debug() << "EmulApp manual trigger thread will be woken up for trigger " << trig;
+    cond2.wakeAll();
+}
+
 EmulApp * EmulApp::singleton = 0;
 
 EmulApp::EmulApp(int & argc, char ** argv)
-    : QApplication(argc, argv, true), fsmPrintFunctor(0), debug(false), initializing(true), nLinesInLog(0), nLinesInLogMax(1000), fsmRunning(false), fsmServerProc(0), soundServerProc(0), soundTrigShm(0), sndShm(0), sndThr(0), lastSndEvt(0)
+    : QApplication(argc, argv, true), fsmPrintFunctor(0), debug(false), initializing(true), nLinesInLog(0), nLinesInLogMax(1000), fsmRunning(false), fsmServerProc(0), soundServerProc(0), soundTrigShm(0), sndThr(0), lastSndEvt(0)
 {
     if (!isSingleInstance()) {
         QMessageBox::critical(0, "FSM Emulator - Error", "Another copy of this program is already running!");
@@ -258,25 +332,6 @@ EmulApp::EmulApp(int & argc, char ** argv)
         soundTrigShm->magic = FSM_EXT_TRIG_SHM_MAGIC;
         soundTrigShm->function = &EmulApp::soundTrigFunc;
         soundTrigShm->valid = 1;
-
-        // do sound shm stuff..
-        sndShm = reinterpret_cast<SndShm *>(RTOS::shmAttach(SND_SHM_NAME, SND_SHM_SIZE, &shmStatus, true));
-        if (!sndShm) {
-            throw FatalException(QString("Cannot create shm to ") + SND_SHM_NAME + " reason was: " + RTOS::statusString(shmStatus));
-        }
-        memset(sndShm, 0, SND_SHM_SIZE);
-        sndShm->magic = SND_SHM_MAGIC;
-        *const_cast<unsigned *>(&sndShm->num_cards) = 1;
-        unsigned minor;
-        if (RTOS::createFifo(minor, SND_FIFO_SZ) == RTOS::INVALID_FIFO) 
-            throw FatalException(QString("Cannot create out fifo for SndShm"));
-        sndShm->fifo_out[0] = minor;
-        if (RTOS::createFifo(minor, SND_FIFO_SZ) == RTOS::INVALID_FIFO) 
-            throw FatalException(QString("Cannot create in fifo for SndShm"));
-        sndShm->fifo_in[0] = minor;
-        Debug() << "Sound Shm FIFOs -  In: " << sndShm->fifo_in[0] << "  Out: " << sndShm->fifo_out[0];
-        sndThr = new SndThr(this, sndShm);
-        sndThr->start();
 
         killProcs("FSMServer");
         killProcs("SoundServer");
@@ -341,14 +396,6 @@ EmulApp::~EmulApp()
         soundTrigShm = 0;
     }
     if (sndThr) delete sndThr, sndThr = 0;
-    if (sndShm) {
-        if (sndShm->fifo_out[0])
-            RTOS::closeFifo(sndShm->fifo_out[0]);
-        if (sndShm->fifo_in[0])
-            RTOS::closeFifo(sndShm->fifo_in[0]);
-        memset(sndShm, 0, sizeof *sndShm);
-        RTOS::shmDetach(sndShm, 0, true);
-    }
     Log() << "Exiting..";
     saveSettings();
     singleton = 0;
@@ -420,6 +467,12 @@ bool EmulApp::eventFilter(QObject *watched, QEvent *event)
             SoundTrigEvent *evt = dynamic_cast<SoundTrigEvent *>(event);
             if (evt) trigSound(evt->trig);
             if (evt->listener) evt->listener->triggered(evt->trig);
+            return true;
+        }
+        if (type == SoundEventType) {
+            SoundEvent *evt = dynamic_cast<SoundEvent *>(event);
+            if (evt) gotSound(evt->id, evt->name);
+            if (evt->listener) evt->listener->gotSound(evt->id);
             return true;
         }
     }
@@ -688,6 +741,10 @@ void EmulApp::stopFSMServer()
 
 void EmulApp::startSoundServer()
 {
+    if (sndThr) delete sndThr, sndThr = 0;
+    sndThr = new SndThr(this);
+    sndThr->start();
+
     if (soundServerProc) delete soundServerProc;
     soundServerProc = new QProcess(this);
 
@@ -755,6 +812,7 @@ void EmulApp::stopSoundServer()
         Log() << "SoundServer process " << pid << " killed.";
     }
     if (soundServerProc) delete soundServerProc, soundServerProc = 0;
+    if (sndThr) delete sndThr, sndThr = 0;
 }
 
 void EmulApp::showProcFileViewer()
@@ -809,34 +867,35 @@ void EmulApp::modParamsChanged()
 }
 
 
+void EmulApp::gotSound(unsigned id, const QString & fname)
+{
+    Debug() << "Got new sound " << id << " for filename `" << fname << "'";
+    SoundPlayerMap::iterator it = soundPlayerMap.find(id);
+    SoundPlayer *sp = 0;
+    if (it != soundPlayerMap.end()) {
+        delete it->second;
+        soundPlayerMap.erase(it);
+    }
+    sp = new SoundPlayer(fname, this);
+    soundPlayerMap[id] = sp;
+    // at this point sp is assigned to a valid SoundPlayer
+    sp->setLoops(QFile::exists(fname + ".loops"));
+}
+
 void EmulApp::trigSound(int sndtrig)
 {
     const bool dostop = sndtrig < 0;    
     const unsigned snd = dostop ? -sndtrig : sndtrig;
     lastSndEvt = sndtrig;
-#ifdef Q_OS_WIN
-    const int pid = soundServerProc->pid()->dwProcessId;
-#else
-    const int pid = soundServerProc->pid();
-#endif
-    QString fname = TmpPath() + "SoundServerSound_" + QString::number(pid) + "_" + QString::number(0) + "_" + QString::number(snd) + ".wav";
 
-    Debug() << "Got sound trig " << sndtrig << " for filename `" << fname << "'";
     SoundPlayerMap::iterator it = soundPlayerMap.find(snd);
     SoundPlayer *sp = 0;
-    if (it == soundPlayerMap.end() 
-        || (sp = it->second)->fileName() != fname ) {
-        // filename has to match.. if not.. there was a restart and the filename was reset, so delete and re-create the QSound object..
-        if (sp) {
-            Debug() << "Deleting sp.  sp->fileName() = " << sp->fileName();
-            sp->stop();
-            delete sp;
-        }
-        sp = new SoundPlayer(fname, this);
-        soundPlayerMap[snd] = sp;
-    } 
-    // at this point qs is assigned to a valid QSound
-    sp->setLoops(QFile::exists(fname + ".loops"));
+    if (it == soundPlayerMap.end()) {
+        Error() << "Triggered unknown sound " << snd;
+        return;
+    }
+    else sp = it->second;
+    Debug() << "Got sound trig " << sndtrig << " for filename `" << sp->fileName() << "'";
     if (dostop) {
         //Debug() << "sound " << snd << " stop";
         sp->stop();
@@ -846,8 +905,7 @@ void EmulApp::trigSound(int sndtrig)
         sp->stop();
         sp->play();
         controlwin->triggeredSound(snd);
-    }
-    
+    }    
 }
 
 /*static*/ int EmulApp::soundTrigFunc(unsigned card, int trig)

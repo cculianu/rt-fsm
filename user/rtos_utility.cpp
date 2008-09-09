@@ -648,6 +648,9 @@ bool RTOS::Fifo::unixAccept()
     socklen_t len = sizeof(addr);
     handle = accept(listen_fd, (struct sockaddr *)&addr, &len);
     if (handle > -1) {
+        // debug
+        //printf("accept got conn listen_fd: %d  handle: %d pipe name: %s\n", listen_fd, (int)handle, name.c_str());
+
         close(listen_fd);
         listen_fd = -1;
         pthread_mutex_lock(&mut);
@@ -656,6 +659,10 @@ bool RTOS::Fifo::unixAccept()
         pthread_mutex_unlock(&mut);
         return true;
     } else {
+        // debug
+        //int err = errno;
+        //printf("accept error listen_fd: %d pipe name: %s  err: %s\n", listen_fd, name.c_str(), strerror(errno));
+        //errno = err;
         if (!refct || errno == EINVAL) pthread_cancel(pthread_self());
         else perror("accept");
         handle = listen_fd;        

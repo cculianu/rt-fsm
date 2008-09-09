@@ -140,6 +140,20 @@ namespace
           return double(unsigned(d-0.5)); // round away from 0 for negative
       return double(unsigned(d+0.5)); // round away from 0 for positive
   }
+
+  inline double Ceil(double d) 
+  { 
+      double c = static_cast<double>(static_cast<long int>(d));
+      if (c < d) c += 1.0;
+      return c;
+  }
+
+  inline double Floor(double d) 
+  { 
+      double c = static_cast<double>(static_cast<long int>(d));
+      if (c > d) c -= 1.0;
+      return c;
+  }
 }
 
 // NB: when writing data, channels should be interleaved as in sample0{chan0,chan1},sample1{chan0,chan1} etc..
@@ -153,10 +167,18 @@ bool OWavFile::write(const double *data, unsigned size, unsigned srate, double s
   }
 
   unsigned nwrit = 0, nframes = size/p->nchans;
-  for (double i = 0; i < nframes; i += factor, ++nwrit) {
+  double fi, ci;
+  for (double i = 0; (fi = Floor(i)) < nframes; i += factor, ++nwrit) {
+    ci = Ceil(i);      
     for (unsigned chan = 0; chan < p->nchans; ++chan) {
-      unsigned idx = unsigned(Round(i))*p->nchans+chan;
-      uint32 samp = uint32((data[idx]-scale_min)/(scale_max-scale_min) * double(~0U)); // 32-bit unsigned sample
+      unsigned idx = unsigned(fi)*p->nchans+chan, idx2 = unsigned(ci)*p->nchans+chan;
+      if (ci >= nframes) idx2 = idx;
+      double datum = data[idx];
+      if (idx != idx2) {
+          double datum2 = data[idx2];
+          datum = datum*(1.-(i-fi)) + datum2*(1.-(ci-i));          
+      }
+      uint32 samp = uint32((datum-scale_min)/(scale_max-scale_min) * double(~0U)); // 32-bit unsigned sample
       if (p->bitspersample != 8) {
         // argh, deal with signed PCM
         samp -= 0x7fffffff;
@@ -193,22 +215,30 @@ bool OWavFile::write(const void *v,
   }
   
   unsigned nwrit = 0, nframes = size/p->nchans;
-  for (double i = 0; i < nframes; i += factor, ++nwrit) {
+  double fi, ci;
+  for (double i = 0; (fi = Floor(i)) < nframes; i += factor, ++nwrit) {
+    ci = Ceil(i);
     for (unsigned chan = 0; chan < p->nchans; ++chan) {
-      unsigned idx = unsigned(Round(i))*p->nchans+chan;
+      unsigned idx = unsigned(fi)*p->nchans+chan, idx2 = unsigned(ci)*p->nchans+chan;
+      if (ci >= nframes) idx2 = idx;
       uint32 samp;
-      double datum = 0.;
+      double datum = 0., datum2 = 0.;
       switch (bits) {
-        case 8:  datum = d[idx]; break;
-        case 16: datum = ((int16 *)d)[idx]; break;
+        case 8:  datum = d[idx]; datum2 = d[idx2]; break;
+        case 16: datum = ((int16 *)d)[idx]; datum2 = ((int16 *)d)[idx2]; break;
         case 24: 
           samp = 0;
           memcpy(&samp, d+idx*3, 3);
           if (isBigEndian()) samp >>= 8;
           datum = samp;
+          memcpy(&samp, d+idx2*3, 3);
+          if (isBigEndian()) samp >>= 8;
+          datum2 = samp;
           break;
-        case 32: datum = ((int32 *)d)[idx]; break;
+        case 32: datum = ((int32 *)d)[idx]; datum2 = ((int32 *)d)[idx2]; break;
       }
+      if (idx != idx2) // interpolate
+          datum = datum*(1.-(i-fi)) + datum2*(1.-(ci-i));
       samp = uint32((datum-scale_min)/(scale_range) * double(~0U));
       if (p->bitspersample != 8) {
         // argh, deal with signed PCM
