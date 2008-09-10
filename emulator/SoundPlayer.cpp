@@ -54,7 +54,7 @@ SoundPlayer::SoundPlayer(const QString & fname,
 }
 
 QString SoundPlayer::fileName() const { return p->s.fileName(); }
-void SoundPlayer::play() { setLoops(p->loops); p->s.play(); }
+void SoundPlayer::play() { p->s.setLoops(p->loops ? -1 : 1); p->s.play(); }
 void SoundPlayer::stop() { p->s.stop(); }
 bool SoundPlayer::loops() const { return p->loops; }
 
