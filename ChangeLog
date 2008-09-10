@@ -1,3 +1,55 @@
+2008-09-10 02:40  calin.culianu
+
+	* [r140] emulator/EmulApp.cpp, emulator/FSM.icns, emulator/FSM.xpm,
+	  emulator/OSXFilePlayer, emulator/OSXFilePlayer/AUOutputBL.cpp,
+	  emulator/OSXFilePlayer/AUOutputBL.h,
+	  emulator/OSXFilePlayer/CAAudioChannelLayout.cpp,
+	  emulator/OSXFilePlayer/CAAudioChannelLayout.h,
+	  emulator/OSXFilePlayer/CAAudioChannelLayoutObject.cpp,
+	  emulator/OSXFilePlayer/CAAudioUnit.cpp,
+	  emulator/OSXFilePlayer/CAAudioUnit.h,
+	  emulator/OSXFilePlayer/CACFDictionary.cpp,
+	  emulator/OSXFilePlayer/CACFDictionary.h,
+	  emulator/OSXFilePlayer/CACFNumber.h,
+	  emulator/OSXFilePlayer/CACFString.h,
+	  emulator/OSXFilePlayer/CAComponent.cpp,
+	  emulator/OSXFilePlayer/CAComponent.h,
+	  emulator/OSXFilePlayer/CAComponentDescription.cpp,
+	  emulator/OSXFilePlayer/CAComponentDescription.h,
+	  emulator/OSXFilePlayer/CAConditionalMacros.h,
+	  emulator/OSXFilePlayer/CADebugMacros.h,
+	  emulator/OSXFilePlayer/CAMath.h,
+	  emulator/OSXFilePlayer/CAReferenceCounted.h,
+	  emulator/OSXFilePlayer/CAStreamBasicDescription.cpp,
+	  emulator/OSXFilePlayer/CAStreamBasicDescription.h,
+	  emulator/OSXFilePlayer/CAXException.cpp,
+	  emulator/OSXFilePlayer/CAXException.h,
+	  emulator/OSXFilePlayer/OSXFilePlayer.cpp,
+	  emulator/OSXFilePlayer/OSXFilePlayer.h, emulator/SoundPlayer.cpp,
+	  emulator/SoundPlayer.h, emulator/emulator.pro,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtDBus.framework[DEL],
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/QtXml.framework[DEL],
+	  emulator/osx-x86/FSMEmulator.app/Contents/Frameworks/phonon.framework[DEL],
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/FSM.icns,
+	  emulator/relink_libs_osx.sh:
+	  
+	  - Changed OSX version of SoundPlayer to use native CoreAudio
+	  facilities
+	  - Imported code from Apple examples to do sound playing using
+	  CoreAudio
+	  - got rid of dependency on phonon for OSX
+	  - remove phonon, QtXml and QtDBus from svn
+	  - Changed icon to a robot icon
+
+2008-09-09 20:49  calin.culianu
+
+	* [r139] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-09 20:47  calin.culianu
 
 	* [r138] addons/SoundTrig/SoundServer.cpp, emulator/EmulApp.cpp,
