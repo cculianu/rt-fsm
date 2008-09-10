@@ -20,14 +20,12 @@ win32 {
         QMAKE_LIBDIR += ./win32
         HEADERS += windows_dlemul.h ffs.h
         SOURCES += windows_dlemul.cpp
-#        system(make -f Makefile.FSMServer OS=OS_WINDOWS)
 } else:macx {
 	DEFINES += OS_OSX
         SOURCES += ../user/scanproc.c
-        QT += phonon
-#        system(make -f Makefile.FSMServer OS=OS_OSX)
+        SOURCES += OSXFilePlayer/OSXFilePlayer.cpp
+        LIBS += -framework AudioUnit -framework AudioToolbox -framework CoreServices
 } else {
 	DEFINES += OS_LINUX
         SOURCES += ../user/scanproc.c
-#        system(make -f Makefile.FSMServer OS=OS_LINUX)
 }
