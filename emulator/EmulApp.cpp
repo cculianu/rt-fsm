@@ -589,11 +589,11 @@ void EmulApp::setupAppIcon()
 #include "FSM.xpm"    
 #include "FSM_smaller.xpm"    
 #include "FSM_med.xpm"
-    QPixmap pm1(FSM_xpm), pm2(FSM_smaller_xpm), pm3(FSM_med_xpm);
-    QIcon ic(pm1);
+    QPixmap lg(FSM_xpm), sm(FSM_smaller_xpm), med(FSM_med_xpm);
+    QIcon ic(med);
 
-    ic.addPixmap(pm2);
-    ic.addPixmap(pm3);
+    ic.addPixmap(lg);
+    ic.addPixmap(sm);
     
     mainwin->setWindowIcon(ic);    
     controlwin->setWindowIcon(ic);

@@ -11,8 +11,8 @@ public:
 
 
     /// use a loopct of 0xffffffff for infinite loops, or 1 for 1 play
-    void setFile(const char *name, unsigned loopct = 1) throw (const CAXException &);
-    /// after calling setfile, you can call duration to get the file duration in secs
+    void setFile(const char *name, unsigned loopct = 1);
+    /// after calling play at least once, you can call duration to get the file duration in secs
     double duration() const;
     /// returns the numbre of loops specified in setfile
     unsigned loopCount() const;

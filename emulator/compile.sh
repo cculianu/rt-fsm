@@ -4,27 +4,35 @@ uname=`uname`
 
 clean=""
 config="debug"
-case "$1"  in
-    release)
-        config=release
-        ;;
-    clean)
-        clean="clean"
-        ;;
-    *)
-        ;;
-esac
+qmake="1"
+servers=""
 
-case "$2" in
-    release)
-        config=release
-        ;;
-    clean)
-        clean="clean"
-        ;;
-    *)
-        ;;
-esac
+while true; do
+
+    case "$1"  in
+        release)
+            config=release
+            ;;
+        clean)
+            clean="clean"
+            ;;
+        noqmake)
+            qmake=""
+            ;;
+        servers)
+            servers="1"
+            ;;
+        *)
+            ;;
+    esac
+
+    if shift; then 
+        continue;
+    else
+        break;
+    fi
+
+done
 
 if [ "$uname" == "Darwin" ]; then
     QMAKESPEC=macx-g++
@@ -41,14 +49,20 @@ else
     after="'CONFIG+=debug'"
 fi
 
-echo qmake -spec "$QMAKESPEC" -after "$after"
-qmake -spec "$QMAKESPEC" -after "$after"
-echo make $clean
-make $clean
+if [ -z "$servers" ]; then
+
+    if [ -n "$qmake" ]; then
+        echo qmake -spec "$QMAKESPEC" -after "$after"
+        qmake -spec "$QMAKESPEC" -after "$after" || exit 1
+    fi
+    echo make $clean
+    make $clean || exit 1
+
+fi
 echo make -f Makefile.FSMServer config="$config" $clean
-make -f Makefile.FSMServer config="$config" $clean
+make -f Makefile.FSMServer config="$config" $clean || exit 1
 echo make -f Makefile.SoundServer config="$config" $clean
-make -f Makefile.SoundServer config="$config" $clean
+make -f Makefile.SoundServer config="$config" $clean || exit 1
 
 if [ "$uname" == "Darwin" ] && [ "$clean" != "clean" ]; then
     ./relink_libs_osx.sh

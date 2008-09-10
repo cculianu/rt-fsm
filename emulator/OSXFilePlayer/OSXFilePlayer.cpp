@@ -32,11 +32,11 @@ struct OSXFilePlayer::Impl
     AUGraph theGraph;
     CAAudioUnit fileAU;
     double fileDuration;
-    bool needstop;
+    bool needstop, needuninit, needclose, needgraphclose;
     std::string filename;
     unsigned loopct;
 
-    Impl() : needstop(false) {}
+    Impl() : needstop(false), needuninit(false), needclose(false), needgraphclose(false) {}
     
     ~Impl() 
     {
@@ -46,9 +46,9 @@ struct OSXFilePlayer::Impl
 //         XThrowIfError (AudioFileClose (audioFile), "AudioFileClose");
 //         XThrowIfError (AUGraphClose (theGraph), "AUGraphClose");
         if (needstop)   AUGraphStop(theGraph);
-        AUGraphUninitialize(theGraph);
-        AudioFileClose(audioFile);
-        AUGraphClose(theGraph);
+        if (needuninit) AUGraphUninitialize(theGraph);
+        if (needclose)  AudioFileClose(audioFile);
+        if (needgraphclose) AUGraphClose(theGraph);
     }
 };
 
@@ -65,30 +65,20 @@ OSXFilePlayer::~OSXFilePlayer()
 void OSXFilePlayer::play() throw(const CAXException &)
 {
     if (!p) return;
-    // start playing
-    XThrowIfError (AUGraphStart (p->theGraph), "AUGraphStart");
-    p->needstop = true;
-}
+    else {
+        std::string fname = p->filename;
+        unsigned loopct = p->loopct;
+        delete p;
+        p = new Impl;
+        p->filename = fname;
+        p->loopct = loopct;
+    }
 
-void OSXFilePlayer::stop() throw (const CAXException &)
-{
-    if (!p) return;
-    XThrowIfError (AUGraphStop (p->theGraph), "AUGraphStop");
-    p->needstop = false;
-}
-
-void OSXFilePlayer::setFile(const char *name, unsigned loopct) throw(const CAXException &)
-{
-    if (p) delete p, p = 0;
-    p = new Impl;
-
-    p->filename = name;
-    p->loopct = loopct;
-
-    XThrowIfError (FSPathMakeRef ((const UInt8 *)name, &p->theRef, NULL), "FSPathMakeRef");
+    XThrowIfError (FSPathMakeRef ((const UInt8 *)p->filename.c_str(), &p->theRef, NULL), "FSPathMakeRef");
 
     XThrowIfError (AudioFileOpen (&p->theRef, fsRdPerm, 0, &p->audioFile), "AudioFileOpen");
-			
+    p->needclose = true;
+
     // get the number of channels of the file
     UInt32 propsize = sizeof(CAStreamBasicDescription);
     XThrowIfError (AudioFileGetProperty(p->audioFile, kAudioFilePropertyDataFormat, &propsize, &p->fileFormat), "AudioFileGetProperty");
@@ -99,15 +89,37 @@ void OSXFilePlayer::setFile(const char *name, unsigned loopct) throw(const CAXEx
 
     // this makes the graph, the file AU and sets it all up for playing
     MakeSimpleGraph (p->theGraph, p->fileAU, p->fileFormat, p->audioFile);
-		
+    p->needuninit = true;
+    p->needgraphclose = true;
 
     // now we load the file contents up for playback before we start playing
     // this has to be done the AU is initialized and anytime it is reset or uninitialized
-    p->fileDuration = PrepareFileAU (p->fileAU, p->fileFormat, p->audioFile, loopct);
+    p->fileDuration = PrepareFileAU (p->fileAU, p->fileFormat, p->audioFile, p->loopct);
     //printf ("file duration: %f secs\n", fileDuration);
 	
     // sleep until the file is finished
     //usleep ((int)fileDuration * 1000 * 1000);
+
+    // start playing
+    XThrowIfError (AUGraphStart (p->theGraph), "AUGraphStart");
+    p->needstop = true;
+}
+
+void OSXFilePlayer::stop() throw (const CAXException &)
+{
+    if (!p) return;
+    if (p->needstop)
+        XThrowIfError (AUGraphStop (p->theGraph), "AUGraphStop");
+    p->needstop = false;
+}
+
+void OSXFilePlayer::setFile(const char *name, unsigned loopct) 
+{
+    if (p) delete p, p = 0;
+    p = new Impl;
+
+    p->filename = name;
+    p->loopct = loopct;
 }
 
 double OSXFilePlayer::duration() const
