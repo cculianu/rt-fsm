@@ -1,3 +1,17 @@
+2008-09-10 20:21  calin.culianu
+
+	* [r146] Client/Matlab/NetClient/FSMClient.mexmaci,
+	  addons/SoundTrig/Client/Matlab/SoundTrigClient/SoundTrigClient.mexmaci:
+	  
+	  - Recompiled OSX versions of SoundTrigClient and FSMClient for
+	  Tiger 10.4.x
+
+2008-09-10 20:02  calin.culianu
+
+	* [r145] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-10 20:01  calin.culianu
 
 	* [r144] emulator/EmulApp.cpp, emulator/FSM_med.xpm,
