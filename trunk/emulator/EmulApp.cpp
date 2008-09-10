@@ -880,10 +880,8 @@ void EmulApp::gotSound(unsigned id, const QString & fname, bool loop_flg)
         delete it->second;
         soundPlayerMap.erase(it);
     }
-    sp = new SoundPlayer(fname, this);
+    sp = new SoundPlayer(fname, this, loop_flg);
     soundPlayerMap[id] = sp;
-    // at this point sp is assigned to a valid SoundPlayer
-    sp->setLoops(loop_flg);
 }
 
 void EmulApp::trigSound(int sndtrig)
