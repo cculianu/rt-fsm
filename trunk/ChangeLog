@@ -1,3 +1,26 @@
+2008-09-10 20:01  calin.culianu
+
+	* [r144] emulator/EmulApp.cpp, emulator/FSM_med.xpm,
+	  emulator/OSXFilePlayer/OSXFilePlayer.cpp,
+	  emulator/OSXFilePlayer/OSXFilePlayer.h, emulator/SoundPlayer.cpp,
+	  emulator/compile.sh,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h:
+	  
+	  - Fixed sounds glitches on Mac OSX (I hope!)
+	  - Added more options to compile.sh script
+	  - Cleaned up app icons
+
+2008-09-10 03:18  calin.culianu
+
+	* [r143] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-10 03:17  calin.culianu
 
 	* [r142] emulator/EmulApp.cpp, emulator/FSM_med.xpm,
