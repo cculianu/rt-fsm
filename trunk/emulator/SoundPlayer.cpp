@@ -16,19 +16,19 @@ SoundPlayer::SoundPlayer(const QString & fname,
     : QObject(parent)
 {
     p = new Impl;
-    try {
-        p->setFile(fname.toUtf8().constData(), loops ? 0xffffffff : 1);
-    } catch (const CAXException &e) {
-        Error() << "ERROR Constructing SoundPlayer object for " << fname << "; error from OSXFilePlayer was: (" << e.mError << ") '" << e.mOperation << "'";
-    }
+    p->setFile(fname.toUtf8().constData(), loops ? 0xffffffff : 1);
 }
 
 QString SoundPlayer::fileName() const { return p->fileName(); }
 void SoundPlayer::play() 
 { 
-    p->play(); 
+    try {
+        p->play(); 
+    } catch (const CAXException &e) {
+        Error() << "ERROR playing using " << fileName() << "; error from OSXFilePlayer was: (" << e.mError << ") '" << e.mOperation << "'";
+    }
 }
-void SoundPlayer::stop() { p->stop(); }
+void SoundPlayer::stop() { try { p->stop(); } catch (...) {} }
 bool SoundPlayer::loops() const { return p->loopCount() > 1; }
 
 #else // !DARWIN
