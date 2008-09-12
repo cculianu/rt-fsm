@@ -1,3 +1,23 @@
+2008-09-12 18:37  calin.culianu
+
+	* [r148] emulator/SoundPlayer.cpp,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h:
+	  
+	  - Addressed 'sounds loop at least once on OSX' issue that Jeff
+	  Erlich reported
+	  - Bumped version number
+
+2008-09-10 20:22  calin.culianu
+
+	* [r147] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-10 20:21  calin.culianu
 
 	* [r146] Client/Matlab/NetClient/FSMClient.mexmaci,
