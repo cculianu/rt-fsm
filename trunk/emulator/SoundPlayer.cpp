@@ -16,7 +16,7 @@ SoundPlayer::SoundPlayer(const QString & fname,
     : QObject(parent)
 {
     p = new Impl;
-    p->setFile(fname.toUtf8().constData(), loops ? 0xffffffff : 1);
+    p->setFile(fname.toUtf8().constData(), loops ? 0xffffffff : 0);
 }
 
 QString SoundPlayer::fileName() const { return p->fileName(); }
@@ -29,7 +29,7 @@ void SoundPlayer::play()
     }
 }
 void SoundPlayer::stop() { try { p->stop(); } catch (...) {} }
-bool SoundPlayer::loops() const { return p->loopCount() > 1; }
+bool SoundPlayer::loops() const { return p->loopCount() > 0; }
 
 #else // !DARWIN
 
