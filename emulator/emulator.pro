@@ -16,7 +16,7 @@ SOURCES += ComediEmul.cpp kernel_emul.cpp main.cpp MainWindow.cpp  EmulApp.cpp L
 win32 {
 	DEFINES += OS_WINDOWS WINDOWS WIN32
         INCLUDEPATH += ./win32
-        LIBS += libpthread
+        LIBS += libpthread libpsapi
         QMAKE_LIBDIR += ./win32
         HEADERS += windows_dlemul.h ffs.h
         SOURCES += windows_dlemul.cpp

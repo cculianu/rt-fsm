@@ -1,5 +1,5 @@
-#if defined(Q_OS_WIN) || defined(Q_OS_CYGWIN)
-#  define _WIN32_WINNT 0x0600
+#if defined(Q_OS_WIN) || defined(Q_OS_CYGWIN) || defined(WIN32)
+#  define _WIN32_WINNT 0x0501
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include <psapi.h>
@@ -924,53 +924,82 @@ void EmulApp::trigSound(int sndtrig)
 }
 
 #if defined(Q_OS_WIN) || defined(Q_OS_CYGWIN)
-void EmulApp::killProcs(const QString & name)
+static  QString GetLastErrorMessage(DWORD *err_out = 0)
 {
-#  if defined (__GNUC__) || defined (__GNUC)
-#    warning killProcs for GNUC/MinGW is not implemented yet!
-    (void)name;
-#  else
+    DWORD err = GetLastError();
+    if (err_out) *err_out = err;
+    char buf[256];
+    buf[0] = 0;
+    FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, 0, err, 0, buf, 256, 0);
+    return buf;
+}
+void EmulApp::killProcs(QString name)
+{
+    if (!name.endsWith(".exe", Qt::CaseInsensitive)) name += ".exe";
     DWORD pids[8192];
     DWORD bret = 0;
-    int n;
-    if (!EnumProcesses(pids, sizeof(pids), &bret)) {
-        Error() << "Could not enumerate processes for killProcs(" << name << ")";
-        return;
+    DWORD WINAPI (*fGetProcessImageFileNameA)(HANDLE, const char *, DWORD) = 0;
+    HMODULE psapi_handle = LoadLibraryA("psapi.dll");
+    // first see if we are on WinXP or Windows Vista by seeing if we can open psapi.dll and then fund the GetProcessImageFileNameA function
+    // if not, resort to calling the command-line program 'taskkill'
+    if (psapi_handle) {
+        fGetProcessImageFileNameA = (DWORD WINAPI(*)(HANDLE, const char *, DWORD))GetProcAddress(psapi_handle, "GetProcessImageFileNameA");
+    } else {
+        DWORD err;
+        QString msg = GetLastErrorMessage(&err);
+        Warning() << "LoadLibrary(\"psapi.dll\") failed, error was: (" << err << ") " << msg;
     }
-    n = bret / sizeof(*pids);
-    for (i = 0; i < n; ++i) {
-        HANDLE h = OpenProcess(PROCESS_ALL_ACCESS, 0, pids[i]);
-        if (h) {
-            char strbuf[1024];
-            DWORD size = sizeof strbuf;
-            if (GetProcessImageFileNameA(h, strbuf, size)) {
-                strbuf[sizeof(strbuf)-1] = 0;
-                QString exename = strbuf;
-                QStringList pathcomps = exename.split("\\");
-                if (pathcomps.size() > 1) {
-                    exename = pathcomps.back();
-                }
-                Debug() << "Found process " << pids[i] << " named " << exename;
-                if (exename.toLower() == name.toLower()) {
-                    TerminateProcess(h, 0);
-                    Log() << "Killing process " << pids[i] << " named `" << exename << "'";
-                }
-            } else {
-                Error() << "Could not grab .exe name for PID " << pids[i];
+    if (fGetProcessImageFileNameA) {
+        Debug() << "Got handle to psapi.dll and found GetProcessImageFileNameA at address " << ((void *)fGetProcessImageFileNameA);
+        int n, i;
+        if (!EnumProcesses(pids, sizeof(pids), &bret)) {
+            Error() << "Could not enumerate processes for killProcs(" << name << ")";
+            return;
             }
-            CloseHandle(h);
-        } else {
-            Warning() << "Could not open process with PID " << pids[i];
+        n = bret / sizeof(*pids);
+        for (i = 0; i < n; ++i) {
+            HANDLE h = OpenProcess(PROCESS_ALL_ACCESS, 0, pids[i]);
+            if (h) {
+                char strbuf[1024];
+                DWORD size = sizeof strbuf;
+                if (fGetProcessImageFileNameA(h, strbuf, size)) {
+                    strbuf[sizeof(strbuf)-1] = 0;
+                    QString exename = strbuf;
+                    QStringList pathcomps = exename.split("\\");
+                    if (pathcomps.size() > 1) {
+                        exename = pathcomps.back();
+                    }
+                    Debug() << "Found process " << pids[i] << " named " << exename;
+                    if (exename.toLower() == name.toLower()) {
+                        TerminateProcess(h, 0);
+                        Log() << "Killing process " << pids[i] << " named `" << exename << "'";
+                    }
+                } else {
+                    Warning() << "Could not grab .exe name for PID " << pids[i];
+                }
+                CloseHandle(h);
+            } else {
+                Debug() << "Could not open process with PID " << pids[i];
+            }
         }
+        FreeLibrary(psapi_handle);
+        psapi_handle = 0;
+    } else {
+        Warning() << "killProcs() failed to use PSAPI for enumerating processes, reverting to taskkill.exe method";
+        QStringList args;
+        args.push_back("/F");
+        args.push_back("/IM");
+        args.push_back("/T");
+        args.push_back(name);
+        QProcess::execute("taskkill", args);
     }
-#  endif
 }
 #elif defined(Q_OS_LINUX) || defined(Q_OS_DARWIN) /* Unixey */
-void EmulApp::killProcs(const QString & name)
+void EmulApp::killProcs(QString name)
 {
-    std::system((QString("killall -TERM '") + name + "' >/dev/null 2>&1").toUtf8().data());
+    std::system((QString("killall -TERM '") + name + "' >/dev/null 2>&1").toUtf8().constData());
     usleep(250000);
-    std::system((QString("killall -KILL '") + name + "' >/dev/null 2>&1").toUtf8().data());
+    std::system((QString("killall -KILL '") + name + "' >/dev/null 2>&1").toUtf8().constData());
 }
 #else
 #  error need to implement EmulApp::killProcs() for this platform!

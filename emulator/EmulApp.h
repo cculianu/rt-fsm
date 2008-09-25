@@ -113,7 +113,7 @@ private:
     void stopSoundServer();
     static int soundTrigFunc(unsigned, int);
     void trigSound(int sndtrig);
-    void killProcs(const QString & name);
+    void killProcs(QString name);
     void destroyAllSounds();
     void gotSound(unsigned id, const QString & fname, bool loop_flg);
     void setupAppIcon();
