@@ -1,12 +1,17 @@
-SRC = SoundServer.cpp rtos_utility.cpp WavFile.cpp Util.cpp
-PRG_OBJS = SoundServer.o rtos_utility.o WavFile.o Util.o
+SRC = SoundServer.cpp rtos_utility.cpp WavFile.cpp Util.cpp libresample.c
+PRG_OBJS = SoundServer.o rtos_utility.o WavFile.o Util.o libresample.o
 PRG = SoundServer
-
 CXX=g++
+CC=gcc
 CXXFLAGS=-W -Wall -g -I../../include -I ../UserspaceExtTrig -I ../../user
+CFLAGS=-W -Wall -g -I../../include -I ../UserspaceExtTrig -I ../../user
 CURRENT = $(shell uname -r)
 KDIR = /lib/modules/$(CURRENT)/build
 PWD = $(shell pwd)
+
+
+.c.o:
+	$(CC) $(CFLAGS) -c $<
 
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c $<
@@ -17,11 +22,11 @@ MOD:
 	@-if test -e $(KDIR)/Module.symvers; then mv -f $(KDIR)/Module.symvers $(KDIR)/__Module.symvers; fi; if test -e $(KDIR)/vmlinux; then mv -f $(KDIR)/vmlinux $(KDIR)/__vmlinux; fi
 	make -C $(KDIR) M=$(PWD) modules
 	@-if test -e $(KDIR)/__Module.symvers; then mv -f $(KDIR)/__Module.symvers $(KDIR)/Module.symvers; fi; if test -e $(KDIR)/__vmlinux; then mv -f $(KDIR)/__vmlinux $(KDIR)/vmlinux; fi
-	
+
 
 DRV:
 	make -C $(PWD)/LynxTWO-RT 
-		
+
 rtos_utility.o: ../../user/rtos_utility.cpp
 	$(CC) $(CXXFLAGS) -c -o $@ $<
 
@@ -42,6 +47,6 @@ clean:
 	rm -f *~ *.o Makefile.bak .deps $(PRG)
 	make -C $(KDIR) M=$(PWD) clean
 	make -C $(PWD)/LynxTWO-RT clean
-	
+
 
 

@@ -17,9 +17,14 @@ PRG = FSMServer
 CXX=g++
 CC=gcc
 ifeq ($(config),release)
-  CXXFLAGS = -Os -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../kernel
+  CXXFLAGS = -O2 -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../kernel
 else
-  CXXFLAGS = -g -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../kernel
+  ifeq ($(config),profile)
+          CXXFLAGS = -pg
+  else
+  	  CXXFLAGS =
+  endif
+  CXXFLAGS += -g -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../kernel
 endif
 LDFLAGS=-lz -lpthread
 ifeq ($(OS),OS_WINDOWS)
