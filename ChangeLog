@@ -1,3 +1,50 @@
+2008-09-25 07:35  calin.culianu
+
+	* [r151] addons/SoundTrig/Makefile, addons/SoundTrig/WavFile.cpp,
+	  addons/SoundTrig/libresample, addons/SoundTrig/libresample.c,
+	  addons/SoundTrig/libresample/config.h,
+	  addons/SoundTrig/libresample/filterkit.c,
+	  addons/SoundTrig/libresample/filterkit.h,
+	  addons/SoundTrig/libresample/libresample.h,
+	  addons/SoundTrig/libresample/resample.c,
+	  addons/SoundTrig/libresample/resample_defs.h,
+	  addons/SoundTrig/libresample/resamplesubs.c,
+	  emulator/Makefile.FSMServer, emulator/Makefile.SoundServer,
+	  emulator/README.txt, emulator/compile-win32-release.bat,
+	  emulator/compile-win32.bat,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h:
+	  
+	  - Modified the SoundServer to use libsamplerate to do resampling
+	  of
+	  incoming sound files. This should fix the
+	  problems/aliases/artifacts
+	  introduced into resampled sounds (previous method used linear
+	  interpolation without a band-pass filter which is bad, bad, bad).
+	  Now
+	  sounds should play ok even if the incoming sounds aren't at
+	  44.1kHz (the
+	  native rate of the emulator). Note, for performance it is still
+	  recommended that you generate and upload sounds at 44.1kHz.
+
+2008-09-18 19:23  calin.culianu
+
+	* [r150] utils/config-i686-fc8:
+	  
+	  undid i686 kernel config changes to pre-July 25th revision
+	  because the new changes were not entirely working/booting on all
+	  systems
+
+2008-09-12 18:38  calin.culianu
+
+	* [r149] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-12 18:37  calin.culianu
 
 	* [r148] emulator/SoundPlayer.cpp,
