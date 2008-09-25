@@ -1,30 +1,39 @@
 How to use the FSMEmulator on Windows:  
 --------------------------------------
 
-1. Make sure all the files in the win32/ distribution directory are together in the same folder (the exe's plus a bunch of .dll's plus the tcc directory).
+  1. Make sure all the files in the win32/ distribution directory are together 
+     in the same folder (the exe's plus a bunch of .dll's plus the tcc 
+     directory).
 
-2. Double-click on FSMEmulator.exe to run!
+  2. Double-click on FSMEmulator.exe to run!
 
-That's it!
+  That's it!
+
+  (Coming soon -- an installer for Windows!)
+
 
 
 
 How to use the FSMEmulator on Mac OSX:
 --------------------------------------
 
-1. Make sure Qt Open Source Edition is installed.  Download the two disk images
-   from here and install them in order:
+  Nota Bene:
 
-   http://www.trolltech.com/download?target=ftp://ftp.trolltech.com/qt/source/qt-mac-opensource-4.4.1.dmg
+  At this time, only Intel binaries are provided.  This is because I lack 
+  access to a PPC Mac and I haven't really had time/inclination to look into
+  cross-compiling for PPC.  So -- you are forced to use an Intel Mac!
 
-   http://www.trolltech.com/download?target=ftp://ftp.trolltech.com/qt/source/qt-mac-opensource-4.4.1-debug-libs.dmg
+  To run:
+
+  1. Double-click on the FSMEmulator.app application bundle, and it should
+     just launch seamlessly.
+
+  That's it!
 
 
-2. Open a terminal
-3. Navigate to the 'osx-x86' subdirectory.
-4. Run the FSMEmulator program as so:
-   # ./FSMEmulator
 
+Last Updated Sept. 18, 2008
 
--Calin
+Calin Culianu <cculianu@yahoo.com>
+
   

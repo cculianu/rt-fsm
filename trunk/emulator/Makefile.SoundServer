@@ -11,15 +11,20 @@ ifndef OS
         endif
 endif
 
-SRC = ../addons/SoundTrig/SoundServer.cpp ../user/rtos_utility.cpp ../user/Util.cpp ../addons/SoundTrig/WavFile.cpp 
-PRG_OBJS = SoundServer.o rtos_utility.o Util.o WavFile.o
+SRC = ../addons/SoundTrig/SoundServer.cpp ../user/rtos_utility.cpp ../user/Util.cpp ../addons/SoundTrig/WavFile.cpp  ../addons/SoundTrig/libresample.c
+PRG_OBJS = SoundServer.o rtos_utility.o Util.o WavFile.o libresample.o
 PRG = SoundServer
 CXX=g++
 CC=gcc
 ifeq ($(config),release)
-  CXXFLAGS = -Os -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
+  CXXFLAGS = -O2 -DEMULATOR -D$(OS) -W -Wall -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
 else
-  CXXFLAGS = -g -DEMULATOR -D$(OS) -W -Wall  -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
+  ifeq ($(config),profile)
+  	CXXFLAGS = -pg
+  else
+  	CXXFLAGS = 
+  endif
+  CXXFLAGS += -g -DEMULATOR -D$(OS) -W -Wall  -I../include -I ../user -I ../addons/SoundTrig/ -I ../kernel/ -I ../addons/UserspaceExtTrig
 endif
 LDFLAGS=-lpthread
 ifeq ($(OS),OS_LINUX)
@@ -36,14 +41,21 @@ endif
 ifeq ($(OS),OS_LINUX)
         LDFLAGS += -lrt
 endif
+CFLAGS = $(CXXFLAGS)
+
+.c.o:
+	$(CC) $(CFLAGS) -c $<
 
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c $<
 
 all:  $(PRG) 
 
+libresample.o: ../addons/SoundTrig/libresample.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 scanproc.o: ../user/scanproc.c
-	$(CC) $(CXXFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 Util.o: ../user/Util.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
