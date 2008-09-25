@@ -1,3 +1,25 @@
+2008-09-25 23:36  calin.culianu
+
+	* [r153] emulator/EmulApp.cpp, emulator/EmulApp.h,
+	  emulator/emulator.pro,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h:
+	  
+	  - Implemented killProcs() properly on windows, using psapi and if
+	  that faile, the 'taskkill' command-line command.
+	  - This addressed a bug on windows with stuck FSMServer and
+	  SoundServer processes.
+
+2008-09-25 07:36  calin.culianu
+
+	* [r152] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-25 07:35  calin.culianu
 
 	* [r151] addons/SoundTrig/Makefile, addons/SoundTrig/WavFile.cpp,
