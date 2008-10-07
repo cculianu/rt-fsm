@@ -290,6 +290,13 @@ enum ShmMsgID
                  an FSMSpec was accepted and if not, what was wrong with it */
     SETAIMODE, /* reset acquisition mode to either asynch or synch */
     GETAIMODE, /* query the current acquisition mode */
+#ifdef EMULATOR
+    GETCLOCKLATCHMS, /* query fsm clock latch amount */
+    SETCLOCKLATCHMS, /* turn fsm clock latching on and set it to x MS */
+    CLOCKLATCHPING, /* ping/reset the clock latch countdown */
+    CLOCKISLATCHED, /* returns true iff the fsm is not advancing due to 
+                       its clock being latched */
+#endif
     LAST_SHM_MSG_ID
 };
 
@@ -376,6 +383,12 @@ struct ShmMsg {
       /* For id == SETAIMODE and GETAIMODE */
       unsigned ai_mode_is_asynch;
 
+#ifdef EMULATOR
+      /* For id == GETCLOCKLATCHMS or SETCLOCKLATCHMS */
+      unsigned latch_time_ms;
+      /* For id ==  either CLOCKISLATCHED */
+      unsigned latch_is_on;
+#endif
     } u;
   };
 
