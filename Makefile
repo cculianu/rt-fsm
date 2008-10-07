@@ -1,7 +1,14 @@
 
 
 
-all:  __KERNEL_MOD__ __EMBC_RUNTIME__ __USER_APP__ __USER_EXT_TRIG_MOD__ __SOUND_SERVER__ __UTILS__
+all:  __KERNEL_MOD__ __EMBC_RUNTIME__ __USER_APP__ __USER_EXT_TRIG_MOD__ __SOUND_SERVER__ __UTILS__ 
+	@echo "*******************************************************************************"
+	@echo "** FSMServer, SoundServer, RealtimeFSM.ko, UserSpaceExtTrig.ko,              **"
+	@echo "** LynxTWO-RT.ko and LynxTrigRT.ko have been built.                          **"
+	@echo "**                                                                           **"
+	@echo "** If you want to compile the emulator, enter the 'emulator/' subdirectory   **"
+	@echo "** and run './compile.sh'                                                    **"
+	@echo "*******************************************************************************"
 
 __EMBC_RUNTIME__:
 	$(MAKE) -C runtime
@@ -21,6 +28,12 @@ __USER_EXT_TRIG_MOD__:
 __SOUND_SERVER__:
 	$(MAKE) -C addons/SoundTrig && cp -f addons/SoundTrig/SoundServer . && cp -f addons/SoundTrig/LynxTrig_RT.ko . && cp -f addons/SoundTrig/LynxTWO-RT/LynxTWO_RT.ko .
 
+__EMULATOR__:
+	cd emulator && ./compile.sh debug
+
+__EMULATOR_CLEAN__:
+	cd emulator && ./compile.sh debug clean
+	
 clean: 
 	$(MAKE) -C kernel clean
 	$(MAKE) -C runtime clean
