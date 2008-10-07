@@ -1,5 +1,4 @@
 #include "kernel_emul.h"
-#undef clock_nanosleep
 #undef timespec_add_ns
 #undef clock_gettime
 #include "rtos_utility.h"
@@ -85,7 +84,13 @@ namespace Emul {
     static void heartBeat() { ++tickCount; }
 
     bool fastFSM = false;
-
+    
+    // clock latch stuff -- note all times are in EMULATOR time not wall-clock time
+    static pthread_mutex_t latchMut = PTHREAD_MUTEX_INITIALIZER;
+    static pthread_cond_t  latchCond = PTHREAD_COND_INITIALIZER;
+    static volatile long latchTimeNanos = 0;
+    static hrtime_t lastLatchTime = 0;
+    
 #ifdef OS_OSX
     int clock_gettime(int clkid, struct timespec *ts)
     {
@@ -226,6 +231,41 @@ namespace Emul {
 
 
 extern "C" {
+
+
+    void latchCountdownReset(void) 
+    {
+        pthread_mutex_lock(&Emul::latchMut);
+        Emul::lastLatchTime = Emul::getTime();
+        pthread_cond_broadcast(&Emul::latchCond);
+        pthread_mutex_unlock(&Emul::latchMut);
+    }
+    
+    long getLatchTimeNanos(void)
+    {
+        return Emul::latchTimeNanos;
+    }
+
+    void setLatchTimeNanos(long ns)
+    {
+        pthread_mutex_lock(&Emul::latchMut);
+        Emul::latchTimeNanos = ns;
+        pthread_mutex_unlock(&Emul::latchMut);        
+        latchCountdownReset();
+    }
+
+    static int isClockLatched_Nolock(void)
+    {
+        return Emul::latchTimeNanos > 0 
+               && Emul::getTime()-Emul::lastLatchTime >= Emul::latchTimeNanos;
+    }
+    int isClockLatched(void)
+    {
+        pthread_mutex_lock(&Emul::latchMut);
+        int ret = isClockLatched_Nolock();
+        pthread_mutex_unlock(&Emul::latchMut);        
+        return ret;
+    }
 
 /* mbuff stuff */
 void *mbuff_alloc(const char *name, unsigned long size)
@@ -523,28 +563,45 @@ static long long timeNowNS()
     return static_cast<long long>(tv.tv_sec) * 1000000000LL + static_cast<long long>(tv.tv_usec)*1000LL;
 }
 
-int clock_nanosleep_emul(int clkid, int flags, const struct timespec *req, struct timespec *rem)
+void clock_wait_next_period_with_latching(FifoHandlerFn_t handleFifos, unsigned num_state_machines)
 {
-    (void)clkid; (void) flags; (void)req; (void)rem;
     /* NB: this function is really severely limited: it unconditionally 
        waits for 1 clock cycle regardless of what's passed-in */ 
 
     // try and sleep as close to 1 task cycle as possible, by remembering
     // the last time we woke and sleep by "timeleft this period" amount..
     
+    // also note clock latch support below..
+
     static long long lastWake = 0;
+    long tick = 1000000000/Emul::taskRate(), amount = tick;
     if (!Emul::fastFSM) {
-        long tick = 1000000000/Emul::taskRate(), amount = tick;
         if (lastWake) {
             amount -= timeNowNS()-lastWake;
             if (amount < 0) amount = 0;
             if (amount > tick) amount = tick;
         }
         Emul::nanosleep(amount);
-    }
+    } 
     lastWake = timeNowNS();
     Emul::heartBeat();
-    return 0;
+    // check clock latch
+    if (Emul::latchTimeNanos > 0) {
+        pthread_mutex_lock(&Emul::latchMut);
+        while (isClockLatched_Nolock()) {
+            struct timespec ts;
+            clock_gettime(CLOCK_REALTIME, &ts);
+            timespec_add_ns(&ts, amount);
+            if ( pthread_cond_timedwait(&Emul::latchCond, &Emul::latchMut, &ts) == ETIMEDOUT ) {
+                pthread_mutex_unlock(&Emul::latchMut);
+                for (unsigned fsmid = 0; fsmid < num_state_machines; ++fsmid)
+                    handleFifos(fsmid);
+                pthread_mutex_lock(&Emul::latchMut);
+            }
+        }
+        pthread_mutex_unlock(&Emul::latchMut);
+    } else // clock latch mode is off, so just refresh latch counter to 'now' in case it gets turned on later
+        Emul::lastLatchTime = Emul::getTime();
 }
 
 void timespec_add_ns(struct timespec *ts, long ns)
