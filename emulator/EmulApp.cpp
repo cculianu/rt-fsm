@@ -634,6 +634,7 @@ void EmulApp::startFSM()
 void EmulApp::stopFSM()
 {
     if (fsmRunning) {
+        setLatchTimeNanos(0);        
         fsm_exit_func();
         fsmRunning = false;
     }

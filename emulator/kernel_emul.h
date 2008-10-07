@@ -147,11 +147,11 @@ extern "C" {
 #   define TIMER_ABSTIME  1
 #endif
 #ifdef NEED_RT_DEFINES
-#   define clock_nanosleep clock_nanosleep_emul
 #   define clock_gettime   clock_gettime_emul
 #   define lldiv lldiv_custom
 #endif
-    int clock_nanosleep_emul(int clkid, int flags, const struct timespec *req, struct timespec *rem);
+    typedef void (*FifoHandlerFn_t)(unsigned);
+    void clock_wait_next_period_with_latching(FifoHandlerFn_t, unsigned num_state_machines);
     int clock_gettime_emul(int clkid, struct timespec *ts);
     void timespec_add_ns(struct timespec *ts, long ns);
 
@@ -170,6 +170,24 @@ extern "C" {
     extern void fsm_get_stats(unsigned fsm_no, struct FSMStats *stats_out);
 
     extern const char *GetTmpPath(void);
+
+    // clock latch stuff...
+    /** 
+        iff nonzero, make the fsm advances by at most 'latchTimeNanos' 
+        nanoseconds (in emulator time) before pausing and waiting for 
+        a latchCountdownReset() call, at which point the emulator is resumed.  
+        So at most latchTimeNanos ns can elapse between latchCountdownReset() 
+        calls.  */
+    extern long getLatchTimeNanos(void);
+    extern void setLatchTimeNanos(long nanos);
+    /// if latchTimeNanos is nonzero, then this needs to be called periodically
+    /// otherwise the emulator will pause after latchTimeNanos ns has elapsed.
+    /// in other words, this resets the latch counter.
+    extern void latchCountdownReset(void);
+    /// returns true iff the clock is currently latched (paused) 
+    /// if true, then latchCountdownReset() needs to be called to continue
+    /// advancing FSM time
+    extern int  isClockLatched(void);
 
 #ifdef __cplusplus
 }
@@ -200,7 +218,7 @@ namespace Emul {
     void setModuleParm(const std::string & name, int val);
     void setModuleParm(const std::string & name, const char *val);
 
-    /// returns the emulated FSM clock time in seconds
+    /// returns the emulated FSM clock time in nanoseconds
     /// -- the emulated fsm clock only advances with calls to 
     /// heartBeat() below... and even then it only advances by
     /// quanta that are multiples of the task_rate
