@@ -1,3 +1,23 @@
+2008-10-07 05:21  calin.culianu
+
+	* [r155] Makefile, emulator/kernel_emul.cpp,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/Version.h:
+	  
+	  - Fixed bug where large FSM programs didn't appear in
+	  procfileviewer properly (they would get truncated)
+	  - Bumped version number
+
+2008-09-25 23:37  calin.culianu
+
+	* [r154] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-09-25 23:36  calin.culianu
 
 	* [r153] emulator/EmulApp.cpp, emulator/EmulApp.h,

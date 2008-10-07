@@ -2112,9 +2112,14 @@ static void *doFSM (void *arg)
         timespec_add_ns(&next_task_wakeup, (long)task_period_ns);
       }
     }
-    
+
+#ifdef EMULATOR    
+    /* Sleep until next period */    
+    clock_wait_next_period_with_latching((FifoHandlerFn_t)handleFifos, NUM_STATE_MACHINES);
+#else
     /* Sleep until next period */    
     clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &next_task_wakeup, 0);
+#endif
   }
 
   atomic_set(&rt_task_running, 0);
@@ -2825,12 +2830,12 @@ static void handleFifos(FSMID_t f)
       do_reply = 1;
       break;
 
-      case GETRUNTIME:
+    case GETRUNTIME:
         msg->u.runtime_us = Nano2USec(rs[f].current_ts);
         do_reply = 1;
         break;
 
-      case READYFORTRIAL:
+    case READYFORTRIAL:
         if (rs[f].current_state == READY_FOR_TRIAL_JUMPSTATE(f)) {
             rs[f].ready_for_trial_flg = 0;
             if(rs[f].valid) gotoState(f, 0, -1);
@@ -2839,18 +2844,18 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;
         break;
 
-      case GETCURRENTSTATE:
+    case GETCURRENTSTATE:
         msg->u.current_state = rs[f].current_state;
         do_reply = 1;
         break;
 
-      case FORCESTATE:
+    case FORCESTATE:
         if ( !rs[f].valid || gotoState(f, msg->u.forced_state, -1) < 0 )
           msg->u.forced_state = -1; /* Indicate error.. */
         do_reply = 1;
         break;
 	
-      case STARTDAQ:
+    case STARTDAQ:
         msg->u.start_daq.range_min = ai_krange.min;        
         msg->u.start_daq.range_max = ai_krange.min;
         msg->u.start_daq.maxdata = maxdata_ai;
@@ -2869,12 +2874,12 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;
         break;
 
-      case STOPDAQ:
+    case STOPDAQ:
         rs[f].daq_ai_nchans = rs[f].daq_ai_chanmask = 0;
         do_reply = 1;
         break;
         
-      case GETAOMAXDATA:
+    case GETAOMAXDATA:
         msg->u.ao_maxdata = maxdata_ao;
         do_reply = 1;
         break;
@@ -2888,7 +2893,26 @@ static void handleFifos(FSMID_t f)
                                         (see buddyTaskHandler()) */
         break;
 
-      default:
+#ifdef EMULATOR
+    case GETCLOCKLATCHMS: 
+        msg->u.latch_time_ms = getLatchTimeNanos()/1000000L; 
+        do_reply = 1;
+        break;
+    case SETCLOCKLATCHMS: 
+        setLatchTimeNanos(msg->u.latch_time_ms*1000000L);
+        do_reply = 1;
+        break;
+    case CLOCKLATCHPING: 
+        latchCountdownReset();
+        do_reply = 1;
+        break;
+    case CLOCKISLATCHED: 
+        msg->u.latch_is_on = isClockLatched();
+        do_reply = 1;
+        break;
+#endif
+
+    default:
         ERROR_INT("Got unknown msg id '%d' in handleFifos(%u)!\n", 
                    msg->id, f);
         do_reply = 0;
@@ -3648,6 +3672,9 @@ static void buddyTaskHandler(void *arg)
     unloadDetachFSM(FSM_PTR(f)); 
     unloadDetachFSM(OTHER_FSM_PTR(f));
     initRunState(f);
+#ifdef EMULATOR
+    setLatchTimeNanos(0);
+#endif
     break;
   case AOWAVE: {
       struct AOWave *w = &msg->u.aowave;
@@ -3709,7 +3736,6 @@ static void buddyTaskHandler(void *arg)
                     sizeof(struct VarLogItem));
     }
     break;
-
   } /* end switch */
 
   /* indicate to RT task that request is done.. */

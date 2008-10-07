@@ -1261,6 +1261,36 @@ void *ConnectionThread::threadFunc(void)
                 msg.u.ai_mode_is_asynch = 0, cmd_error = false;
             if (!cmd_error)
                 sendToRT(msg);
+#ifdef EMULATOR
+        } else if (line.find("GET CLOCK LATCH MS") == 0) { // GETCLOCKLATCHMS
+            msg.id = GETCLOCKLATCHMS;
+            sendToRT(msg);
+            std::ostringstream os;
+            os << msg.u.latch_time_ms << "\n";
+            sockSend(os.str());
+            cmd_error = false;
+        } else if (line.find("SET CLOCK LATCH MS") == 0) { // SETCLOCKLATCHMS
+            std::istringstream s(line.substr(18));
+            int ms = -1;
+            s >> ms;
+            msg.id = SETCLOCKLATCHMS;
+            cmd_error = true;
+            if (ms >= 0 && ms < 2000)
+                msg.u.latch_time_ms = ms, cmd_error = false;
+            if (!cmd_error)
+                sendToRT(msg);
+        } else if (line.find("CLOCK LATCH PING") == 0) { // CLOCKLATCHPING
+            msg.id = CLOCKLATCHPING;
+            sendToRT(msg);
+            cmd_error = false;
+        } else if (line.find("IS CLOCK LATCHED") == 0) { //CLOCKISLATCHED
+            msg.id = CLOCKISLATCHED;
+            sendToRT(msg);
+            std::ostringstream os;
+            os << (msg.u.latch_is_on ? 1 : 0) << "\n";
+            sockSend(os.str());
+            cmd_error = false;
+#endif
         } // end if to compare line to cmds
     } // end if client_ver
     if (cmd_error) {

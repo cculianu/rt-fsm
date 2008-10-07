@@ -56,6 +56,8 @@
 #  define MBUFF_DEV_NAME2 ""
 #elif defined(OS_LINUX)
 #  include <time.h>
+#elif defined(OS_OSX)
+#  include <sys/time.h>
 #endif
 
 #ifndef MIN
@@ -605,8 +607,7 @@ int RTOS::Fifo::unixChkCon(bool block)
           struct timespec ts;
 #ifdef OS_OSX
           struct timeval tv;
-          struct timezone tz;
-          gettimeofday(&tv, &tz);
+          gettimeofday(&tv, 0);
           TIMEVAL_TO_TIMESPEC(&tv, &ts);
 #else
           clock_gettime(CLOCK_REALTIME, &ts);
