@@ -570,15 +570,17 @@ int clock_gettime_emul(int clkid, struct timespec *ts)
 int seq_printf(struct seq_file *m, const char *fmt, ...) 
 {
     (void)m;
-    char buf[4096];
+    static const unsigned long bufsz = 262144*2;
+    char * buf = new char[bufsz];
     va_list ap;
     va_start(ap, fmt);
-    int ret = vsnprintf(buf, sizeof(buf), fmt, ap);
+    int ret = vsnprintf(buf, bufsz, fmt, ap);
     va_end(ap);
     if (ret > -1) {
-        buf[sizeof(buf)-1] = 0;
+        buf[bufsz-1] = 0;
         Emul::procFileEmulStream << buf;
     }
+    delete [] buf;
     return ret;
 }
 
