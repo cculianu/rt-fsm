@@ -1,3 +1,67 @@
+2008-10-10 03:16  calin.culianu
+
+	* [r159] Client/Matlab/@RTLSM/ClearSimulatedInputEvents.m,
+	  Client/Matlab/@RTLSM/ClockLatchPing.m,
+	  Client/Matlab/@RTLSM/Contents.m,
+	  Client/Matlab/@RTLSM/DoQueryMatrixCmd.m,
+	  Client/Matlab/@RTLSM/EnqueueSimulatedInputEvents.m,
+	  Client/Matlab/@RTLSM/GetClockLatch.m,
+	  Client/Matlab/@RTLSM/GetSimulatedInputEvents.m,
+	  Client/Matlab/@RTLSM/GetStimuli.m,
+	  Client/Matlab/@RTLSM/IsClockLatched.m,
+	  Client/Matlab/@RTLSM/IsFastClock.m, Client/Matlab/@RTLSM/RTLSM.m,
+	  Client/Matlab/@RTLSM/ReceiveMatrix.m,
+	  Client/Matlab/@RTLSM/ReceiveREADY.m,
+	  Client/Matlab/@RTLSM/SetClockLatch.m,
+	  Client/Matlab/@RTLSM/SetFastClock.m,
+	  addons/SoundTrig/Client/Matlab/@RTLSoundMachine/ReceiveREADY.m,
+	  include/EmbC.h, include/FSM.h, include/Version.h, kernel/fsm.c,
+	  user/FSMServer.cpp, user/Util.cpp, user/Util.h:
+	  
+	  Implemented new FSM features:
+	  
+	  - Fast Clock mode
+	  - SimulateInputEvents for fakerat
+	  - GetStimuli to retrieve a list of stimuli and events (sort of a
+	  more informative GetEvents2)
+	  - Clock latch
+
+2008-10-10 03:13  calin.culianu
+
+	* [r158] emulator/ControlWin.cpp, emulator/ControlWin.h,
+	  emulator/kernel_emul.cpp, emulator/kernel_emul.h,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/EmbC.h,
+	  emulator/win32/dist/EmbC.h:
+	  
+	  Implemented new FSM features and their associated matlab calls:
+	  
+	  - Fast clock
+	  - Simulated input events for fakerat
+	  - Clock latch
+	  - GetStimuli to retrieve a list of events and stimuli delivered
+	  by the FSM
+
+2008-10-07 20:55  calin.culianu
+
+	* [r157] ChangeLog, Client/Matlab/@RTLSM/ClockLatchPing.m,
+	  Client/Matlab/@RTLSM/Contents.m,
+	  Client/Matlab/@RTLSM/GetClockLatch.m,
+	  Client/Matlab/@RTLSM/IsClockLatched.m,
+	  Client/Matlab/@RTLSM/SetClockLatch.m, include/FSM.h,
+	  include/Version.h, kernel/fsm.c, user/FSMServer.cpp,
+	  user/rtos_utility.cpp:
+	  
+	  Implemented clock latch mechanism, along with associated matlab
+	  functions
+
+2008-10-07 20:54  calin.culianu
+
+	* [r156] emulator/EmulApp.cpp, emulator/kernel_emul.cpp,
+	  emulator/kernel_emul.h:
+	  
+	  Implemented clock latch mechanism, along with associated matlab
+	  functions
+
 2008-10-07 05:21  calin.culianu
 
 	* [r155] Makefile, emulator/kernel_emul.cpp,
