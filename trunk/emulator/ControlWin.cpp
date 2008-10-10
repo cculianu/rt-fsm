@@ -3,9 +3,11 @@
 #include <QLabel>
 #include <QGridLayout>
 #include <QTimer>
+#include <QCheckBox>
 #include "ComediView.h"
 #include "kernel_emul.h"
 #include <strings.h>
+#include <QHBoxLayout>
 
 ControlWin::ControlWin(QWidget *p, Qt::WindowFlags f)
     : QWidget(p,f)
@@ -42,27 +44,47 @@ ControlWin::ControlWin(QWidget *p, Qt::WindowFlags f)
     l2 = new QGridLayout(gb);
     QLabel *tmpl;
     int col = 0, row = 0;
+    fastClk = new QCheckBox("'Fast Clock' mode", gb);
+    fastClk->setToolTip("In 'Fast Clock' mode, emulated time passes as quickly as possible\n(without any sleeps inside the periodic loop)");
+    l2->addWidget(fastClk, row, col++, 1, 8, Qt::AlignLeft);
+    connect(fastClk, SIGNAL(stateChanged(int)), this, SLOT(fastClkSlot(int)));
+    ++row;  col = 0;
     tmpl = new QLabel("FSM 0: ", gb);
     pausedValidRdyLbl = new QLabel("", gb);
     l2->addWidget(tmpl, row, col++, Qt::AlignRight);
-    l2->addWidget(pausedValidRdyLbl, 0, col++, Qt::AlignLeft);
+    l2->addWidget(pausedValidRdyLbl, row, col++, Qt::AlignLeft);
     tmpl = new QLabel("Cycle:", gb);
-    l2->addWidget(tmpl, 0, col++, Qt::AlignRight);
+    l2->addWidget(tmpl, row, col++, Qt::AlignRight);
     cycleCtLbl = new QLabel("", gb);
     l2->addWidget(cycleCtLbl, row, col++, Qt::AlignLeft);
     tmpl = new QLabel("Time:", gb);
-    l2->addWidget(tmpl, 0, col++, Qt::AlignRight);
+    l2->addWidget(tmpl, row, col++, Qt::AlignRight);
     tsLbl = new QLabel("", gb);
     l2->addWidget(tsLbl, row, col++, Qt::AlignLeft);
     tmpl = new QLabel("State:", gb);
-    l2->addWidget(tmpl, 0, col++, Qt::AlignRight);
+    l2->addWidget(tmpl, row, col++, Qt::AlignRight);
     currentStateLbl = new QLabel("", gb);
     l2->addWidget(currentStateLbl, row, col++, Qt::AlignLeft);
     tmpl = new QLabel("Transitions:", gb);
-    l2->addWidget(tmpl, 0, col++, Qt::AlignRight);
+    l2->addWidget(tmpl, row, col++, Qt::AlignRight);
     transitionCountLbl = new QLabel("", gb);
     l2->addWidget(transitionCountLbl, row, col++, Qt::AlignLeft);
+    int tmpCol = col;
+    QWidget *w = new QWidget(gb);
+    ++row, col = 0;
+    l2->addWidget(w, row, col, 1, tmpCol, Qt::AlignLeft);
     
+    QHBoxLayout *l3 = new QHBoxLayout(w); 
+    tmpl = new QLabel("Clock Latch:", w);
+    l3->addWidget(tmpl, 0, Qt::AlignRight);
+    clockLatchLbl = new QLabel("(off)", w);
+    l3->addWidget(clockLatchLbl, 0, Qt::AlignLeft);
+    tmpl = new QLabel("   Enqueued Simulated Input Events:", w);
+    l3->addWidget(tmpl, 1, Qt::AlignRight);
+    enqInpEvtsLbl = new QLabel("", w);
+    l3->addWidget(enqInpEvtsLbl, 0, Qt::AlignLeft);
+    //    l3->addWidget(new QWidget(w), 2, Qt::AlignRight);
+
     col = 0; ++row;
     {
         QWidget *w = new QWidget(gb);
@@ -94,6 +116,9 @@ void ControlWin::updateMiscStats()
 {
     struct FSMStats st;
     fsm_get_stats(0, &st);
+    fastClk->blockSignals(true);
+    fastClk->setCheckState(st.isFastClk ? Qt::Checked : Qt::Unchecked);
+    fastClk->blockSignals(false);
     QString pvr = "";
     if (st.isValid) {
         pvr += "valid";
@@ -107,6 +132,16 @@ void ControlWin::updateMiscStats()
     tsLbl->setText(QString::number(st.ts, 'f', 3)+"s");
     currentStateLbl->setText(QString::number(st.state));
     transitionCountLbl->setText(QString::number(st.transitions));
+    QString clk = "";
+    if (st.clockLatchTime > 0.) {
+        clk = QString::number(st.clockLatchTime) + "s";
+        if (st.isClockLatched) clk += ", <font color='red'><b>clock latched</b></font>";
+        else clk += ", <font color='#009900'>clock not latched</font>";
+    } else
+        clk = "(off)";
+
+    clockLatchLbl->setText(clk);
+    enqInpEvtsLbl->setText(QString::number(st.enqInpEvts));
     if (st.activeSchedWaves) {
         QString txt("");
         int w;
@@ -166,4 +201,9 @@ void ControlWin::resetAllSoundStats()
 {
     lastPlayedSounds.clear();
     updateMiscStats();
+}
+
+void ControlWin::fastClkSlot(int state)
+{
+    setFastClock(state == Qt::Checked);
 }
