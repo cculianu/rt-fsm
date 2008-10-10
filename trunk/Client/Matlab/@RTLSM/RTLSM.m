@@ -26,7 +26,7 @@
 %
 function [sm] = RTLSM(host,port,which_sm)
   sm.MIN_SERVER_VERSION = 220080319; % update this on protocol change
-  sm.CLIENT_VERSION = 220081007; % FYI to server about our version
+  sm.CLIENT_VERSION = 220081009; % FYI to server about our version
   sm.host = 'localhost';
   sm.port = 3333;
   sm.fsm_id = 0;
@@ -36,6 +36,7 @@ function [sm] = RTLSM(host,port,which_sm)
   sm.input_event_mapping = []; % input_event_mapping is written-to by SetInputEvents below..
   sm.ready_for_trial_jumpstate = 35;
   sm.in_chkconn = 0;
+  sm.is_emul = 0; % if is_emul is true, then we are connected to an emulator and not a real fsm
 
   switch nargin
     case 0
@@ -66,8 +67,8 @@ function [sm] = RTLSM(host,port,which_sm)
   
   % just to make sure to explode here if the connection failed
   FSMClient('connect', sm.handle);
-  ChkConn(sm);
-  ChkVersion(sm);
+  sm = ChkConn(sm);
+  sm = ChkVersion(sm);
   sm = SetStateMachine(sm, sm.fsm_id);
   sm = SetInputEvents(sm, 6, 'ai'); % 6 input events, two for each nosecone
 

@@ -19,7 +19,9 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 function [sm] = ClockLatchPing(sm)
-    ChkConn(sm);
+    if (~sm.is_emul),
+        error('This command is only supported on the FSM emulator');
+    end;
     DoSimpleCmd(sm, 'CLOCK LATCH PING');
     return;
 end

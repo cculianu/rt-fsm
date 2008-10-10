@@ -19,6 +19,9 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 function [sm] = SetClockLatch(sm, t)
+    if (~sm.is_emul),
+        error('This command is only supported on the FSM emulator');
+    end;
     DoSimpleCmd(sm, sprintf('SET CLOCK LATCH MS %d', t*1e3));
     return;
 end

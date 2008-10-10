@@ -3043,7 +3043,11 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;
         break;
     case CLOCKLATCHPING: 
-        latchCountdownReset(msg->u.ts_for_clock_latch);
+        latchCountdownReset(msg->u.ts_for_clock_latch+rs[f].init_ts);
+        do_reply = 1;
+        break;
+    case CLOCKLATCHQUERY: 
+        msg->u.ts_for_clock_latch = getLatchT0Nanos()-rs[f].init_ts;
         do_reply = 1;
         break;
     case CLOCKISLATCHED: 
@@ -3949,7 +3953,7 @@ static void buddyTaskHandler(void *arg)
           simInpEvtPush(f, sie);
       }
 #ifdef EMULATOR
-      latchCountdownReset(msg->u.sim_inp.ts_for_clock_latch);
+      latchCountdownReset(msg->u.sim_inp.ts_for_clock_latch+rs[f].init_ts);
 #endif
       rs[f].valid = wasvalid;
   }
@@ -4514,5 +4518,6 @@ void fsm_get_stats(unsigned f, struct FSMStats *stats)
     stats->isClockLatched = isClockLatched();
     stats->clockLatchTime = ((double)getLatchTimeNanos())/1e9;
     stats->enqInpEvts = simInpEvtCount(f);
+    stats->latchAt = (((double)(getLatchT0Nanos()-rs[f].init_ts))/1e9) + stats->clockLatchTime;
 }
 #endif

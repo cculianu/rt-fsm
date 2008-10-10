@@ -36,7 +36,7 @@ function [sm] = EnqueueSimulatedInputEvents(sm, ts, events_matrix)
       error('Please pass an m x 2 events matrix of doubles');
   end;
   events_matrix = double(events_matrix); % make sure it's a double array
-  ChkConn(sm);
+  sm = ChkConn(sm);
   % now, send the matrix
   [res] = FSMClient('sendstring', sm.handle, sprintf('ENQUEUE SIMULATED INPUT EVENTS %f %u %u\n', ts, m, n));
   ReceiveREADY(sm, 'ENQUEUE SIMULATED INPUT EVENTS'); 

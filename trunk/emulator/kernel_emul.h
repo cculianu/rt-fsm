@@ -166,6 +166,7 @@ extern "C" {
         unsigned activeSchedWaves, activeAOWaves;
         double clockLatchTime; ///< in secs
         unsigned enqInpEvts; ///< the number of input events currently enqueued
+        double latchAt; ///< the time when the clock latch will occur
     };
 
     /* implemented in fsm.c for emulator only */
@@ -195,6 +196,8 @@ extern "C" {
     /// if true, then latchCountdownReset() needs to be called to continue
     /// advancing FSM time
     extern int  isClockLatched(void);
+    /// the time the clock latch will initiate
+    extern long long getLatchT0Nanos(void);
 
     /* emulate linux's sort by calling C library's qsort() */
     static inline void sort(void *base, size_t nmemb, size_t size, int (*cmp)(const void *, const void *), void *dummy) { (void)dummy; qsort(base, nmemb, size, cmp); }

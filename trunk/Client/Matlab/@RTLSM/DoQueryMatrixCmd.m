@@ -6,7 +6,7 @@ function [result_matrix] = DoQueryMatrixCmd(varargin)
   dorecvok = 1;
   if (nargin > 2), dorecvok = varargin{3}; end;
   
-  ChkConn(sm);
+  sm = ChkConn(sm);
   res = FSMClient('sendstring', sm.handle, sprintf('%s\n', cmd));
   if (isempty(res)), error(sprintf('%s error, connection down?', cmd)); end;
   mat = ReceiveMatrix(sm, cmd);

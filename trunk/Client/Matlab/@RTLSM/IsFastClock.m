@@ -12,6 +12,10 @@
 %                functionality.  See GetSimEvents.m and EnqueueSimEvents.m.
 %
 function [ret] = IsFastClock(sm)
+    if (~sm.is_emul),
+        error('This command is only supported on the FSM emulator');
+    end;
+    sm = ChkConn(sm);
     str = DoQueryCmd(sm, 'IS FAST CLOCK');
     ret = sscanf(str, '%d');
     return;

@@ -1,5 +1,5 @@
 function [lines] = DoLinesCmd(sm, cmd)
-  ChkConn(sm);
+  sm = ChkConn(sm);
   res = FSMClient('sendstring', sm.handle, sprintf('%s\n', cmd));
   if (isempty(res)) error(sprintf('%s error, cannot send string!', cmd)); end;
   lines = FSMClient('readlines', sm.handle);

@@ -136,7 +136,7 @@ void ControlWin::updateMiscStats()
     if (st.clockLatchTime > 0.) {
         clk = QString::number(st.clockLatchTime) + "s";
         if (st.isClockLatched) clk += ", <font color='red'><b>clock latched</b></font>";
-        else clk += ", <font color='#009900'>clock not latched</font>";
+        else clk += QString(", <font color='#009900'>clock not latched</font>, latch at: ") + QString::number(st.latchAt);
     } else
         clk = "(off)";
 

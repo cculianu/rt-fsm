@@ -18,6 +18,9 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 function [ret] = IsClockLatched(sm)
+    if (~sm.is_emul),
+        error('This command is only supported on the FSM emulator');
+    end;
     str = DoQueryCmd(sm, 'IS CLOCK LATCHED');
     ret = sscanf(str, '%d');
     return;

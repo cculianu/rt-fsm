@@ -91,7 +91,19 @@ namespace Emul {
     static volatile long latchTimeNanos = 0;
     static hrtime_t lastLatchTime = 0;
     
-#ifdef OS_OSX
+    /* Provide clock_gettime() emulation using gettimeofday 
+       on OSX and on Windows */
+#if defined(OS_OSX) || defined(WIN32) || defined(OS_WINDOWS)
+#ifdef WIN32
+    /* OSX has this function, windows does not */
+    static void TIMEVAL_TO_TIMESPEC(const struct timeval *tv,
+                                    struct timespec *ts)
+    {
+        ts->tv_sec = tv->tv_sec;
+        ts->tv_nsec = tv->tv_usec*1000;
+        if (ts->tv_nsec >= 1000000000) ts->tv_nsec -= 1000000000, ++ts->tv_sec;
+    }
+#endif
     int clock_gettime(int clkid, struct timespec *ts)
     {
         struct timeval tv;
@@ -100,6 +112,9 @@ namespace Emul {
         TIMEVAL_TO_TIMESPEC(&tv, ts);
         return ret;
     }
+#endif
+
+#ifdef OS_OSX
     static pthread_cond_t nscond = PTHREAD_COND_INITIALIZER;
     static pthread_mutex_t nsmut = PTHREAD_MUTEX_INITIALIZER;
     void nanosleep(unsigned long nanos)
@@ -134,6 +149,7 @@ namespace Emul {
         CloseHandle(hTimer);
     }
 #else
+    using ::clock_gettime;
     void nanosleep(unsigned long nanos)
     {
         static sem_t sem;
@@ -257,14 +273,26 @@ extern "C" {
 
     static int isClockLatched_Nolock(void)
     {
+        hrtime_t now = Emul::getTime();
+        /*        fprintf(stderr, "now: %llu  latchtime: %ld  lastlatchtime: %lld\n",
+                  now, Emul::latchTimeNanos, Emul::lastLatchTime);*/
         return Emul::latchTimeNanos > 0 
-               && Emul::getTime()-Emul::lastLatchTime >= Emul::latchTimeNanos;
+               && now-Emul::lastLatchTime >= static_cast<long long>(Emul::latchTimeNanos);
     }
     int isClockLatched(void)
     {
         pthread_mutex_lock(&Emul::latchMut);
         int ret = isClockLatched_Nolock();
         pthread_mutex_unlock(&Emul::latchMut);        
+        return ret;
+    }
+
+    /// the time the clock latch will initiate
+    long long getLatchT0Nanos(void)
+    {
+        pthread_mutex_lock(&Emul::latchMut);
+        long long ret = Emul::lastLatchTime;
+        pthread_mutex_unlock(&Emul::latchMut);
         return ret;
     }
 
@@ -602,7 +630,7 @@ void clock_wait_next_period_with_latching(FifoHandlerFn_t handleFifos, unsigned 
         pthread_mutex_lock(&Emul::latchMut);
         while (isClockLatched_Nolock()) {
             struct timespec ts;
-            clock_gettime(CLOCK_REALTIME, &ts);
+            Emul::clock_gettime(CLOCK_REALTIME, &ts);
             timespec_add_ns(&ts, amount);
             if ( pthread_cond_timedwait(&Emul::latchCond, &Emul::latchMut, &ts) == ETIMEDOUT ) {
                 pthread_mutex_unlock(&Emul::latchMut);
@@ -612,8 +640,7 @@ void clock_wait_next_period_with_latching(FifoHandlerFn_t handleFifos, unsigned 
             }
         }
         pthread_mutex_unlock(&Emul::latchMut);
-    } else // clock latch mode is off, so just refresh latch counter to 'now' in case it gets turned on later
-        Emul::lastLatchTime = Emul::getTime();
+    } 
 }
 
 void timespec_add_ns(struct timespec *ts, long ns)
