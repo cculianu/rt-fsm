@@ -233,10 +233,11 @@ namespace Emul {
 extern "C" {
 
 
-    void latchCountdownReset(void) 
+    void latchCountdownReset(long long ts) 
     {
+        if (ts < 0) ts = Emul::getTime();
         pthread_mutex_lock(&Emul::latchMut);
-        Emul::lastLatchTime = Emul::getTime();
+        Emul::lastLatchTime = ts;
         pthread_cond_broadcast(&Emul::latchCond);
         pthread_mutex_unlock(&Emul::latchMut);
     }
@@ -250,8 +251,8 @@ extern "C" {
     {
         pthread_mutex_lock(&Emul::latchMut);
         Emul::latchTimeNanos = ns;
+        pthread_cond_broadcast(&Emul::latchCond);
         pthread_mutex_unlock(&Emul::latchMut);        
-        latchCountdownReset();
     }
 
     static int isClockLatched_Nolock(void)
@@ -561,6 +562,17 @@ static long long timeNowNS()
     struct timeval tv;
     gettimeofday(&tv, 0);
     return static_cast<long long>(tv.tv_sec) * 1000000000LL + static_cast<long long>(tv.tv_usec)*1000LL;
+}
+
+/// returns true iff FSM is running in 'fast clock' mode
+int isFastClock(void)
+{
+    return Emul::fastFSM;
+}
+/// set/unset 'fast clock' mode for the FSM
+void setFastClock(int on_off)
+{
+    Emul::fastFSM = on_off;
 }
 
 void clock_wait_next_period_with_latching(FifoHandlerFn_t handleFifos, unsigned num_state_machines)

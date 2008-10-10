@@ -5,6 +5,7 @@
 #include <map>
 #include <QTime>
 class QLabel;
+class QCheckBox;
 
 class ControlWin : public QWidget
 {
@@ -18,8 +19,10 @@ public slots:
 private slots:
     /// updates misc stats
     void updateMiscStats();     
+    void fastClkSlot(int); 
 private:
-    QLabel *pausedValidRdyLbl, *cycleCtLbl, *tsLbl, *currentStateLbl, *transitionCountLbl, *schedWavesLbl, *aoWavesLbl, *sndsLbl;
+    QLabel *pausedValidRdyLbl, *cycleCtLbl, *tsLbl, *currentStateLbl, *transitionCountLbl, *clockLatchLbl, *enqInpEvtsLbl, *schedWavesLbl, *aoWavesLbl, *sndsLbl;
+    QCheckBox *fastClk;
     typedef std::map<unsigned, QTime> SndTimeMap;
     SndTimeMap lastPlayedSounds; ///< map of sndid -> expiry
 };

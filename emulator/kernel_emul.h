@@ -162,8 +162,10 @@ extern "C" {
         double ts; /**< in seconds */
         unsigned state;
         unsigned transitions;
-        int isPaused, isValid, readyForTrial;
+        int isPaused, isValid, readyForTrial, isFastClk, isClockLatched;
         unsigned activeSchedWaves, activeAOWaves;
+        double clockLatchTime; ///< in secs
+        unsigned enqInpEvts; ///< the number of input events currently enqueued
     };
 
     /* implemented in fsm.c for emulator only */
@@ -183,12 +185,25 @@ extern "C" {
     /// if latchTimeNanos is nonzero, then this needs to be called periodically
     /// otherwise the emulator will pause after latchTimeNanos ns has elapsed.
     /// in other words, this resets the latch counter.
-    extern void latchCountdownReset(void);
+    /// @param: ts_when_latch_starts is a timestamp in emulator time (nanos)
+    ///         when the clock latch is to 'start' counting down
+    ///         the clock latch will actually assert at time:
+    ///          ts_when_latch_starts + getLatchTimeNanos()
+    ///         -1 means 'current time'    
+    extern void latchCountdownReset(long long ts_when_latch_starts);
     /// returns true iff the clock is currently latched (paused) 
     /// if true, then latchCountdownReset() needs to be called to continue
     /// advancing FSM time
     extern int  isClockLatched(void);
 
+    /* emulate linux's sort by calling C library's qsort() */
+    static inline void sort(void *base, size_t nmemb, size_t size, int (*cmp)(const void *, const void *), void *dummy) { (void)dummy; qsort(base, nmemb, size, cmp); }
+
+    /// returns true iff FSM is running in 'fast clock' mode
+    extern int isFastClock(void);
+    /// set/unset 'fast clock' mode for the FSM
+    extern void setFastClock(int on_off);
+    
 #ifdef __cplusplus
 }
 #endif
