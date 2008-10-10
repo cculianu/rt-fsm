@@ -25,6 +25,7 @@
 #include <sstream>
 #include "Mutex.h"
 #include <sys/time.h> /* for struct timeval and gettimeofday -- for non-Unix we need to figure out a way to handle this */
+#include "IntTypes.h"
 
 #ifndef ABS
 #define ABS(a) ( (a) < 0 ? -(a) : (a) )
@@ -157,5 +158,19 @@ class FatalException : public Exception
 public:
     FatalException(const std::string & s) : Exception(s) {}
 };
+
+/// returns a count of the number of bits set in the bitarray dwords
+extern unsigned countBits(int32_t *dwords, unsigned num_dwords_in_array);
+
+
+/**
+ * findNextBit - find the next set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search, in number of bits
+ */
+extern unsigned long findNextBit(const unsigned long *addr, 
+                                 unsigned long size,
+                                 unsigned long offset);
 
 #endif

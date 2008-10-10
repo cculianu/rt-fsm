@@ -1,4 +1,4 @@
-% [sm]           = ClockLatchPing(sm, ms)
+% [sm]           = ClockLatchPing(sm)
 %
 %                *****EMULATOR MODE ONLY COMMAND*****
 %
@@ -18,7 +18,7 @@
 %                the emount of time that may elapse (in state machine time)
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
-function [sm] = ClockLatchPing(sm, ms)
+function [sm] = ClockLatchPing(sm)
     ChkConn(sm);
     DoSimpleCmd(sm, 'CLOCK LATCH PING');
     return;

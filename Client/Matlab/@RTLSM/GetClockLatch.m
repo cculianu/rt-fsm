@@ -1,8 +1,8 @@
-% [latchtime_ms] = GetClockLatch(sm)
+% [latchtime_secs] = GetClockLatch(sm)
 %
 %                *****EMULATOR MODE ONLY COMMAND*****
 %
-%                Retrieve the current clock latch setting, in MS, for the
+%                Retrieve the current clock latch setting, in secs, for the
 %                state machine.  A value of 0 indicates that clock latching
 %                is disabled.
 %
@@ -12,8 +12,8 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 function [ret] = GetClockLatch(sm)
-    ChkConn(sm);
     str = DoQueryCmd(sm, 'GET CLOCK LATCH MS');
     ret = sscanf(str, '%d');
+    ret = ret / 1e3;
     return;
 end

@@ -399,7 +399,7 @@
 %                Get the number of events that have occurred since
 %                the last call to Initialize().
 %
-% [EventList]   = GetEvents(sm, int StartEventNumber, int EndEventNumber)
+% [EventList]  = GetEvents(sm, int StartEventNumber, int EndEventNumber)
 %
 %                Gets a matrix in which each row corresponds to an
 %                Event; the matrix will have
@@ -436,7 +436,7 @@
 %                the fourth is the new state that was entered as a
 %                result of the state transition
 %
-% [EventList]   = GetEvents2(sm, int StartEventNumber, int EndEventNumber)
+% [EventList]  = GetEvents2(sm, int StartEventNumber, int EndEventNumber)
 %
 %                Improved version of GetEvents.m which supports more than 32
 %                input events.  GetEvents.m had the returned event-id be
@@ -486,7 +486,7 @@
 %                Gets the time, in seconds, that has elapsed since
 %                the last call to Initialize().
 %
-% [struct]=      GetTimeEventsAndState(sm, first_event_num)
+% [struct] = GetTimeEventsAndState(sm, first_event_num)
 %                Gets the time, in seconds, that has elapsed since
 %                the last call to Initialize(), as well as the Events matrix
 %                starting from first_event_num up until the present.
@@ -497,13 +497,13 @@
 %                        event_ct: (event number of the latest event)
 %                        events: (m by 5 matrix of events)
 %
-% [int r]       = IsRunning(sm)  return 1 if running, 0 if halted    
+% [int r] = IsRunning(sm)  return 1 if running, 0 if halted    
 %
 % [int n_vars] = GetVarLogCounter(sm)   
 %                Get the number of variables that have been logged
 %                since the last call to Initialize().
 %
-% [mode]       = GetAIMode(sm)
+% [mode]  = GetAIMode(sm)
 %                Retrieve the current data acquisition mode for the AI 
 %                subdevice.  Possible modes returned are:
 %                'asynch' -- asynchronous acquisition -- this is faster 
@@ -512,7 +512,7 @@
 %                'synch'  -- synchronous acquisition -- the default
 %                            works reliably with all boards.
 %
-% [sm]         = SetAIMode(sm, mode)
+% [sm] = SetAIMode(sm, mode)
 %                Set the data acquisition mode to use for the AI 
 %                subdevice.  Possible modes to use are:
 %                'asynch' -- asynchronous acquisition -- this is faster 
@@ -521,13 +521,133 @@
 %                'synch'  -- synchronous acquisition -- the default
 %                            works reliably with all boards.
 %
+% [simEvtList] = GetSimulatedInputEvents(sm)
+%                Inspects the simulated input events queue for the current
+%                FSM and retrieves them in a m x 2 matrix.  
+% 
+%                Format for each row of the matrix is 
+%                [ event_id timestamp_seconds ], where:
+%
+%                event_id is an integer corresponding to an input
+%                event number (as would be returned by GetEvents2.m or as
+%                would be specified by SetInputEvents.m).  -1 indicates a
+%                'timeout event'.
+%
+%                timestamp_seconds is the time at which the event should
+%                occur in the future, in FSM time (the same time as would
+%                be returned by GetTime.m).
+%
+%                Simulated input events are a mechanism by which the state
+%                can be programmed to receive input events at specific
+%                times in the future, for the purposes of simulating a real
+%                experiment on a state machine program, for example.  See
+%                also EnqueueSimulatedInputEvents.m and
+%                ClearSimulatedInputEvents.m
+%
+% [sm] = EnqueueSimulatedInputEvents(sm, timestamp, events_matrix)
+%                Adds simulated input events described in the m x 2 matrix
+%                `events_matrix' to the simulated input events queue.  
+%
+%                The `timestamp' parameter is a time (in FSM time, in
+%                seconds, preferably in the future) at which to initiate
+%                the clock latch countdown.  The emulator time will be
+%                frozen at time: timestamp + clock_latch_time.
+%                *** NOTE *** This argument is ignored on the real FSM and
+%                only used by the emulator with its clock-latching
+%                mechanism. (See GetClockLatch.m and SetClockLatch.m).
+% 
+%                Format for each row of the matrix is 
+%                [ event_id timestamp_seconds ], where:
+%
+%                event_id is an integer corresponding to an input
+%                event number (as would be returned by GetEvents2.m or as
+%                would be specified by SetInputEvents.m).  -1 indicates a
+%                'timeout event'.
+%
+%                timestamp_seconds is the time at which the event should
+%                occur in the future, in FSM time (the same time as would
+%                be returned by GetTime.m).
+%
+%                Simulated input events are a mechanism by which the state
+%                can be programmed to receive input events at specific
+%                times in the future, for the purposes of simulating a real
+%                experiment on a state machine program, for example.  See
+%                also GetSimulatedInputEvents.m and
+%                ClearSimulatedInputEvents.m
+%           
+% [sm] = ClearSimulatedInputEvents(sm)
+%                Forcefully clears (empties) the simulated input events
+%                queue for the current FSM.  
+% 
+%                Simulated input events are a mechanism by which the state
+%                can be programmed to receive input events at specific
+%                times in the future, for the purposes of simulating a real
+%                experiment on a state machine program, for example.  See
+%                also EnqueueSimulatedInputEvents.m and
+%                SetSimulatedInputEvents.m
+%
+% [stimmatrix] = GetStimuli(sm, startEventNumber, endEventNumber)
+%                Retrieve information on what input events and what outputs
+%                were deliverd by the FSM in the past.  Similar in spirit
+%                to the GetEvents2.m function, but also reports on what
+%                outputs occurred.
+%
+%                Parameter startEventNumber specifies a 1-indexed event
+%                number to start from, and the endEventNumber is the last
+%                event number to retrieve, inclusive.
+%
+%                The returned matrix is an mx4 matrix which encapsulates
+%                all the input events and output the FSM did.  Each row
+%                corresponds to an input or output event and the columns
+%                have the following meaning:
+%
+%                1st - type
+%                      a number indicating the type of the event. Possible
+%                      values include:
+%                             0 for INPUT 
+%                             1 for Digital OUTPUT (DOUT)
+%                             2 for Trigger OUTPUT
+%                             3 for External (Sound) OUTPUT
+%                             4 for Scheduled Wave OUTPUT
+%                             5 for TCP OUTPUT
+%                             6 for UDP OUTPUT
+%                           127 for NOOP OUTPUT
+%
+%               2nd - id
+%                    a number whose meaning depends on 'type' above.
+%                    INPUT - for input events corresponds to the state
+%                            matrix column number of the input event, this
+%                            id will be the same id you would get from the
+%                            GetEvents2.m 'event_id'.
+%                    TIMEOUT - for timeouts will be a -1 (just like
+%                              GetEvents2.m's event_id)
+%                    OUTPUT  - for all others will correspond to the state 
+%                              machine OUTPUT ROUTING output column number.
+%                
+%               3rd - value
+%                    a number whose meaning depends on the 'type' above.
+%                    INPUT/TIMEOUT - the state that was jumped to as a
+%                                    result of this event ID.
+%                    OUTPUT - the value of the output (eg, the DOUT lines
+%                    set or the sound triggered, etc).
+%
+%               4th - timestamp
+%                    the time at which the event occurred, in seconds (in
+%                    FSM time, same time as one would get from GetTime.m).
+%
+%               See also: GetStimuliCounter.m and GetEvents2.m
+% 
+% [int nevents] = GetStimuliCounter(sm)   
+%                Get the number of stimuli events that have occurred since
+%                the last call to Initialize() (see also GetStimuli.m).
+%
 % ----- Emulator-only commands ----------
 %
-% [latchtime_ms] = GetClockLatch(sm)
+% [latchtime_secs] = GetClockLatch(sm)
 %
 %                *****EMULATOR MODE ONLY COMMAND*****
 %
-%                Retrieve the current clock latch setting, in MS, for the
+%                Retrieve the current clock latch setting, in secs, for the
 %                state machine.  A value of 0 indicates that clock latching
 %                is disabled.
 %
@@ -537,17 +657,20 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 %
-% [sm]         = SetClockLatch(sm, ms)
+% [sm] = SetClockLatch(sm, latch_time_secs)
 %
 %                *****EMULATOR MODE ONLY COMMAND*****
 %
-%                Set the clock latch  time to ms milliseconds for the state
-%                machine.  A value of 0 indicates that clock latching is to
-%                be disabled.
+%                Set the clock latch  time to latch_time_secs secs for the
+%                state machine.  A value of 0 indicates that clock latching
+%                is to be disabled.
 %
 %                Note this command takes effect immediately (it does not
 %                require a SetStateMatrix/SetStateProgram call to take
 %                effect).
+%
+%                Note also that the clock latch time is reset should the 
+%                FSM be reset via a call to Initialize.m.
 %
 %                Clock latching is a mechanism to limit the amount of
 %                processing the state machine does by specifying a limit on
@@ -555,7 +678,7 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 %
-% [sm]         = ClockLatchPing(sm, ms)
+% [sm] = ClockLatchPing(sm)
 %
 %                *****EMULATOR MODE ONLY COMMAND*****
 %
@@ -576,7 +699,7 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 %
-% [bool_flg]   = IsClockLatched(sm)
+% [bool_flg] = IsClockLatched(sm)
 %
 %                *****EMULATOR MODE ONLY COMMAND*****
 %
@@ -595,6 +718,32 @@
 %                the emount of time that may elapse (in state machine time)
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
+%
+% [boolean_flg] = IsFastClock(sm)
+%
+%                *****EMULATOR MODE ONLY COMMAND*****
+%
+%                Returns 1 if the FSM is currently running in 'fast clock'
+%                mode, 0 otherwise.  
+%
+%                An FSM emulator running in 'fast clock' mode simulates
+%                time as quickly as possible.  That is, without any sleeps
+%                in the periodic loop of the FSM.  This is useful in
+%                conjunction with the 'Simulated Input Events'
+%                functionality.  See GetSimEvents.m and EnqueueSimEvents.m.
+%
+% [sm] = SetFastClock(sm, bool_flag)
+%
+%                *****EMULATOR MODE ONLY COMMAND*****
+%
+%                Set the fast clock flag to 1 or 0 (fast clock enabled or 
+%                disabled).
+%
+%                An FSM emulator running in 'fast clock' mode simulates
+%                time as quickly as possible.  That is, without any sleeps
+%                in the periodic loop of the FSM.  This is useful in
+%                conjunction with the 'Simulated Input Events'
+%                functionality.  See GetSimEvents.m and EnqueueSimEvents.m.
 %
 %
 % ----- Control issues ----------

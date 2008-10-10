@@ -52,7 +52,7 @@ struct SchedWave
                               here it is. */
 };
 
-enum { OSPEC_DOUT = 0, OSPEC_TRIG, OSPEC_EXT, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };
+enum { OSPEC_DOUT = 1, OSPEC_TRIG, OSPEC_EXT, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };
 
 #define OUTPUT_SPEC_DATA_SIZE 1024
 #define IP_HOST_LEN 80
@@ -247,6 +247,34 @@ struct AOWave
                                                corresponding sample */
 };
 
+
+/** Simulated Input Events -- used for fakerat, etc */
+struct SimInpEvt
+{
+    int event_id; /* event column id, where -1 means a timeout event! */
+    long long ts; /* ts in nanos */
+};
+#ifndef __cplusplus
+typedef struct SimInpEvt SimInpEvt;
+#endif
+
+#define MAX_SIM_INP_EVTS 8192
+
+#define FSM_EVT_TYPE_IN 0
+
+/** FSMEvent -- used with the GETSTIMULI FSM message type */
+struct FSMEvent
+{
+    short type; /* One of OSPEC_* for output events, or 0 for input */
+    short id;   /* Corresponds to FSM column id for the event, 0 indexed */
+    int val;    /*  For output events, corresponds to the value outputted
+                    For input events, corresponds to the state we jumped to */
+    long long ts; /* timestamp in nanos in FSM time */
+};
+#ifndef __cplusplus
+typedef struct FSMEvent FSMEvent;
+#endif
+
 enum ShmMsgID 
 {
     GETPAUSE = 1,  /* Query the FSM to find out if it is paused. */
@@ -290,12 +318,23 @@ enum ShmMsgID
                  an FSMSpec was accepted and if not, what was wrong with it */
     SETAIMODE, /* reset acquisition mode to either asynch or synch */
     GETAIMODE, /* query the current acquisition mode */
+    GETSIMINPEVTS, /* query the simulated input events */
+    ENQSIMINPEVTS, /* enqueue some simulated input events */
+    CLEARSIMINPEVTS, /* clear the simulated input events */
+    GETSTIMULI,  /** Returns a FSMEvents in the [from,to] range. */
+    STIMULICOUNT, /** Returns the number of FSMEvents in the from,to range */
 #ifdef EMULATOR
     GETCLOCKLATCHMS, /* query fsm clock latch amount */
     SETCLOCKLATCHMS, /* turn fsm clock latching on and set it to x MS */
     CLOCKLATCHPING, /* ping/reset the clock latch countdown */
     CLOCKISLATCHED, /* returns true iff the fsm is not advancing due to 
                        its clock being latched */
+    FASTCLOCK,        /* Set/Clear the 'fast clock' flag for the emulator --
+                       fast clock FSMs run the emulated time as fast as 
+                       possible without sleeps in the 
+                       clock_wait_next_period() function.
+                       See kernel_emul.cpp */
+    ISFASTCLOCK,     /* Query the status of the 'fast clock' flag */
 #endif
     LAST_SHM_MSG_ID
 };
@@ -383,11 +422,31 @@ struct ShmMsg {
       /* For id == SETAIMODE and GETAIMODE */
       unsigned ai_mode_is_asynch;
 
+      struct {
+          SimInpEvt evts[MAX_SIM_INP_EVTS];
+          unsigned num;
+#ifdef EMULATOR
+          long long ts_for_clock_latch;
+#endif
+      } sim_inp;
+
+        struct {
+            unsigned from, num;
+#define MSG_MAX_EVENTS 64
+            FSMEvent e[MSG_MAX_EVENTS];/**< for id == GETSTIMULI */
+        } fsm_events;
+
+        unsigned fsm_events_count; /**< for id == STIMULICOUNT */
+
 #ifdef EMULATOR
       /* For id == GETCLOCKLATCHMS or SETCLOCKLATCHMS */
       unsigned latch_time_ms;
-      /* For id ==  either CLOCKISLATCHED */
+      /* For id ==  CLOCKISLATCHED */
       unsigned latch_is_on;
+     /* For id == FASTCLOCK or ISFASTCLOCK */ 
+      int fast_clock_flg;
+     /* For id == CLOCKLATCHPING */
+      long long ts_for_clock_latch;
 #endif
     } u;
   };
@@ -493,7 +552,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf001011b)) /*< Magic no. for shm... 'fool011b'  */
+#define FSM_SHM_MAGIC ((int)(0xf001011d)) /*< Magic no. for shm... 'fool011d'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }

@@ -95,8 +95,9 @@ struct Matrix
 {
 public:
   Matrix(const Matrix & mat) : d(0) { *this = mat; }
-  Matrix(int m, int n) : m(m), n(n) { d = new double[m*n]; }
-  ~Matrix() { delete [] d; }
+  Matrix(int m, int n) : m(m), n(n) { d = new double[m*n ? m*n : 1]; }
+  Matrix() : m(0), n(0) { d = new double[1]; }
+  ~Matrix() { delete [] d; d = 0; }
   Matrix & operator=(const Matrix &rhs);
   Matrix & vertCat(const Matrix &rhs); // modified this
   double & at(int r, int c, bool = false)  { return *const_cast<double *>(d + c*m + r); }
@@ -114,8 +115,8 @@ Matrix & Matrix::operator=(const Matrix &rhs)
 {
   if (d) delete [] d;
   m = rhs.m; n = rhs.n;
-  d = new double[m*n];
-  std::memcpy(d, rhs.d, m*n*sizeof(double));
+  d = new double[m*n ? m*n : 0];
+  if (rhs.d && m*n) std::memcpy(d, rhs.d, m*n*sizeof(double));
   return *this;
 }
 
@@ -343,6 +344,8 @@ private:
   Matrix doGetTransitionsFromRT(int & first, int & last, int & state, bool old_format = false);
   Matrix doGetTransitionsFromRT(int & first, int & last, bool old_format = false) { int dummy; return doGetTransitionsFromRT(first, last, dummy, old_format); }
   Matrix doGetTransitionsFromRT(int & first, bool old_format = false) { int dummy = -1; return doGetTransitionsFromRT(first, dummy, old_format); }
+  Matrix doGetSimInpEvtsFromRT();
+  Matrix doGetStimuliFromRT(int & first, int & last);
 
   IntStringMap parseIntStringMapBlock(const std::string &); ///< not static because it needs object for logging errors
   static void parseStringTable(const char *stable, StringMatrix &m);
@@ -997,6 +1000,32 @@ void *ConnectionThread::threadFunc(void)
                     cmd_error = false;
                 }
             }
+        } else if (line.find("GET STIMULI COUNTER") == 0) {
+            msg.id = STIMULICOUNT;
+            sendToRT(msg);
+            std::stringstream s;
+            s << msg.u.fsm_events_count << std::endl;
+            sockSend(s.str());
+            cmd_error = false;
+        } else if (line.find("GET STIMULI") == 0) {
+            std::string::size_type pos = line.find_first_of("-0123456789");
+            if (pos != std::string::npos) {
+                std::istringstream is(line.substr(pos));
+                int first = 0, last = 0;
+                is >> first >> last;
+                Matrix mat  = doGetStimuliFromRT(first, last);
+                cmd_error = false;
+                std::ostringstream os;
+                os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
+                sockSend(os.str());
+
+                line = sockReceiveLine(); // wait for "READY" from client
+                
+                if (line.find("READY") != std::string::npos) {
+                    sockSend(mat.buf(), mat.bufSize(), true);
+                } else
+                    cmd_error = true;
+            }
         } else if (line.find("GET EVENTS") == 0) {
             std::string::size_type pos = line.find_first_of("0123456789");
             if (pos != std::string::npos) {
@@ -1261,6 +1290,63 @@ void *ConnectionThread::threadFunc(void)
                 msg.u.ai_mode_is_asynch = 0, cmd_error = false;
             if (!cmd_error)
                 sendToRT(msg);
+        } else if (line.find("GET SIMULATED INPUT EVENT QUEUE") == 0) {
+            Matrix mat = doGetSimInpEvtsFromRT();            
+            std::ostringstream os;
+            os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
+            sockSend(os.str());
+
+            line = sockReceiveLine(); // wait for "READY" from client
+
+            if (line.find("READY") != std::string::npos) {
+                sockSend(mat.buf(), mat.bufSize(), true);
+                cmd_error = false;
+            }
+        } else if (line.find("ENQUEUE SIMULATED INPUT EVENTS") == 0) {
+            std::string::size_type pos = line.find_first_of("-0123456789");
+            if (pos != std::string::npos) {
+                std::istringstream is(line.substr(pos));
+                double ts = 0.;
+                unsigned m = 0, n = 0;
+                int ret;
+                is >> ts >> m >> n;
+                if (m < MAX_SIM_INP_EVTS && (!m || n == 2)) {
+                    if ( (ret = sockSend("READY\n")) <= 0 ) {
+                        Log() << "Send error..." << std::endl; 
+                        break;
+                    }
+                    Log() << "Getting ready to receive simulated input events matrix sized " << m << "x" << n << std::endl; 
+                
+                    Matrix mat (m, n);
+                    ret = sockReceiveData(mat.buf(), mat.bufSize());
+                    if (ret == (int)mat.bufSize()) {
+                        if (debug) { 
+                            Log() << "Matrix is:" << std::endl; 
+                            for (int i = 0; i < (int)mat.rows(); ++i) {
+                                TLog log = Log();
+                                for (int j = 0; j < (int)mat.cols(); ++j)
+                                    log << mat.at(i,j) << " " ;
+                                log << "\n";       
+                            }
+                        }
+                        msg.id = ENQSIMINPEVTS;
+                        msg.u.sim_inp.num = m;
+                        msg.u.sim_inp.ts_for_clock_latch = static_cast<long long>(ts*1e9);
+                        for (unsigned i = 0; i < m; ++i) {
+                            msg.u.sim_inp.evts[i].event_id = static_cast<int>(mat.at(i, 0));
+                            msg.u.sim_inp.evts[i].ts = static_cast<long long>(mat.at(i, 1) * 1e9);
+                        }
+                        sendToRT(msg); 
+                        cmd_error = false;
+                    } else if (ret <= 0) {
+                        break;
+                    }
+                }
+            }
+        } else if (line.find("CLEAR SIMULATED INPUT EVENTS") == 0) {
+            msg.id = CLEARSIMINPEVTS;
+            sendToRT(msg);
+            cmd_error = false;
 #ifdef EMULATOR
         } else if (line.find("GET CLOCK LATCH MS") == 0) { // GETCLOCKLATCHMS
             msg.id = GETCLOCKLATCHMS;
@@ -1270,16 +1356,22 @@ void *ConnectionThread::threadFunc(void)
             sockSend(os.str());
             cmd_error = false;
         } else if (line.find("SET CLOCK LATCH MS") == 0) { // SETCLOCKLATCHMS
-            std::istringstream s(line.substr(18));
-            int ms = -1;
-            s >> ms;
-            msg.id = SETCLOCKLATCHMS;
-            cmd_error = true;
-            if (ms >= 0 && ms < 2000)
-                msg.u.latch_time_ms = ms, cmd_error = false;
-            if (!cmd_error)
-                sendToRT(msg);
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::istringstream s(line.substr(pos));
+                double ms = -1;
+                s >> ms;
+                msg.id = SETCLOCKLATCHMS;
+                if (ms >= 0. && ms < 2000.)
+                    msg.u.latch_time_ms = unsigned(ms), cmd_error = false;
+                if (!cmd_error)
+                    sendToRT(msg);
+            }
         } else if (line.find("CLOCK LATCH PING") == 0) { // CLOCKLATCHPING
+            msg.id = GETRUNTIME;
+            sendToRT(msg);
+            long long ts = msg.u.runtime_us*1000LL;
+            msg.u.ts_for_clock_latch = ts;
             msg.id = CLOCKLATCHPING;
             sendToRT(msg);
             cmd_error = false;
@@ -1290,6 +1382,24 @@ void *ConnectionThread::threadFunc(void)
             os << (msg.u.latch_is_on ? 1 : 0) << "\n";
             sockSend(os.str());
             cmd_error = false;
+        } else if (line.find("IS FAST CLOCK") == 0) { //ISFASTCLOCK
+            msg.id = ISFASTCLOCK;
+            sendToRT(msg);
+            std::ostringstream os;
+            os << (msg.u.fast_clock_flg ? 1 : 0) << "\n";
+            sockSend(os.str());
+            cmd_error = false;
+        } else if (line.find("SET FAST CLOCK") == 0) { // FASTCLOCK
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::istringstream s(line.substr(pos));
+                int flg = 0;
+                s >> flg;
+                msg.id = FASTCLOCK;
+                msg.u.fast_clock_flg = flg;
+                sendToRT(msg);
+                cmd_error = false;
+            }
 #endif
         } // end if to compare line to cmds
     } // end if client_ver
@@ -2992,6 +3102,58 @@ Matrix ConnectionThread::doGetTransitionsFromRT(int & first, int & last, int & s
               mat.at(ct, 2) = static_cast<double>(t.ts/1000ULL) / 1000000.0; /* convert us to seconds */
               mat.at(ct, 3) = t.state;
               mat.at(ct, 4) = static_cast<double>(t.ext_ts/1000ULL) / 1000000.0;
+            }
+      }
+      return mat;
+  }
+  return empty;
+}
+
+
+Matrix ConnectionThread::doGetSimInpEvtsFromRT()
+{
+    // query the count first to check sanity
+    msg.id = GETSIMINPEVTS;
+    sendToRT(msg);
+    Matrix mat(msg.u.sim_inp.num, 2);
+    for (unsigned i = 0; i < msg.u.sim_inp.num; ++i) {
+        mat.at(i, 0) = msg.u.sim_inp.evts[i].event_id;
+        mat.at(i, 1) = static_cast<double>(msg.u.sim_inp.evts[i].ts) / 1e9;
+    }
+    return mat;
+}
+
+Matrix ConnectionThread::doGetStimuliFromRT(int & first, int & last)
+{
+  static const Matrix empty(0, 4);
+
+  // query the count first to check sanity
+  msg.id = STIMULICOUNT;
+  sendToRT(msg);
+
+  int n_events = msg.u.fsm_events_count;
+
+  if (first < 0) first = 0;
+  if (last < 0) last = n_events-1;
+
+  if (first > -1 && first <= last && last < n_events) {
+      int desired = last-first+1, received = 0, ct = 0;
+      Matrix mat(desired, 4);
+
+
+      // keep 'downloading' the matrix from RT until we get all the transitions we require
+      while (received < desired) {
+            msg.id = GETSTIMULI;
+            msg.u.fsm_events.num = desired - received;
+            msg.u.fsm_events.from = first + received;
+            sendToRT(msg);
+            received += (int)msg.u.fsm_events.num;
+            for (int i = 0; i < (int)msg.u.fsm_events.num; ++i, ++ct) {
+              struct FSMEvent & e = msg.u.fsm_events.e[i];
+              mat.at(ct, 0) = double(e.type);
+              mat.at(ct, 1) = e.id;
+              mat.at(ct, 2) = e.val;
+              mat.at(ct, 3) = double(e.ts) / 1e9;
             }
       }
       return mat;

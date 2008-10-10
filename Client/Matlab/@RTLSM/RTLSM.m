@@ -26,7 +26,7 @@
 %
 function [sm] = RTLSM(host,port,which_sm)
   sm.MIN_SERVER_VERSION = 220080319; % update this on protocol change
-  sm.CLIENT_VERSION = 220080514; % FYI to server about our version
+  sm.CLIENT_VERSION = 220081007; % FYI to server about our version
   sm.host = 'localhost';
   sm.port = 3333;
   sm.fsm_id = 0;

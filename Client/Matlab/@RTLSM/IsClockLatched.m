@@ -18,7 +18,6 @@
 %                between external 'update' commands.  See
 %                ClockLatchPing.m and SetLockLatch.m.
 function [ret] = IsClockLatched(sm)
-    ChkConn(sm);
     str = DoQueryCmd(sm, 'IS CLOCK LATCHED');
     ret = sscanf(str, '%d');
     return;
