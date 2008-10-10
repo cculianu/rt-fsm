@@ -1,8 +1,8 @@
 #ifndef FSM_VERSION_H
 #define FSM_VERSION_H
 
-#define VersionSTR_Base "2008.10.09"
-#define VersionNUM      220081009UL
+#define VersionSTR_Base "2008.10.10"
+#define VersionNUM      220081010UL
 
 #ifdef EMULATOR
 #  define VersionSTR  VersionSTR_Base " EmbC.Emul"

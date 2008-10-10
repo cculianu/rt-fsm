@@ -8,7 +8,7 @@
 %                            works reliably with all boards.
 %
 function [ret] = GetAIMode(sm)
-    ChkConn(sm);
+    sm = ChkConn(sm);
     ret = DoQueryCmd(sm, 'GET AIMODE');
     return;
 end

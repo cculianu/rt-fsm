@@ -327,6 +327,7 @@ enum ShmMsgID
     GETCLOCKLATCHMS, /* query fsm clock latch amount */
     SETCLOCKLATCHMS, /* turn fsm clock latching on and set it to x MS */
     CLOCKLATCHPING, /* ping/reset the clock latch countdown */
+    CLOCKLATCHQUERY, /* ask what time the clock latch will initiate */
     CLOCKISLATCHED, /* returns true iff the fsm is not advancing due to 
                        its clock being latched */
     FASTCLOCK,        /* Set/Clear the 'fast clock' flag for the emulator --
@@ -445,7 +446,7 @@ struct ShmMsg {
       unsigned latch_is_on;
      /* For id == FASTCLOCK or ISFASTCLOCK */ 
       int fast_clock_flg;
-     /* For id == CLOCKLATCHPING */
+     /* For id == CLOCKLATCHPING CLOCKLATCHQUERY */
       long long ts_for_clock_latch;
 #endif
     } u;
@@ -552,7 +553,7 @@ struct ShmMsg {
 #endif
 
 #define FSM_SHM_NAME "FSMShm"
-#define FSM_SHM_MAGIC ((int)(0xf001011d)) /*< Magic no. for shm... 'fool011d'  */
+#define FSM_SHM_MAGIC ((int)(0xf001011e)) /*< Magic no. for shm... 'fool011e'  */
 #define FSM_SHM_SIZE (sizeof(struct Shm))
 #ifdef __cplusplus
 }

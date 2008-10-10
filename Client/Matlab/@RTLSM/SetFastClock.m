@@ -12,7 +12,10 @@
 %                functionality.  See GetSimEvents.m and EnqueueSimEvents.m.
 %
 function [sm] = SetFastClock(sm, flg)
-    ChkConn(sm);
+    if (~sm.is_emul),
+        error('This command is only supported on the FSM emulator');
+    end;
+    sm = ChkConn(sm);
     if (isempty(flg)), flg = 0; end;
     DoSimpleCmd(sm, sprintf('SET FAST CLOCK %d', flg));
     return;

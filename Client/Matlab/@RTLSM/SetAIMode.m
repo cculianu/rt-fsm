@@ -8,7 +8,7 @@
 %                            works reliably with all boards.
 %
 function [sm] = SetAIMode(sm, mode)
-    ChkConn(sm);
+    sm = ChkConn(sm);
     if (~strcmp(mode,'asynch') & ~strcmp(mode,'synch')),
         error('Second argument to SetAIMode must be one of ''asynch'' or ''synch''');
     end;

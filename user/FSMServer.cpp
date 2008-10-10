@@ -1367,6 +1367,13 @@ void *ConnectionThread::threadFunc(void)
                 if (!cmd_error)
                     sendToRT(msg);
             }
+        } else if (line.find("GET LATCH TIME T0 SECS") == 0) { // CLOCKLATCHQUERY
+            msg.id = CLOCKLATCHQUERY;
+            sendToRT(msg);
+            std::ostringstream os;
+            os << (double(msg.u.ts_for_clock_latch/1000LL)/1e6) << "\n";
+            sockSend(os.str());
+            cmd_error = false;
         } else if (line.find("CLOCK LATCH PING") == 0) { // CLOCKLATCHPING
             msg.id = GETRUNTIME;
             sendToRT(msg);
