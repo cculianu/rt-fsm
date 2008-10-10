@@ -47,6 +47,7 @@
 #include <linux/seq_file.h>
 #include <linux/random.h>
 #include <linux/kmod.h> /* for call_usermodehelper                     */
+#include <linux/sort.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
 #  error This sourcecode really requires Kernel 2.6.20 or newer!  Sorry!
@@ -170,6 +171,7 @@ static volatile struct FSMExtTimeShm *extTimeShm = 0; /* for external time synch
 
 #define JITTER_TOLERANCE_NS 60000
 #define MAX_HISTORY 65536 /* The maximum number of state transitions we remember -- note that the struct StateTransition is currently 16 bytes so the memory we consume (in bytes) is this number times 16! */
+
 #define DEFAULT_TASK_RATE 6000
 #define DEFAULT_AI_SAMPLING_RATE 10000
 #define DEFAULT_AI_SETTLING_TIME 4
@@ -351,7 +353,7 @@ static inline long Micro2Sec(long long micro, unsigned long *remainder);
 static inline long long timespec_to_nano(const struct timespec *);
 static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig);
 static inline void SET_EXT_TRIG(unsigned which, unsigned trig);
-static inline void doExtTrigOutput(unsigned which, unsigned trig);
+static inline void doExtTrigOutput(FSMID_t f, unsigned which, unsigned trig);
 /** Return nonzero on error */
 static int initializeFSM(FSMID_t f, struct FSMSpec *fsmspec_ptr);
 static void swapFSMs(FSMID_t);
@@ -379,6 +381,13 @@ struct StateHistory
   unsigned num_log_items; /* keeps track of variables logged by embedded C */
 };
 
+/** FSMEvents -- used with the GETSTIMULI FSM message type */
+struct FSMEvents
+{
+    FSMEvent events[MAX_HISTORY];
+    unsigned n_events;
+};
+
 struct RunState {
     /* TODO: verify this is smp-safe.                                        */
     
@@ -395,7 +404,12 @@ struct RunState {
     FSMID_t id; /* the ID of this RunState; links to embedded C's 'fsm' var */
 
     /* Bitset of the events that were detected for an fsm cycle.. cleared each task period */
-    unsigned long events_bits[(0x1UL<<(sizeof(unsigned short)*8))/(8*sizeof(unsigned long))+1];
+#define EVENTS_BITS_ARRAYLEN ( (0x1UL<<(sizeof(unsigned short)*8))/(8*sizeof(unsigned long))+1 ) /**< Used in fsm.c:struct RunState::events_bits as well as struct EventSet below */
+
+    unsigned long events_bits[EVENTS_BITS_ARRAYLEN];
+
+    /** Keeps track of the events that occurred since FSM reset. */
+    struct FSMEvents fsm_events;
 
     /* inherited from ai_bits and/or dio_bits, but overwritten by
        optional embedded-C event detection code */
@@ -477,6 +491,9 @@ struct RunState {
   unsigned pending_fsm_swap; /**< iff true, need to swap fsms on next state0
                                   crossing */
 
+  struct SimInpEvt sim_inp_evts[MAX_SIM_INP_EVTS];
+  int sim_inp_evt_cur, sim_inp_evt_end; /* Index into array: sim_inp_evt_cur%MAX_SIM_INP_EVTS iff sim_inp_evt_cur < sim_inp_evt_end */
+
   /* This *always* should be at the end of this struct since we don't clear
      the whole thing in initRunState(), but rather clear bytes up until
      this point! */
@@ -507,9 +524,18 @@ static inline void historyPush(FSMID_t, int event_id);
 static inline volatile struct VarLogItem *logItemAt(FSMID_t, unsigned);
 static inline volatile struct VarLogItem *logItemTop(FSMID_t);
 static inline void logItemPush(FSMID_t f, const char *n, double v);
+static inline const SimInpEvt *simInpEvtTop(FSMID_t f);
+static inline const SimInpEvt *simInpEvtAt(FSMID_t f, unsigned);
+static inline unsigned simInpEvtCount(FSMID_t f);
+static inline void simInpEvtPop(FSMID_t f);
+static inline void simInpEvtPush(FSMID_t f, const SimInpEvt *in);
+static inline void simInpEvtClear(FSMID_t f);
+static inline int simInpEvtCmp(const SimInpEvt *a, const SimInpEvt *b);
+static void fsmEventPush(FSMID_t f, short type, short id, int val);
 
 static int gotoState(FSMID_t, unsigned state_no, int event_id_for_history); /**< returns 1 if new state, 0 if was the same and no real transition ocurred, -1 on error */
 static void detectInputEvents(FSMID_t); /**< sets the bitfield array rs[f].events_bits of all the events detected -- each bit corresponds to a state matrix "in event column" position, eg center in is bit 0, center out is bit 1, left-in is bit 2, etc */
+static void detectSimulatedInputEvents(FSMID_t, int *got_timeout_flag); /**< sets the bitfield array rs[f].events_bits of all the simulated events detected -- each bit corresponds to a state matrix "in event column" position, eg center in is bit 0, center out is bit 1, left-in is bit 2, etc */
 static int doSanityChecksStartup(void); /**< Checks mod params are sane. */
 static int doSanityChecksRuntime(FSMID_t); /**< Checks FSM input/output params */
 static void doSetupThatNeededFloatingPoint(void);
@@ -599,7 +625,7 @@ static int emblib_printf(const char *format, ...) __attribute__ ((format (printf
 static int emblib_snprintf(char *buf, unsigned long sz, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
 static void emblib_sendPacket(unsigned fsm, int proto, const char *host, unsigned short port, const void *data, unsigned len);
 static void emblib_trigSchedWave(unsigned fsm_id, unsigned sched_wave_bits);
-static void emblib_trigExt(unsigned which, unsigned trig);
+static void emblib_trigExt(unsigned fsm_id, unsigned which, unsigned trig);
 /*-----------------------------------------------------------------------------*/
 
 int init (void)
@@ -2050,7 +2076,11 @@ static void *doFSM (void *arg)
              
              Note that we may have some events bits already 
              as part of the forced_event stuff above.  */
-          detectInputEvents(f);   
+          detectInputEvents(f);
+          /* Simulated input events get dequeued here and if they 
+             are scheduled to have run, also add them to the rs[f].events_bits
+             bitfield array. */
+          detectSimulatedInputEvents(f, &got_timeout);
           
           DEBUG_VERB("FSM %u Got input events mask %08x\n", f, *(unsigned *)rs[f].events_bits);
           
@@ -2071,10 +2101,11 @@ static void *doFSM (void *arg)
           
         }
         
-        if (got_timeout) 
-          /* Timeout expired, transistion to timeout_state.. */
-          gotoState(f, STATE_TIMEOUT_STATE(fsm, state), -1);
-        
+        if (got_timeout) {
+            fsmEventPush(f, FSM_EVT_TYPE_IN, -1, STATE_TIMEOUT_STATE(fsm, state));
+            /* Timeout expired, transistion to timeout_state.. */
+            gotoState(f, STATE_TIMEOUT_STATE(fsm, state), -1);
+        }
         /* Normal event transition code, keep popping ones off our 
            bitfield array, events_bits. */
         for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit((const unsigned long *)rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < ((int)NUM_INPUT_EVENTS(f)) && n_evt_loops < (int)NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
@@ -2146,6 +2177,50 @@ static inline volatile struct VarLogItem *logItemTop(FSMID_t f)
 {
   return logItemAt(f, NUM_LOG_ITEMS(f)-1);
 }
+static inline unsigned simInpEvtCount(FSMID_t f)
+{
+    int n_sim_evts = rs[f].sim_inp_evt_end - rs[f].sim_inp_evt_cur;
+    return n_sim_evts < 0 ? 0 : n_sim_evts;
+}
+static inline const SimInpEvt *simInpEvtTop(FSMID_t f)
+{
+    return simInpEvtAt(f, 0);
+}
+static inline const SimInpEvt *simInpEvtAt(FSMID_t f, unsigned off)
+{
+    int n_sim_evts = simInpEvtCount(f);
+    if (n_sim_evts > 0 && n_sim_evts <= MAX_SIM_INP_EVTS && ((int)off) < n_sim_evts) {
+        return (SimInpEvt *)(&rs[f].sim_inp_evts[ (rs[f].sim_inp_evt_cur+off)%MAX_SIM_INP_EVTS ]);
+    }
+    return 0;
+}
+static inline void simInpEvtPop(FSMID_t f)
+{
+    int n_sim_evts = rs[f].sim_inp_evt_end - rs[f].sim_inp_evt_cur;
+    if (n_sim_evts > 0) 
+        ++rs[f].sim_inp_evt_cur;
+}
+static inline void simInpEvtPush(FSMID_t f, const SimInpEvt *in)
+{
+    int n_sim_evts = rs[f].sim_inp_evt_end - rs[f].sim_inp_evt_cur;
+    if (n_sim_evts >= 0 && n_sim_evts < MAX_SIM_INP_EVTS) {
+        int pos = rs[f].sim_inp_evt_end++ % MAX_SIM_INP_EVTS;
+        memcpy((void *)(&rs[f].sim_inp_evts[pos]), in, sizeof(*in));
+    }
+}
+static inline void simInpEvtClear(FSMID_t f)
+{
+    rs[f].sim_inp_evt_end = rs[f].sim_inp_evt_cur = 0;
+}
+static inline int simInpEvtCmp(const SimInpEvt *a, const SimInpEvt *b)
+{
+    if (a && b) {
+        if (a->ts < b->ts) return -1;
+        else if (a->ts > b->ts) return 1;
+        return 0;
+    }
+    return 0;
+}
 
 static inline void transitionNotifyUserspace(FSMID_t f, volatile struct StateTransition *transition)
 {
@@ -2179,6 +2254,16 @@ static inline void historyPush(FSMID_t f, int event_id)
   rs[f].last_transition.event = transition->event_id;
   
   transitionNotifyUserspace(f, transition);
+}
+
+static void fsmEventPush(FSMID_t f, short type, short id, int val)
+{
+    volatile struct FSMEvent *evt 
+        = &rs[f].fsm_events.events[(rs[f].fsm_events.n_events++) % MAX_HISTORY];
+    evt->type = type;
+    evt->id = id;
+    evt->val = val;
+    evt->ts = rs[f].current_ts;
 }
 
 static inline void logItemPush(FSMID_t f, const char *n, double v)
@@ -2338,19 +2423,20 @@ static void doOutput(FSMID_t f)
   
   for (i = 0; i < FSM_NUM_OUTPUT_COLS(fsm); ++i) {
     struct OutputSpec *spec = OUTPUT_ROUTING(f,i);
+    unsigned o = 0;
     switch (spec->type) {
     case OSPEC_DOUT:
-      conts |= STATE_OUTPUT(fsm, state, i) << spec->from;
+      conts |= (o=STATE_OUTPUT(fsm, state, i)) << spec->from;
       break;
     case OSPEC_TRIG:
-      trigs |= STATE_OUTPUT(fsm, state, i) << spec->from;
+      trigs |= (o=STATE_OUTPUT(fsm, state, i)) << spec->from;
       break;
     case OSPEC_EXT:
       /* Do Ext 'virtual' triggers... */
-      doExtTrigOutput(spec->object_num, STATE_OUTPUT(fsm, state, i));
+      doExtTrigOutput(f, spec->object_num, (o=STATE_OUTPUT(fsm, state, i)));
       break;
     case OSPEC_SCHED_WAVE: 
-      doSchedWaveOutput(f, STATE_OUTPUT(fsm, state, i));
+      doSchedWaveOutput(f, (o=STATE_OUTPUT(fsm, state, i)));
       break;
     case OSPEC_TCP:
     case OSPEC_UDP:  /* write non-realtime TCP/UDP packet to fifo */
@@ -2360,7 +2446,7 @@ static void doOutput(FSMID_t f)
          state matrix though (in reconfigureIO) */
       if (!rs[f].last_ip_outs_is_valid[i] 
           || rs[f].last_ip_outs[i] != STATE_OUTPUT(fsm, state, i)) {
-        rs[f].last_ip_outs[i] = STATE_OUTPUT(fsm, state, i);
+        rs[f].last_ip_outs[i] = (o=STATE_OUTPUT(fsm, state, i));
         rs[f].last_ip_outs_is_valid[i] = 1;
         doNRTOutput(f, /* fsm id */
                     (spec->type == OSPEC_TCP) ? NRT_TCP : NRT_UDP,  /* type */
@@ -2374,6 +2460,7 @@ static void doOutput(FSMID_t f)
       }
       break;
     }
+    fsmEventPush(f, spec->type, i, o);
   }
 
   /* Do trigger outputs */
@@ -2495,9 +2582,22 @@ static void detectInputEvents(FSMID_t f)
       DEBUG_VERB("detectInputEvents set bit %d\n", event_id_edge_down);
       ++thresh_lo_ct[i]; /* tally this thresh crossing, either writes to ai_thresh_lo_ct or di_thresh_lo_ct*/
     }
-  }
+  } 
 }
 
+static void detectSimulatedInputEvents(FSMID_t f, int *got_timeout_flg)
+{
+    const struct SimInpEvt *sie;
+    while ( (sie = simInpEvtTop(f)) && sie->ts <= rs[f].current_ts ) {
+        if ( (sie->event_id < 0 || sie->event_id >= (int)NUM_INPUT_EVENTS(f))
+             && got_timeout_flg ) {
+            *got_timeout_flg = 1;
+        } else {
+            set_bit(sie->event_id, rs[f].events_bits);
+        }
+        simInpEvtPop(f);
+    }
+}
 
 static void dispatchEvent(FSMID_t f, unsigned event_id)
 {
@@ -2510,6 +2610,7 @@ static void dispatchEvent(FSMID_t f, unsigned event_id)
     return;
   }
   next_state = (event_id == NUM_INPUT_EVENTS(f)) ? STATE_TIMEOUT_STATE(fsm, state) : STATE_COL(fsm, state, event_id); 
+  fsmEventPush(f, FSM_EVT_TYPE_IN, event_id == NUM_INPUT_EVENTS(f) ? -1 : (int)event_id, next_state);
   gotoState(f, next_state, event_id);
 }
 
@@ -2607,7 +2708,13 @@ static void handleFifos(FSMID_t f)
 
     case LOGITEMS:
     case TRANSITIONS:
+    case GETSIMINPEVTS:
+    case GETSTIMULI:
         do_reply = 1; /* just reply that it's done */
+        break;
+
+    case ENQSIMINPEVTS:
+        do_reply = 1; 
         break;
         
     default:
@@ -2820,7 +2927,7 @@ static void handleFifos(FSMID_t f)
             break;
           }
         if (i < NUM_OUT_COLS(f)) /* otherwise we didn't find one */
-            doExtTrigOutput(which, msg->u.forced_triggers);
+            doExtTrigOutput(f, which, msg->u.forced_triggers);
         do_reply = 1;
       }
       break;
@@ -2893,6 +3000,39 @@ static void handleFifos(FSMID_t f)
                                         (see buddyTaskHandler()) */
         break;
 
+    case GETSIMINPEVTS:
+         BUDDY_TASK_PEND(GETSIMINPEVTS);
+        break;
+
+    case ENQSIMINPEVTS:
+         BUDDY_TASK_PEND(ENQSIMINPEVTS);
+        break;
+
+    case CLEARSIMINPEVTS:
+        simInpEvtClear(f);
+        do_reply = 1;
+        break;
+
+    case STIMULICOUNT:
+        msg->u.fsm_events_count = rs[f].fsm_events.n_events;
+        do_reply = 1;
+        break;
+        
+    case GETSTIMULI:  {
+        unsigned *from = &msg->u.fsm_events.from; /* Shorthand alias.. */
+        unsigned *num = &msg->u.fsm_events.num; /* alias.. */
+
+        if ( *from >= rs[f].fsm_events.n_events) 
+          *from = rs[f].fsm_events.n_events ? rs[f].fsm_events.n_events-1 : 0;
+        if (*num + *from > rs[f].fsm_events.n_events)
+          *num = rs[f].fsm_events.n_events - *from + 1;
+        
+        if (*num > MSG_MAX_EVENTS)
+            *num = MSG_MAX_EVENTS;
+        BUDDY_TASK_PEND(GETSTIMULI);
+    }
+        break;
+
 #ifdef EMULATOR
     case GETCLOCKLATCHMS: 
         msg->u.latch_time_ms = getLatchTimeNanos()/1000000L; 
@@ -2903,11 +3043,19 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;
         break;
     case CLOCKLATCHPING: 
-        latchCountdownReset();
+        latchCountdownReset(msg->u.ts_for_clock_latch);
         do_reply = 1;
         break;
     case CLOCKISLATCHED: 
         msg->u.latch_is_on = isClockLatched();
+        do_reply = 1;
+        break;
+    case FASTCLOCK:
+        setFastClock(msg->u.fast_clock_flg);
+        do_reply = 1;
+        break;
+    case ISFASTCLOCK:
+        msg->u.fast_clock_flg = isFastClock();
         do_reply = 1;
         break;
 #endif
@@ -3297,17 +3445,19 @@ static inline void UNSET_EXT_TRIG(unsigned which, unsigned trig)
 static inline void SET_EXT_TRIG(unsigned which, unsigned trig)
 {
   DEBUG_VERB("Virtual Trigger %d set for target %u\n", trig, which); 
-  FSM_EXT_TRIG(extTrigShm, which, trig); 
+  FSM_EXT_TRIG(extTrigShm, which, trig);  
 }
 
-static inline void doExtTrigOutput(unsigned which, unsigned t) 
+static inline void doExtTrigOutput(FSMID_t f, unsigned which, unsigned t) 
 {
+  (void)f;
   int trig = *(int *)&t;
   if (!trig) return;
   if (trig < 0) /* Is 'last' bit set? */ 
       UNSET_EXT_TRIG( which, -trig );
-    else 
+  else 
       SET_EXT_TRIG( which, trig ); 
+  
 }
 
 static inline void putDebugFifo(unsigned val)
@@ -3351,7 +3501,7 @@ static void processSchedWaves(FSMID_t f)
 
           id = SW_EXTOUT_ROUTING(f, wave);
           if ( id > 0 ) /* if it's routed to do ext trigs */
-            doExtTrigOutput(DEFAULT_EXT_TRIG_OBJ_NUM(f), id); /* trigger sound, etc */
+            doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), id); /* trigger sound, etc */
               
           w->edge_up_ts = 0; /* mark this component done */
     }
@@ -3373,7 +3523,7 @@ static void processSchedWaves(FSMID_t f)
 
           id = SW_EXTOUT_ROUTING(f, wave);
           if ( id > 0 ) /* if it's routed to do ext trigs */
-            doExtTrigOutput(DEFAULT_EXT_TRIG_OBJ_NUM(f), -id); /* untrigger sound, etc */
+            doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), -id); /* untrigger sound, etc */
 
           w->edge_down_ts = 0; /* mark this wave component done */
     } 
@@ -3407,8 +3557,9 @@ static void processSchedWavesAO(FSMID_t f)
       int evt_col = w->evt_cols[w->cur];
       lsampl_t samp = w->samples[w->cur];
       writeAO(w->aoline, samp); /* NB this function does checking to make sure data write is sane */
-      if (evt_col > -1 && evt_col <= (int)NUM_IN_EVT_COLS(f))
+      if (evt_col > -1 && evt_col <= (int)NUM_IN_EVT_COLS(f)) {
         set_bit(evt_col, rs[f].events_bits);
+      }
       w->cur++;
     } else { /* w->cur >= w->nsamples, so wave ended.. unschedule it. */
       scheduleWaveAO(f, wave, -1);
@@ -3525,7 +3676,7 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
           id = SW_EXTOUT_ROUTING(f, wave);
           
           if (id > 0) /* if it's routed to play sounds, untrigger sound */
-              doExtTrigOutput(DEFAULT_EXT_TRIG_OBJ_NUM(f), -id);
+              doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), -id);
               
     }
     if (do_chan > -1 && w->end_ts && w->end_ts <= rs[f].current_ts)
@@ -3724,17 +3875,84 @@ static void buddyTaskHandler(void *arg)
                     sizeof(struct StateTransition));
     }
     break;
+  case GETSTIMULI: {
+        unsigned const from = msg->u.fsm_events.from; /* Shorthand alias.. */
+        unsigned const num = msg->u.fsm_events.num; /* alias.. */
+        unsigned i;
+
+        for (i = 0; i < num; ++i)
+            memcpy((void *)&msg->u.fsm_events.e[i],
+                    (const void *)&rs[f].fsm_events.events[(from + i) % MAX_HISTORY],
+                    sizeof(struct FSMEvent));
+    }
+    break;
 
   case LOGITEMS: {
         unsigned const from = msg->u.log_items.from; /* Shorthand alias.. */
         unsigned const num = msg->u.log_items.num; /* alias.. */
         unsigned i;
-
+        
         for (i = 0; i < num; ++i)
             memcpy((void *)&msg->u.log_items.items[i],
                     (const void *)logItemAt(f, from + i),
                     sizeof(struct VarLogItem));
     }
+    break;
+  case GETSIMINPEVTS: {
+        int wasvalid = rs[f].valid;
+        unsigned i, ct;
+        rs[f].valid = 0;
+        ct = simInpEvtCount(f);
+        DEBUG_VERB("simInpEvtCount = %u\n", ct);
+        for (i = 0; i < ct; ++i) {     
+            const SimInpEvt * sie = simInpEvtAt(f, i);
+            if (sie) {
+                memcpy((void *) (&msg->u.sim_inp.evts[i]),
+                       (const void *) sie,
+                       sizeof(*sie));
+            } else
+                break;
+        }
+        msg->u.sim_inp.num = i;
+        rs[f].valid = wasvalid;
+    }
+    break;
+  case ENQSIMINPEVTS: {
+      /* we need to make sure the resulting queue of Simulated Input Events
+         are sorted so what we do is copy the ones from the kernel RunState 
+         to the msg's shm temporarily, 
+         sort the whole thing, 
+         then copy them back to kernel RunState as one big sorted queue 
+         of SimInpEvt structs */
+      int wasvalid = rs[f].valid;
+      const SimInpEvt *sie;
+      unsigned i;
+      rs[f].valid = 0; /* lock kernel FSM so the simInpEvts don't move from 
+                          underneath us -- hacky but we have to do this for 
+                          correctness */
+      /* pop off the SimInpEvt structs 1 by 1 and put them into the shm
+         buffer temporarily (this is so they all live in one place for 
+         sort() to be able to sort them) */
+      while ( (sie = simInpEvtTop(f)) && msg->u.sim_inp.num < MAX_SIM_INP_EVTS ) {
+          memcpy((void *)&msg->u.sim_inp.evts[msg->u.sim_inp.num++],
+                 (const void *)sie,
+                 sizeof(*sie));
+          simInpEvtPop(f);
+      }
+      /* now that they all live in msg->u.sim_inp_evts, sort them in place there */
+      sort((void *)msg->u.sim_inp.evts, msg->u.sim_inp.num, sizeof(SimInpEvt), (int (*)(const void *, const void *))simInpEvtCmp, 0);
+      simInpEvtClear(f);
+      /* .. and finally, push them back into the struct RunState */
+      for (i = 0; i < msg->u.sim_inp.num; ++i) {
+          sie = &msg->u.sim_inp.evts[i];
+          DEBUG_VERB("sie->event_id = %d, sie->ts = %s\n", sie->event_id, int64_to_cstr(sie->ts));
+          simInpEvtPush(f, sie);
+      }
+#ifdef EMULATOR
+      latchCountdownReset(msg->u.sim_inp.ts_for_clock_latch);
+#endif
+      rs[f].valid = wasvalid;
+  }
     break;
   } /* end switch */
 
@@ -4062,9 +4280,9 @@ static void emblib_trigSchedWave(unsigned fsm_id, unsigned sched_wave_bits)
     if (fsm_id < NUM_STATE_MACHINES)
         doSchedWaveOutput(fsm_id, sched_wave_bits);
 }
-static void emblib_trigExt(unsigned which, unsigned trig)
+static void emblib_trigExt(unsigned fsm_id, unsigned which, unsigned trig)
 {
-    doExtTrigOutput(which, trig);
+    doExtTrigOutput(fsm_id, which, trig);
 }
 
 static void swapFSMs(FSMID_t f)
@@ -4292,5 +4510,9 @@ void fsm_get_stats(unsigned f, struct FSMStats *stats)
     stats->readyForTrial = rs[f].ready_for_trial_flg;
     stats->activeSchedWaves = rs[f].active_wave_mask;
     stats->activeAOWaves = rs[f].active_ao_wave_mask;
+    stats->isFastClk = isFastClock();
+    stats->isClockLatched = isClockLatched();
+    stats->clockLatchTime = ((double)getLatchTimeNanos())/1e9;
+    stats->enqInpEvts = simInpEvtCount(f);
 }
 #endif

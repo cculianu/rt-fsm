@@ -135,3 +135,65 @@ const std::string & TmpPath()
     return tmp;
 }
 
+unsigned countBits(int32_t *dwords,
+                   unsigned ndwords)
+{
+    unsigned ret = 0, v;
+    for (unsigned i = 0; i < ndwords; ++i) {
+        v = dwords[i];
+        v = v - ((v >> 1) & 0x55555555);  // reuse input as temporary
+        v = (v & 0x33333333) + ((v >> 2) & 0x33333333);     // temp
+        ret += ((v + (v >> 4) & 0xF0F0F0F) * 0x1010101) >> 24; // count
+    }
+    return ret;
+}
+
+static inline int __ffs(int x) { return ffs(x)-1; }
+#define BITS_PER_LONG (sizeof(long)*8)
+#define BITOP_WORD(nr)          ((nr) / BITS_PER_LONG)
+/**
+ * findNextBit - find the next set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search, in number of bits
+ */
+unsigned long findNextBit(const unsigned long *addr, 
+                          unsigned long size,
+                          unsigned long offset)
+{
+
+        const unsigned long *p = addr + BITOP_WORD(offset);
+        unsigned long result = offset & ~(BITS_PER_LONG-1);
+        unsigned long tmp;
+
+        if (offset >= size)
+                return size;
+        size -= result;
+        offset %= BITS_PER_LONG;
+        if (offset) {
+                tmp = *(p++);
+                tmp &= (~0UL << offset);
+                if (size < BITS_PER_LONG)
+                        goto found_first;
+                if (tmp)
+                        goto found_middle;
+                size -= BITS_PER_LONG;
+                result += BITS_PER_LONG;
+        }
+        while (size & ~(BITS_PER_LONG-1)) {
+                if ((tmp = *(p++)))
+                        goto found_middle;
+                result += BITS_PER_LONG;
+                size -= BITS_PER_LONG;
+        }
+        if (!size)
+                return result;
+        tmp = *p;
+
+found_first:
+        tmp &= (~0UL >> (BITS_PER_LONG - size));
+        if (tmp == 0UL)         /* Are any bits set? */
+                return result + size;   /* Nope. */
+found_middle:
+        return result + __ffs(tmp);
+}

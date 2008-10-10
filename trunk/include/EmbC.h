@@ -98,7 +98,7 @@ struct EmbC
   int (*bypassDOut)(unsigned,unsigned);
   
   void (*sendPacket)(uint fsm, int proto, const char *, unsigned short, const void *, unsigned);
-  void (*trigExt)(unsigned, unsigned);
+  void (*trigExt)(uint fsm, unsigned, unsigned);
   void (*trigSchedWave)(unsigned, unsigned);
   
   // prints a message (most likely to the kernel log buffer)
@@ -344,7 +344,7 @@ static inline void sendUDPPacket(const char *host, unsigned short port, const vo
 static inline void sendUDPPacketStr(const char *host, unsigned short port, const char *str) { sendUDPPacket(host, port, str, strlen(str)); }
 /** Call the external triggerable module passing it data 'which' and trigger 'trig'.  
     This is typically how you trigger sound! */
-static inline void triggerExt(unsigned which, int trig) { __embc->trigExt(which, trig); }
+static inline void triggerExt(unsigned which, int trig) { __embc->trigExt(fsm(), which, trig); }
 /** Synonym for triggerExt() but named triggerSound() for convenience */
 static inline void triggerSound(unsigned card, unsigned snd) { triggerExt(card, snd); }
 static inline void untriggerSound(unsigned card, unsigned snd) { triggerExt(card, -(int)snd); }
