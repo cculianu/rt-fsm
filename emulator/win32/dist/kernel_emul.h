@@ -147,11 +147,11 @@ extern "C" {
 #   define TIMER_ABSTIME  1
 #endif
 #ifdef NEED_RT_DEFINES
-#   define clock_nanosleep clock_nanosleep_emul
 #   define clock_gettime   clock_gettime_emul
 #   define lldiv lldiv_custom
 #endif
-    int clock_nanosleep_emul(int clkid, int flags, const struct timespec *req, struct timespec *rem);
+    typedef void (*FifoHandlerFn_t)(unsigned);
+    void clock_wait_next_period_with_latching(FifoHandlerFn_t, unsigned num_state_machines);
     int clock_gettime_emul(int clkid, struct timespec *ts);
     void timespec_add_ns(struct timespec *ts, long ns);
 
@@ -162,8 +162,11 @@ extern "C" {
         double ts; /**< in seconds */
         unsigned state;
         unsigned transitions;
-        int isPaused, isValid, readyForTrial;
+        int isPaused, isValid, readyForTrial, isFastClk, isClockLatched;
         unsigned activeSchedWaves, activeAOWaves;
+        double clockLatchTime; ///< in secs
+        unsigned enqInpEvts; ///< the number of input events currently enqueued
+        double latchAt; ///< the time when the clock latch will occur
     };
 
     /* implemented in fsm.c for emulator only */
@@ -171,6 +174,39 @@ extern "C" {
 
     extern const char *GetTmpPath(void);
 
+    // clock latch stuff...
+    /** 
+        iff nonzero, make the fsm advances by at most 'latchTimeNanos' 
+        nanoseconds (in emulator time) before pausing and waiting for 
+        a latchCountdownReset() call, at which point the emulator is resumed.  
+        So at most latchTimeNanos ns can elapse between latchCountdownReset() 
+        calls.  */
+    extern long getLatchTimeNanos(void);
+    extern void setLatchTimeNanos(long nanos);
+    /// if latchTimeNanos is nonzero, then this needs to be called periodically
+    /// otherwise the emulator will pause after latchTimeNanos ns has elapsed.
+    /// in other words, this resets the latch counter.
+    /// @param: ts_when_latch_starts is a timestamp in emulator time (nanos)
+    ///         when the clock latch is to 'start' counting down
+    ///         the clock latch will actually assert at time:
+    ///          ts_when_latch_starts + getLatchTimeNanos()
+    ///         -1 means 'current time'    
+    extern void latchCountdownReset(long long ts_when_latch_starts);
+    /// returns true iff the clock is currently latched (paused) 
+    /// if true, then latchCountdownReset() needs to be called to continue
+    /// advancing FSM time
+    extern int  isClockLatched(void);
+    /// the time the clock latch will initiate
+    extern long long getLatchT0Nanos(void);
+
+    /* emulate linux's sort by calling C library's qsort() */
+    static inline void sort(void *base, size_t nmemb, size_t size, int (*cmp)(const void *, const void *), void *dummy) { (void)dummy; qsort(base, nmemb, size, cmp); }
+
+    /// returns true iff FSM is running in 'fast clock' mode
+    extern int isFastClock(void);
+    /// set/unset 'fast clock' mode for the FSM
+    extern void setFastClock(int on_off);
+    
 #ifdef __cplusplus
 }
 #endif
@@ -200,7 +236,7 @@ namespace Emul {
     void setModuleParm(const std::string & name, int val);
     void setModuleParm(const std::string & name, const char *val);
 
-    /// returns the emulated FSM clock time in seconds
+    /// returns the emulated FSM clock time in nanoseconds
     /// -- the emulated fsm clock only advances with calls to 
     /// heartBeat() below... and even then it only advances by
     /// quanta that are multiples of the task_rate
