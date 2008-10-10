@@ -1765,7 +1765,20 @@ bool ConnectionThread::matrixToRT(const StringMatrix & m,
               std::string thisCell = trimWS(m.at(r,c));
               if (!thisCell.length()) thisCell = "0";
               if ( 0 == regexec(&isNumericRE, thisCell.c_str(), 0, 0, 0) ) {
-                  numArrayStrm << thisCell << (c == TIMEOUT_TIME_COL(&msg.u.fsm) ? "*1000000UL" : "") << ", ";
+                  if (c == TIMEOUT_TIME_COL(&msg.u.fsm)) {
+                      // timeout times are in microseconds, 
+                      // so transform number to micros
+                      // note we must do this here because there is a 
+                      // bug in tcc on windows!
+                      std::istringstream is(thisCell);
+                      double d = 0.;
+                      is >> d;
+                      d *= 1e6;
+                      std::ostringstream os;
+                      os << static_cast<unsigned long>(d);
+                      thisCell = os.str();
+                  }
+                  numArrayStrm << thisCell << ", ";
                   ++numericsCt;
               } else {
                   numArrayStrm << "0/*C Expr Omitted*/, ";
