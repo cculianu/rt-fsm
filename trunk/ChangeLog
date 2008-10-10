@@ -1,3 +1,58 @@
+2008-10-10 21:32  calin.culianu
+
+	* [r162]
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/Resources/kernel_emul.h,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe,
+	  emulator/win32/dist/kernel_emul.h, user/FSMServer.cpp:
+	  
+	  - Fixed bug reported by Dan with FSM states not advancing
+	  correctly if timeout < 1.0 on Windows only (due to bug in tcc
+	  compiler)
+	  - Fixed some bugs with clock latch
+	  - Fixed build errors on Windows and OSX
+
+2008-10-10 18:52  calin.culianu
+
+	* [r161] Client/Matlab/@RTLSM/ChkConn.m,
+	  Client/Matlab/@RTLSM/ChkVersion.m,
+	  Client/Matlab/@RTLSM/ClockLatchPing.m,
+	  Client/Matlab/@RTLSM/Contents.m,
+	  Client/Matlab/@RTLSM/DoLinesCmd.m,
+	  Client/Matlab/@RTLSM/DoQueryCmd.m,
+	  Client/Matlab/@RTLSM/DoQueryMatrixCmd.m,
+	  Client/Matlab/@RTLSM/DoSimpleCmd.m,
+	  Client/Matlab/@RTLSM/EnqueueSimulatedInputEvents.m,
+	  Client/Matlab/@RTLSM/GetAIMode.m,
+	  Client/Matlab/@RTLSM/GetClockLatch.m,
+	  Client/Matlab/@RTLSM/GetLatchTimeStart.m,
+	  Client/Matlab/@RTLSM/IsClockLatched.m,
+	  Client/Matlab/@RTLSM/IsFastClock.m, Client/Matlab/@RTLSM/RTLSM.m,
+	  Client/Matlab/@RTLSM/SetAIMode.m,
+	  Client/Matlab/@RTLSM/SetClockLatch.m,
+	  Client/Matlab/@RTLSM/SetFastClock.m, emulator/ControlWin.cpp,
+	  emulator/kernel_emul.cpp, emulator/kernel_emul.h,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMEmulator,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/FSMServer,
+	  emulator/osx-x86/FSMEmulator.app/Contents/MacOS/SoundServer,
+	  emulator/win32/dist/FSMEmulator.exe,
+	  emulator/win32/dist/FSMServer.exe,
+	  emulator/win32/dist/SoundServer.exe, include/FSM.h,
+	  include/Version.h, kernel/fsm.c, user/FSMServer.cpp,
+	  user/Util.cpp:
+	  
+	  - Bugfix for clock latching which was working incorrectly
+	  - Full rebuild for osx and win32
+
+2008-10-10 03:16  calin.culianu
+
+	* [r160] ChangeLog:
+	  
+	  Updated ChangeLog
+
 2008-10-10 03:16  calin.culianu
 
 	* [r159] Client/Matlab/@RTLSM/ClearSimulatedInputEvents.m,
