@@ -1331,7 +1331,9 @@ void *ConnectionThread::threadFunc(void)
                         }
                         msg.id = ENQSIMINPEVTS;
                         msg.u.sim_inp.num = m;
+#ifdef EMULATOR
                         msg.u.sim_inp.ts_for_clock_latch = static_cast<long long>(ts*1e9);
+#endif
                         for (unsigned i = 0; i < m; ++i) {
                             msg.u.sim_inp.evts[i].event_id = static_cast<int>(mat.at(i, 0));
                             msg.u.sim_inp.evts[i].ts = static_cast<long long>(mat.at(i, 1) * 1e9);
