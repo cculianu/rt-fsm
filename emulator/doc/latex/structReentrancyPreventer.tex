@@ -1,0 +1,52 @@
+\section{ReentrancyPreventer Struct Reference}
+\label{structReentrancyPreventer}\index{ReentrancyPreventer@{ReentrancyPreventer}}
+A helper class that helps prevent reentrancy into certain functions.  
+
+
+\subsection*{Public Member Functions}
+\begin{CompactItemize}
+\item 
+{\bf ReentrancyPreventer} ()
+\item 
+{\bf $\sim$ReentrancyPreventer} ()
+\item 
+{\bf operator bool} () const \label{structReentrancyPreventer_2f9b7344c32f4096b5f73211fb5d3938}
+
+\begin{CompactList}\small\item\em Returns true if the global counter is 1 (that is, only one globally active instance of this class exists throughout the application), and false otherwise. If false is returned, you can then abort your function early as a reentrancy condition has been detected. \item\end{CompactList}\end{CompactItemize}
+\subsection*{Static Public Attributes}
+\begin{CompactItemize}
+\item 
+static volatile int \textbf{ct} = 0\label{structReentrancyPreventer_b81c1eb29d2181821f7aec842c065303}
+
+\end{CompactItemize}
+
+
+\subsection{Detailed Description}
+A helper class that helps prevent reentrancy into certain functions. 
+
+Mainly EmulApp::loadStim(), EmulApp::unloadStim(), and EmulApp::pickOutputDir() make use of this class to prevent recursive calls into themselves.
+
+Functions that want to be mutually exclusive with respect to each other and non-reentrant with respect to themselves need merely construct an instance of this class as a local variable, and then reentrancy into the function can be guarded by checking against this class's operator bool() function. 
+
+Definition at line 561 of file EmulApp.cpp.
+
+\subsection{Constructor \& Destructor Documentation}
+\index{ReentrancyPreventer@{ReentrancyPreventer}!ReentrancyPreventer@{ReentrancyPreventer}}
+\index{ReentrancyPreventer@{ReentrancyPreventer}!ReentrancyPreventer@{ReentrancyPreventer}}
+\subsubsection{\setlength{\rightskip}{0pt plus 5cm}ReentrancyPreventer::ReentrancyPreventer ()\hspace{0.3cm}{\tt  [inline]}}\label{structReentrancyPreventer_7f5d7b40387ab9edf6575602b2121310}
+
+
+Increments a global counter. The global counter is 1 if only 1 instance of this class exists throughout the application, and $>$1 otherwise. 
+
+Definition at line 566 of file EmulApp.cpp.\index{ReentrancyPreventer@{ReentrancyPreventer}!$\sim$ReentrancyPreventer@{$\sim$ReentrancyPreventer}}
+\index{$\sim$ReentrancyPreventer@{$\sim$ReentrancyPreventer}!ReentrancyPreventer@{ReentrancyPreventer}}
+\subsubsection{\setlength{\rightskip}{0pt plus 5cm}ReentrancyPreventer::$\sim$ReentrancyPreventer ()\hspace{0.3cm}{\tt  [inline]}}\label{structReentrancyPreventer_83ee912ed2df8e2d8ff6d8bd656b79a9}
+
+
+Decrements the global counter. If it reaches 0 this was the last instance of this class and there are no other ones active globally. 
+
+Definition at line 569 of file EmulApp.cpp.
+
+The documentation for this struct was generated from the following file:\begin{CompactItemize}
+\item 
+EmulApp.cpp\end{CompactItemize}

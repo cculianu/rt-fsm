@@ -1,0 +1,4 @@
+<area shape="rect" href="$classLog.html" title="Super class of Debug, Warning, Error classes." alt="" coords="7,56,49,83">
+<area shape="rect" href="$classDebug.html" title="Stream&#45;like class to print a debug message to the app&#39;s console window Example:..." alt="" coords="105,5,167,32">
+<area shape="rect" href="$classError.html" title="Stream&#45;like class to print an error message to the app&#39;s console window Example:..." alt="" coords="111,56,161,83">
+<area shape="rect" href="$classWarning.html" title="Stream&#45;like class to print a warning message to the app&#39;s console window." alt="" coords="100,107,172,133">

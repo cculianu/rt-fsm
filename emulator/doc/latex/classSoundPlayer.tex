@@ -1,0 +1,38 @@
+\section{SoundPlayer Class Reference}
+\label{classSoundPlayer}\index{SoundPlayer@{SoundPlayer}}
+{\tt \#include $<$SoundPlayer.h$>$}
+
+\subsection*{Public Member Functions}
+\begin{CompactItemize}
+\item 
+\textbf{SoundPlayer} (const QString \&filename, QObject $\ast$parent=0, bool loops=false)\label{classSoundPlayer_52bb3dd37bb3af6b78d42ede27ccd9a6}
+
+\item 
+QString \textbf{fileName} () const \label{classSoundPlayer_09a11aa0c28e1ec749cb55ae1981a161}
+
+\item 
+bool \textbf{loops} () const \label{classSoundPlayer_3e938ca6d719d32a58fae3f2081bef09}
+
+\item 
+void \textbf{play} ()\label{classSoundPlayer_15133f4990b8f8375edd0f0e6a8aa25a}
+
+\item 
+void \textbf{stop} ()\label{classSoundPlayer_11d2fd57fbb9b0b386451733f9cca5f2}
+
+\end{CompactItemize}
+\subsection*{Classes}
+\begin{CompactItemize}
+\item 
+struct \textbf{Impl}
+\end{CompactItemize}
+
+
+\subsection{Detailed Description}
+Abstracts out the soundplayer since on OSX we use Phonon and on all other platforms we use QSound. 
+
+Definition at line 8 of file SoundPlayer.h.
+
+The documentation for this class was generated from the following files:\begin{CompactItemize}
+\item 
+SoundPlayer.h\item 
+SoundPlayer.cpp\end{CompactItemize}
