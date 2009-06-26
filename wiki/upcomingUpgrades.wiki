@@ -15,4 +15,6 @@ Three main things are being done:
   * State transitions will now be able to occur on conditions (e.g., "is input line 3 high?") in addition to the current capacity, punctate events (e.g., "did line 3 just change from low to high?")
   * A general framework to easily add new transition types is being constructed
 
-These enhancements should be posted in a week or two -- beginning of July.
+All of these are on the non-embedded C capable side of the code. We'll get to the embedded C later.
+
+The enhancements should be posted in a week or two -- beginning of July.
