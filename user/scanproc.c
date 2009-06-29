@@ -26,7 +26,6 @@
 #include <string.h>
 #include <errno.h>
 #ifdef OS_OSX
-#include <kvm.h>
 #include <sys/sysctl.h>
 #include <fcntl.h>
 #include <stdbool.h>
