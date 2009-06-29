@@ -66,6 +66,7 @@
 #include "Mutex.h"
 #include "Util.h"
 
+
 #if defined(OS_CYGWIN) || defined(OS_OSX) || defined(OS_WINDOWS)
 namespace {
   /* Cygwin (and OSX?) lacks this function, so we will emulate it using 
@@ -253,6 +254,18 @@ struct FSMSpecific
   unsigned daqNumChans, daqMaxData, aoMaxData;
   double daqRangeMin, daqRangeMax;
 
+  unsigned int dio_scheduled_wave_num_columns;  /* Default is for DIO scheduled waves not to have the 'loop' column;
+						   If the 'loop' column is to be used, then it is the 9th column, 
+						   and this variable should be set to 9. The need for this variable
+						   exists only here in FSMServer.cpp. By the time SchedWave specs
+						   are sent to fsm.c, we've gotten rid of the silly matrix 
+						   message-passing, and we pass proper sensible C structs. 
+						   Current legal values are 8, 9, 10, or 11: the last 3 are loop, 
+						   wave_ids to trigger, and wave_ids to untrigger
+						*/
+  bool use_happenings;                          /* Default is false. When this is true, we expect a happenings
+						   spec and a happenings list to be sent with the state matrix */
+
   void *transNotifyThrFun();
   void *daqThrFun();
   void *nrtThrFun();
@@ -351,7 +364,16 @@ private:
   static void parseStringTable(const char *stable, StringMatrix &m);
   static std::string genStringTable(const StringMatrix &m);
   static std::string genStringTable(const Matrix &m);
-  
+
+  std::ostringstream error_string;  /* used for error messages to be sent back to Client if error during reading */
+
+  int  ConnectionThread::mapHappName2ID(std::string myHappSpecName);
+  bool ConnectionThread::sockReadHappeningsSpecs();
+  bool ConnectionThread::sockReadHappeningsList();
+  /* Check whether happening specs user asked for are legal, and map detectorFunctionNames to detectorFunctionNumbers: */
+  bool happeningSpecsAreLegal(int num_specs, happeningUserSpec *happeningSpecs);
+
+
 
   // the extern "C" wrapper func passed to pthread_create
   friend void *threadfunc_wrapper(void *);
@@ -586,6 +608,11 @@ static void init()
   } else 
       throw Exception("Could not determine Linux kernel version!  Is this Linux??");
 #endif
+
+  for (int f = 0; f < NUM_STATE_MACHINES; ++f) {
+    fsms[f].dio_scheduled_wave_num_columns = 8;        /* Initialize default of 8 items for sched wave spec */
+    fsms[f].use_happenings                  = false;
+  }
   attachShm();
   openFifos();
   createTransNotifyThreads();
@@ -765,6 +792,214 @@ int main(int argc, char *argv[])
   return ret;
 }
 
+
+
+
+
+bool ConnectionThread::happeningSpecsAreLegal(int num_specs, happeningUserSpec *happeningSpecs) 
+/*
+  Checks that all happeningUserSpecs have unique happIds, and that they all use existing detectorFunctionNames; 
+  in this process, also fills in the detectorFunctionNumber for each of the user specs. Returns true if all ok.
+ */
+{
+  int i,j; bool foundspec;
+  for( i=0; i<num_specs; i++ ) {
+    for( j=0; j<i; j++ ) {  /* This j loop checks for duplicate happIds */
+      if ( happeningSpecs[j].happId == happeningSpecs[i].happId ) { error_string.str(""); 
+	error_string << "ERROR! I'm being sent duplicate happening ID ";
+	error_string << happeningSpecs[i].happId << " in the happening specs!!" << std::endl;
+	return false;
+      }
+    } /* end for j */
+
+    std::string str1, str2;
+    foundspec = false;
+    for( j=0; j<NUM_HAPPENING_DETECTOR_FUNCTIONS; j++ ) { /* This j loop checks that all requested 
+							     detectorsFunctioNames exist internally */
+      str1 = happeningDetectorsList[j].detectorFunctionName;
+      str2 = happeningSpecs[i].detectorFunctionName;
+      if (str1 == str2) {
+	foundspec = true;
+	happeningSpecs[i].detectorFunctionNumber = j;
+      }
+    }
+    if (!foundspec) { error_string.str("");
+      error_string << "ERROR! All detectorFunctionNames must be names known internally-- " 
+		   << " I don't know \"" << happeningSpecs[i].detectorFunctionName 
+		   << "\", call GET HAPPENING SPECS for a list of known functions " << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
+bool ConnectionThread::sockReadHappeningsSpecs()
+/* return TRUE if read was fine*/
+{
+  // Log() << "Carlos: Got 'SET HAPPENINGS SPEC'" << std::endl;
+  int i, num_specs = 0; std::string line;
+  if ((line = sockReceiveLine()).length() == 0) { error_string.str("");
+    error_string << "ERROR: expecting a line with the number of happening specs and not finding it!" << std::endl;
+    return false;
+  }
+   
+  std::string::size_type pos = line.find_first_of("0123456789");
+  if (pos == std::string::npos) { error_string.str(""); 
+    error_string << "ERROR:expected a number (total number of happenings), but didn't find it." << std::endl;
+    return false;
+  }
+
+  std::stringstream s(line.substr(pos));
+  s >> num_specs;
+  // Log() << "Carlos: I'm told to expect " << num_specs << " happening specs " << std::endl;
+  if (num_specs > MAX_HAPPENING_SPECS) { error_string.str(""); 
+    error_string << "ERROR: max number of happening specs is fixed at " << MAX_HAPPENING_SPECS << 
+      " but you're telling me you want to send me " << num_specs << std::endl;
+    return false;
+  }
+
+  msg.u.fsm.plain.numHappeningSpecs = num_specs;
+  static struct happeningUserSpec *myspec = NULL;
+  for ( i=0; i<num_specs; i++ ) { /* iterate over happening specs */
+    if ((line = sockReceiveLine()).length() == 0) {  /* it's an error if we couldn't read the line */
+      error_string.str(""); 
+      error_string << "ERROR: expected to read a line for happening spec " << i << " but didn't get it " << std::endl;
+      return false; 
+    }
+
+    /* FINISH CHECKING BOTH OSCKREADHAPP FNS AND MAKE SURE THEIR BOOL RETURNS AND ERROR STRINGS ARE HANDLED OK */
+    /* 2nD SOCKREADFN NEEDS CHECKING FOR EWRROR STRUNG */
+
+    std::stringstream s(line);
+    myspec = &(msg.u.fsm.plain.happeningSpecs[i]);
+    // Log() << "Carlos: got line \"" << line << "\" now in stringstream \"" << s << "\"." << std::endl;
+    s >> myspec->name >> myspec->detectorFunctionName >>
+      myspec->inputNumber >> myspec->happId;
+    // Log() << "Carlos: Got happening space with name \"" << myspec->name << "\", detectorFunctionName \"" << myspec->detectorFunctionName << "\", inputNumber " << myspec->inputNumber << ", happId " << myspec->happId << std::endl;
+  } /* end for ( i=0 ... iteration over happening specs */
+
+  /* Have received all happening specs, now go through them to check they are legal, and map detectorFunctioNames
+     to detectorFunctionNumbers: */
+  if (!happeningSpecsAreLegal(num_specs, msg.u.fsm.plain.happeningSpecs)) return false;
+
+  return true;
+}
+
+int ConnectionThread::mapHappName2ID(std::string myHappSpecName)
+/* Assumes that the happening specs in msg are legal. Runs through them to find which one
+   has a name matching myHappSecName; if found, returns its position in the list. If not
+   found, returns -1. */
+{
+  int k; 
+  for( k=0; k<(int)msg.u.fsm.plain.numHappeningSpecs; k++ )
+    if (myHappSpecName == msg.u.fsm.plain.happeningSpecs[k].name) return k;
+  return -1;
+}
+
+bool ConnectionThread::sockReadHappeningsList()
+/* returns TRUE if read was successful */
+{
+  Log() << "Carlos: Going into 'SET HAPPENINGS LIST'" << std::endl;
+
+  int i, num_happenings = 0;  std::string line;
+  if ((line = sockReceiveLine()).length() == 0) { error_string.str("");
+    error_string << "ERROR: expecting a line with the total number of happenings specs and not finding it!" << std::endl;
+    return false;
+  }
+  std::string::size_type pos = line.find_first_of("0123456789");
+  if (pos == std::string::npos) { error_string.str("");
+    error_string << "ERROR:expected a number (total number of happenings), but didn't find it." << std::endl;
+    return false;
+  }
+
+  std::stringstream s(line.substr(pos));
+  s >> num_happenings;
+  Log() << "Will read " << num_happenings << " total happenings " << std::endl;
+  if (num_happenings > MAX_HAPPENING_LIST_LENGTH) { error_string.str("");
+    error_string << "ERROR: max happening list length is fixed at " << MAX_HAPPENING_LIST_LENGTH 
+       << " but you're telling me you want to send me " << num_happenings << std::endl;
+    return false;
+  } 
+    
+  int totalReadHapps = 0;
+  for ( i=0; i<(int)msg.u.fsm.plain.numStates; i++ ) {  /* iterate over total number of states */
+    int my_num_happs, j;
+    if ((line = sockReceiveLine()).length() == 0) {  /* it's an error if we couldn't read the line */
+      error_string.str("");
+      error_string << "ERROR: expected to read a line for the number of happenings of state " << i 
+		   << " but didn't get it " << std::endl;
+      return false; 
+    }
+    pos = line.find_first_of("0123456789");
+    if ( pos==std::string::npos ) { error_string.str(""); /* error if we don't find a number */
+      error_string << "ERROR: expected the number of happenings for state " << i << " but didn't find it " << std::endl;
+      return false; 
+    }
+    std::stringstream s(line.substr(pos));
+    s >> my_num_happs; /* number of happenings in this state */
+    if ( my_num_happs > num_happenings || my_num_happs < 0 ) { /* error if one state has more than the 
+								  total num of happenings! */
+      error_string.str("");
+      error_string << "ERROR: I was told that the total sum of happenings across states was " << num_happenings 
+		    << " but now you tell me state " << i << " has " << my_num_happs << " happenings??? " << std::endl;
+      return false;
+    } else if ( totalReadHapps + my_num_happs > num_happenings ) { error_string.str("");
+      error_string << "ERROR: I was told that the total sum of happenings across states was " << num_happenings 
+		   << " but adding in the ones for state " << i 
+		   << " would take me to " << totalReadHapps + my_num_happs << std::endl;
+      return false;
+    }
+    /* ok, number of happenings we're expecting to read for this state looks ok */
+    msg.u.fsm.plain.numHappenings[i] = my_num_happs;  /* number of happenings of this state */
+    msg.u.fsm.plain.myHapps[i]       = totalReadHapps; /* where this state's happs start in the total happs list */
+    for( j=0; j<my_num_happs; j++, totalReadHapps++ ) { /* iterate over happenings for this state */
+      std::string myHappSpecName;
+      int myHappSpecNum, myJumpState;
+
+      if ((line = sockReceiveLine()).length() == 0) {  /* it's an error if we couldn't read the line */
+	error_string.str("");
+	error_string << "ERROR: expected to read a line for happening " << j+1 << " of state " << i 
+		     << " but didn't get it " << std::endl;
+	return false; 
+      }
+      std::stringstream s(line);
+      s >> myHappSpecName;
+      s >> myJumpState;
+      if ( (myHappSpecNum = mapHappName2ID(myHappSpecName)) < 0 ) { error_string.str("");
+	error_string << "ERROR: I couldn't find the happening spec name \"" << myHappSpecName << "\" in the list "
+		     << "of happening specs that I was sent." << std::endl;
+	return false;
+      }      
+      if ( myJumpState < 0 || myJumpState >= (int)msg.u.fsm.plain.numStates ) { error_string.str("");
+	error_string << "ERROR: I have " << msg.u.fsm.plain.numStates << " states in my spec, but state " << i 
+		     << " wants a happening that jumps to state  " << myHappSpecNum << "????" << std::endl;
+	return false;
+      }
+      if ( myHappSpecNum < 0 || myHappSpecNum >= (int)msg.u.fsm.plain.numHappeningSpecs ) { error_string.str("");
+	error_string << "ERROR: was previously sent " << msg.u.fsm.plain.numHappeningSpecs << " total happening specs " 
+		     << "but now state " << i << " is asking for spec number " << myHappSpecNum << "????" << std::endl;
+	return false;
+      }
+      /* ok, this happening entry looks ok */
+      msg.u.fsm.plain.happsList[totalReadHapps].happeningSpecNumber = (unsigned)myHappSpecNum;
+      msg.u.fsm.plain.happsList[totalReadHapps].stateToJumpTo       = (unsigned)myJumpState;
+    } /* end iterate over happenings for one state */
+    Log() << "Read " << my_num_happs << " happenings for state " << i << std::endl;
+  } /* end iterate over states */	
+
+  if ( totalReadHapps != num_happenings ) { error_string.str("");
+    error_string << "ERROR: I was told that the sum of happenings across states was " << num_happenings 
+		 << " but after reading all states, I only got " << totalReadHapps << std::endl;
+    return false;
+  }
+  
+  return true;
+}
+
+
+
 void *ConnectionThread::threadFunc(void)
 {
   Timer connectionTimer;
@@ -818,11 +1053,12 @@ void *ConnectionThread::threadFunc(void)
             std::string::size_type pos = line.find_first_of("0123456789");
 
             if (pos != std::string::npos) {
-                unsigned m = 0, n = 0, num_Events = 0, num_SchedWaves = 0, readyForTrialState = 0, num_ContChans = 0, num_TrigChans = 0, num_Vtrigs = 0, state0_fsm_swap_flg = 0;
+	      unsigned m = 0, n = 0, num_Events = 0, num_SchedWaves = 0, readyForTrialState = 0, num_ContChans = 0, num_TrigChans = 0, num_Vtrigs = 0, state0_fsm_swap_flg = 0;
                 std::string outputSpecStr = "";
                 std::string inChanType = "ERROR";
                 std::stringstream s(line.substr(pos));
-                s >> m >> n >> num_Events >> num_SchedWaves >> inChanType >> readyForTrialState >> num_ContChans >> num_TrigChans >> num_Vtrigs >> outputSpecStr >> state0_fsm_swap_flg;
+		s >> m >> n >> num_Events >> num_SchedWaves >> inChanType >> readyForTrialState >> num_ContChans >> num_TrigChans >> num_Vtrigs >> outputSpecStr >> state0_fsm_swap_flg;
+		
                 if (m && n) {
                     if (outputSpecStr.length() == 0 && (num_ContChans || num_TrigChans || num_Vtrigs || num_SchedWaves)) {
             // old FSM client, so build an output spec string for them
@@ -852,7 +1088,36 @@ void *ConnectionThread::threadFunc(void)
                         Matrix mat (m, n);
                         count = sockReceiveData(mat.buf(), mat.bufSize());
                         if (count == (int)mat.bufSize()) {
-                            cmd_error = !matrixToRT(mat, num_Events, num_SchedWaves, inChanType, readyForTrialState, outputSpecStr, state0_fsm_swap_flg);
+			  if (!matrixToRT(mat, num_Events, num_SchedWaves, inChanType, 
+					  readyForTrialState, outputSpecStr, state0_fsm_swap_flg)) break;
+			  
+			  if ( fsms[fsm_id].use_happenings ) {
+			    std::string line;   
+			    if ((line = sockReceiveLine()).length() == 0) { 
+			      error_string.str("");
+			      error_string << "ERROR: expecting a line with SET HAPPENINGS SPEC " 
+					   << "and not finding it!" << std::endl;
+			      break;
+			    }
+			    if (!sockReadHappeningsSpecs()) {
+			      Log() << error_string.str(); sockSend(error_string.str()); break;			    
+			    } else 
+			      sockSend("OK\n");
+			    
+			    if ((line = sockReceiveLine()).length() == 0) { 
+			      error_string.str("");
+			      error_string << "ERROR: expecting a line with SET HAPPENINGS LIST " 
+					   << "and not finding it!" << std::endl;
+			      break;
+			    }
+			    if (!sockReadHappeningsList()) {
+			      Log() << error_string.str(); sockSend(error_string.str()); break;			    
+			    } else
+			      sockSend("OK\n");
+			  } /* end if use_happenings */
+
+ 			  sendToRT(msg); 
+			  cmd_error = false;
                         } else if (count <= 0) {
                             break;
                         }
@@ -946,6 +1211,39 @@ void *ConnectionThread::threadFunc(void)
                     cmd_error = false;
                 }
             }
+        } else if (line.find("SET DIO SCHED WAVE NUM COLUMNS") == 0 ) { 
+            unsigned int num_columns = 8;
+            std::string::size_type pos = line.find_first_of("0123456789");
+            if (pos != std::string::npos) {
+                std::stringstream s(line.substr(pos));
+                s >> num_columns;
+                if ( MIN_DIO_SCHED_WAVE_NUM_COLUMNS <= num_columns & num_columns <= MAX_DIO_SCHED_WAVE_NUM_COLUMNS) { // ensure legal # of columns
+		  fsms[fsm_id].dio_scheduled_wave_num_columns = num_columns;
+		  cmd_error = false;
+                } else {
+		  std::ostringstream os;
+		  os << "SET DIO SCHED WAVE NUM COLUMNS expects an integer between " << MIN_DIO_SCHED_WAVE_NUM_COLUMNS;
+		  os << " and " << MAX_DIO_SCHED_WAVE_NUM_COLUMNS << " but you gave me " << num_columns << " \n";
+		  sockSend(os.str());
+		  cmd_error = true;
+		}
+            }
+        } else if (line.find("GET DIO SCHED WAVE NUM COLUMNS") == 0 ) { 
+	  std::ostringstream os;
+	  os << fsms[fsm_id].dio_scheduled_wave_num_columns << std::endl;
+	  sockSend(os.str());
+	  cmd_error = false;
+        } else if (line.find("USE HAPPENINGS") == 0 ) { 
+	  fsms[fsm_id].use_happenings = true;
+	  cmd_error = false;
+        } else if (line.find("DO NOT USE HAPPENINGS") == 0 ) { 
+	  fsms[fsm_id].use_happenings = false;
+	  cmd_error = false;
+        } else if (line.find("GET USE HAPPENINGS FLAG") == 0 ) { 
+	  std::ostringstream os;
+	  os << (int)fsms[fsm_id].use_happenings << std::endl;
+	  sockSend(os.str());
+	  cmd_error = false;
         } else if (line.find("GET EVENT COUNTER") == 0) {
             msg.id = TRANSITIONCOUNT;
             sendToRT(msg);
@@ -981,6 +1279,24 @@ void *ConnectionThread::threadFunc(void)
             s << msg.u.current_state << std::endl;
             sockSend(s.str());
             cmd_error = false;        
+        } else if (line.find("GET INPUT CHANNEL STATES") == 0) {
+            msg.id = GETINPUTCHANNELSTATES;
+            sendToRT(msg);
+	    /* Read the vector of states out from the returned message */
+	    Matrix mat(1, msg.u.input_channels.num);
+	    for(int i=0; i<(int)msg.u.input_channels.num; ++i) 
+	      mat.at(0,i) = msg.u.input_channels.state[i];
+	    /* Tell the client that a vector is coming */
+            std::ostringstream os;
+            os << "MATRIX " << mat.rows() << " " << mat.cols() << std::endl;
+            sockSend(os.str());
+	    /* Wait for the client's READY signal */
+	    line = sockReceiveLine(); // wait for "READY" from client
+	    if (line.find("READY") != std::string::npos) {
+	      /* send the result */
+	      sockSend(mat.buf(), mat.bufSize(), true);
+	      cmd_error = false;
+	    }
         } else if (line.find("GET EVENTS_II") == 0) {
             std::string::size_type pos = line.find_first_of("0123456789");
             if (pos != std::string::npos) {
@@ -1349,6 +1665,80 @@ void *ConnectionThread::threadFunc(void)
             msg.id = CLEARSIMINPEVTS;
             sendToRT(msg);
             cmd_error = false;
+        } else if (line.find("SET NUM STATES") == 0 ) { /* Here only for debug purposes, user shouldn't use
+							   this cmd-- sending num states is 
+							   part of SET STATE MATRIX */
+	  std::string::size_type pos = line.find_first_of("0123456789");
+	  if (pos == std::string::npos) { error_string.str("");
+	    error_string << "ERROR:expected a number(num states), but didn't find it." << std::endl;
+	    sockSend(error_string.str()); Log() << error_string.str();
+	  }
+	  std::stringstream s(line.substr(pos));
+	  s >> msg.u.fsm.plain.numStates;
+	  cmd_error = false;
+        } else if (line.find("GET NUM STATES") == 0 ) {
+	  std::stringstream s;
+	  s << msg.u.fsm.plain.numStates << std::endl;
+	  sockSend(s.str());
+	  cmd_error = false;
+        } else if (line.find("SET HAPPENINGS SPEC") == 0 ) { /* Here for debug purposes, user shouldn't use
+								this cmd-- sending happenings spec is 
+								part of SET STATE MATRIX */
+	  if (sockReadHappeningsSpecs()) cmd_error = false;
+	  else                         { Log() << error_string.str(); sockSend(error_string.str()); }
+        } else if (line.find("SET HAPPENINGS LIST") == 0 ) { /* Here for debug purposes, user shouldn't use
+								this cmd-- sending happenings list is
+								part of SET STATE MATRIX */
+	  if (sockReadHappeningsList())  cmd_error = false;
+	  else                         { Log() << error_string.str(); sockSend(error_string.str()); }
+        } else if (line.find("GET HAPPENINGS SPEC") == 0) {
+	  std::ostringstream os; int i;
+	  os << "LINES " << msg.u.fsm.plain.numHappeningSpecs << std::endl;
+	  for(i=0; i<(int)msg.u.fsm.plain.numHappeningSpecs; i++ ) {
+	    happeningUserSpec thisSpec = msg.u.fsm.plain.happeningSpecs[i];
+	    os << "Name=\"" << thisSpec.name << "\" detectorFunctionName=\"" << thisSpec.detectorFunctionName 
+	       << "\"" << " inputNumber=" << thisSpec.inputNumber << " happId=" << thisSpec.happId
+	       << " detectorFunctionNumber=" << thisSpec.detectorFunctionNumber << std::endl;
+	  }
+	  sockSend(os.str());
+	  cmd_error = false;
+        } else if (line.find("GET HAPPENINGS LIST") == 0) {
+	  std::ostringstream os; int i, j, statenum, tothapps=0, actualhapps=0;
+	  for( tothapps = 0, i=0; i<(int)msg.u.fsm.plain.numStates; i++ ) tothapps += msg.u.fsm.plain.numHappenings[i];
+	  os << "LINES " << tothapps+2 << std::endl;
+	  for( statenum=0; statenum<(int)msg.u.fsm.plain.numStates; statenum++ ) {
+	    int myhapps = msg.u.fsm.plain.numHappenings[statenum];
+	    for ( j=0; j<myhapps; j++, actualhapps++ ) {
+	      os << "Happ " << j << " in state " << statenum << ": happeningSpecNumber=" 
+		 << msg.u.fsm.plain.happsList[actualhapps].happeningSpecNumber
+		 << " jumpTo=" << msg.u.fsm.plain.happsList[actualhapps].stateToJumpTo 
+		 << " by pointer, specNum=" 
+		 << msg.u.fsm.plain.happsList[msg.u.fsm.plain.myHapps[statenum]+j].happeningSpecNumber
+		 << " and jumpTo=" << msg.u.fsm.plain.happsList[msg.u.fsm.plain.myHapps[statenum]+j].stateToJumpTo
+		 << std::endl;
+	    }
+	  }
+	  os << actualhapps << " total happs " << std::endl;
+
+	  /* for(j=0; j<(int)msg.u.fsm.plain.fsm.num
+	    happeningUserSpec thisSpec = msg.u.fsm.plain.happeningSpecs[i];
+	    os << "Name=\"" << thisSpec.name << "\" detectorFunctionName=\"" << thisSpec.detectorFunctionName 
+	       << "\"" << " inputNumber=" << thisSpec.inputNumber << " happId=" << thisSpec.happId
+	       << " detectorFunctionNumber=" << thisSpec.detectorFunctionNumber << std::endl;
+	       } */
+	  sockSend(os.str());
+	  cmd_error = false;
+        } else if (line.find("GET HAPPENING DETECTOR FUNCTIONS") == 0) {
+	    std::ostringstream os; int i;
+	    os << "LINES " << NUM_HAPPENING_DETECTOR_FUNCTIONS+2 << std::endl;
+	    os << "These are the functions available as happening detector functions:" << std::endl << std::endl;
+	    for(i=0; i<NUM_HAPPENING_DETECTOR_FUNCTIONS; i++) {
+	      os << "Function name: \"" << happeningDetectorsList[i].detectorFunctionName << "\". Type=" << 
+		(happeningDetectorsList[i].happType==HAPPENING_CONDITION ? "Condition. " : "Event. ") <<
+		"Description: \"" << happeningDetectorsList[i].description << "\"" << std::endl;
+	    }
+	    sockSend(os.str());
+	    cmd_error = false;
 #ifdef EMULATOR
         } else if (line.find("GET CLOCK LATCH MS") == 0) { // GETCLOCKLATCHMS
             msg.id = GETCLOCKLATCHMS;
@@ -2178,16 +2568,24 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   }
 
   // compute scheduled waves cells used
-  int swCells = numSchedWaves * 8; // each sched wave uses 8 cells.
-  int swRows = (swCells / m.cols()) + (swCells % m.cols() ? 1 : 0);
-  int swFirstRow = (int)nRows - swRows;
-  int inpRow = swFirstRow - 1;
-  nRows = inpRow;
+  int swCells = numSchedWaves * fsms[fsm_id].dio_scheduled_wave_num_columns; // each sched wave uses dio_scheduled_wave_num_columns cells.
+  int swRows  = (swCells / m.cols()) + (swCells % m.cols() ? 1 : 0);  /* total number of rows used in sched wave def */
+  int swFirstRow  = (int)nRows - swRows;                    /* matrix nRows is:
+							       states; one row of input spec ; swRows */
+  int inpRow = swFirstRow - 1;                                        /* the row with the input spec */
+  nRows = inpRow;                                                     /* nRows is now number of states */
+  Log() << "I believe this state matrix has " << nRows << " rows corresponding to states and " << swRows << " corresponding to scheduled waves " << std::endl;
+  if ( nRows > MAX_STATES ) {
+    Log() << "Matrix has " << nRows << " rows but I can only take a max of " << MAX_STATES << std::endl;
+    return false;
+  }
+  msg.u.fsm.plain.numStates = nRows;
   if (inpRow < 0 || swFirstRow < 0 || inpRow < 0) {
     Log() << "Matrix specification has invalid number of rows! Error!" << std::endl; 
     return false;            
   }
 
+  // ----- Read the input routing row of the matrix ----------
   // first clear the input routing array, by setting mappings to null (-1)
   for (i = 0; i < FSM_MAX_IN_EVENTS; ++i) msg.u.fsm.routing.input_routing[i] = -1;
   // compute input mapping from input spec vector
@@ -2210,6 +2608,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   msg.u.fsm.routing.num_in_chans = maxChan-minChan+1;
   msg.u.fsm.routing.first_in_chan = minChan;
   
+  // ----- Read the sched waves spec ----------
   // rip out the sched wave spec in the matrix, use it to
   // populate fields in FSMBlob::Routing  
   int row = swFirstRow, col = -1;
@@ -2261,9 +2660,34 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
     w.sustain_us = static_cast<unsigned>(m.at(row,col)*1e6);
     NEXT_COL();
     w.refraction_us = static_cast<unsigned>(m.at(row,col)*1e6);
+    if (fsms[fsm_id].dio_scheduled_wave_num_columns > 8) {
+      /* If there is a ninth column, it is always the loop parameter */
+      NEXT_COL();
+      w.loop = (int)m.at(row, col);
+    } else {
+      w.loop = 0;
+    }
+    if (fsms[fsm_id].dio_scheduled_wave_num_columns > 9) {
+      /* If there are a 10th and an 11th column, 
+	 they are always the waves to trigger on up and
+	 the waves to UNtrigger on down. */
+      NEXT_COL();
+      w.sw_trigger_on_up     = (unsigned int)m.at(row, col);
+    } else {
+      w.sw_trigger_on_up = 0; 
+    } if (fsms[fsm_id].dio_scheduled_wave_num_columns > 10) {
+      /* Now the 11th column if it is there */
+      NEXT_COL();
+      w.sw_untrigger_on_down = (unsigned int)m.at(row, col);
+    } else {
+      w.sw_untrigger_on_down = 0;
+    }
     w.enabled = true;
+    if (debug) 
+      Log() << "Sched wave " << id << " says preamble=" << w.preamble_us << " sustain=" << w.sustain_us << " refraction=" << w.refraction_us << " loop=" << w.loop << "\n";
   }
 #undef NEXT_COL
+
 
   // make sure it fits
   {
@@ -2292,8 +2716,6 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
   strncpy(msg.u.fsm.name, fsm_shm_name.c_str(), sizeof(msg.u.fsm.name));
   msg.u.fsm.name[sizeof(msg.u.fsm.name)-1] = 0;
 
-  sendToRT(msg);
-  
   return true;
 }
 
@@ -2754,7 +3176,7 @@ std::vector<SchedWaveSpec>
 ConnectionThread::parseSchedWaveSpecStr(const std::string & str)
 {
 
-  // format of sched wave string is \1ID\2IN_EVT_COL\2OUT_EVT_COL\2DIO_LINE\2SOUND_TRIG\2PREAMBLE_SECS\2SUSTAIN_SECS\2REFRACTION_SECS\2... so split on \1 and within that, on \2
+  // format of sched wave string is \1ID\2IN_EVT_COL\2OUT_EVT_COL\2DIO_LINE\2SOUND_TRIG\2PREAMBLE_SECS\2SUSTAIN_SECS\2REFRACTION_SECS\2LOOP\2... so split on \1 and within that, on \2
 
   std::vector<SchedWaveSpec> ret;
   std::set<int> ids_seen;
@@ -2763,8 +3185,9 @@ ConnectionThread::parseSchedWaveSpecStr(const std::string & str)
   std::vector<std::string>::const_iterator it;
   for (it = waveSpecStrs.begin(); it != waveSpecStrs.end(); ++it) {
     flds = splitString(*it, "\2");
-    if (flds.size() != 8) {
+    if (flds.size() != fsms[fsm_id].dio_scheduled_wave_num_columns) {
       Log() << "Parse error for sched waves spec \"" << *it << "\" (ignoring! Argh!)\n"; 
+      Log() << "Didn't find " << fsms[fsm_id].dio_scheduled_wave_num_columns << " fields for my sched wave!! Spec \"" << *it << "\" Argh!\n";
       continue;      
     }
     struct SchedWaveSpec spec;
@@ -2778,6 +3201,17 @@ ConnectionThread::parseSchedWaveSpecStr(const std::string & str)
     if (ok) spec.preamble_us = static_cast<unsigned>(FromString<double>(flds[i++], &ok) * 1e6);
     if (ok) spec.sustain_us = static_cast<unsigned>(FromString<double>(flds[i++], &ok) * 1e6);
     if (ok) spec.refraction_us = static_cast<unsigned>(FromString<double>(flds[i++], &ok) * 1e6);
+    if (fsms[fsm_id].dio_scheduled_wave_num_columns>8) {
+      if (ok) spec.loop = FromString<int>(flds[i++], &ok);
+    } else {
+      spec.loop = 0;
+    }
+    if (!ok) {
+      Log() << "parsing sched wave " << spec.id << "broke\n";
+    } else {
+      Log() << "FSMServer: parsing got wave " << spec.id << " : " << spec.in_evt_col << " : " << spec.out_evt_col << " : " << spec.ext_trig;
+      Log() << " : " << spec.preamble_us <<  " : " << spec.sustain_us <<  " : " << spec.refraction_us <<  " : " << spec.loop <<  "\n";
+    }     
     if (!ok) {
       int num = i--;
       Log() << "Parse error for sched waves str: \"" << *it << "\" field #" << num << "\"" << flds[i] << "\" (ignoring! Argh!)\n"; 

@@ -2,6 +2,12 @@
 #  define FSM_H
 
 #include "IntTypes.h" // for int8 int16 int32, etc
+#  if defined(OS_LINUX) || defined(OS_OSX) 
+#    include <dlfcn.h>  // for type bool
+#  else
+#    include "windows_dlemul.h"
+#  endif
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +37,9 @@ extern "C" {
 #define FSM_MAX_OUT_EVENTS 16 /* this should be enough, right? */
 #define FSM_ERROR_BUF_SIZE FSM_MEMORY_BYTES
 
+#define MAX_HAPPENING_LIST_LENGTH (FSM_MEMORY_BYTES/8)
+#define MAX_STATES  16384
+
 struct SchedWave
 {
   int enabled; /**< Iff true, actually use this sched_wave.  Otherwise it's
@@ -43,14 +52,34 @@ struct SchedWave
   unsigned refraction_us; /**< the blanking time for the scheduled waveform.
                               The amount of time after it goes low again
                               until it can be triggered normally again.
-                              It cannot fire or be triggered during the 
+			      Scheduled waves cannot be triggered during their 
+			      preamble, sustain, or refraction-- to interrupt 
+			      them and start them again, you have to explicitly
+			      untrigger them first. Therefore, a wave cannot
+			      fire or be triggered during the 
                               refractory period -- instead a triggered wave
-                              during this time will *not* fire at all!!
-
-                              refraction_us_remaining + preamble_us after the
-                              trigger.  Not sure how useful this is.. but
-                              here it is. */
+                              during this time will *not* fire at all!! */
+  int loop; /** Number of times to repeat the sched wave (i.e., after end of 
+		refraction, start preamble again). If negative, it means 
+		repeat infinitely. Untriggering stops the looping; a jump to 
+		state 0 stops the looping. During looping, the wave cannot be 
+		triggered, it has to be untriggered first. */
+  unsigned int sw_trigger_on_up;  /** a bit mask, indicating wave 
+				      ids of scheduled waves that this wave
+				      should trigger when this wave reaches the
+				      end of its preamble (i.e., goes up into sustain) */
+  unsigned int sw_untrigger_on_down; /** a bit mask, indicating wave 
+					 ids of scheduled waves that this wave
+					 should UNtrigger when this wave reaches the
+					 end of its sustain (i.e., goes down into refraction) */
 };
+
+#define MIN_DIO_SCHED_WAVE_NUM_COLUMNS 8  /** Minimum number of items in a sched wave spec. 8 means no 'loop' item */
+
+#define MAX_DIO_SCHED_WAVE_NUM_COLUMNS 11  /** Maximum number of items in a sched wave spec. 
+					       9th col is always loop parameter;
+					       10th col is always waves to trigger on High; 
+					       11th col is always waves to UNtrigger on Low.*/
 
 enum { OSPEC_DOUT = 1, OSPEC_TRIG, OSPEC_EXT, OSPEC_SCHED_WAVE, OSPEC_TCP, OSPEC_UDP, OSPEC_NOOP = 0x7f };
 
@@ -76,6 +105,53 @@ struct OutputSpec
     };
   };
 };
+
+  
+#define MAX_HAPPENING_NAME_LENGTH 64
+#define MAX_HAPPENING_SPECS 1024
+enum { HAPPENING_CONDITION = 1, HAPPENING_EVENT };
+
+struct happeningTypeSpec {
+  char detectorFunctionName[MAX_HAPPENING_NAME_LENGTH];    /* The name with which clients will refer to it */
+  unsigned int happType;                                   /* Currently, one of HAPPENING_CONDITION or HAPPENING_EVENT */
+  char description[256];                                   /* something descriptive for end-users */
+};
+
+# define NUM_HAPPENING_DETECTOR_FUNCTIONS 4
+
+const struct happeningTypeSpec happeningDetectorsList[NUM_HAPPENING_DETECTOR_FUNCTIONS] = {	\
+  {"line_high", HAPPENING_CONDITION, "Checks whether a physical input line is high"}, \
+  {"line_low",  HAPPENING_CONDITION, "Checks whether a physical input line is low"},  \
+  {"wave_high", HAPPENING_CONDITION, "Checks whether a digital sched wave is high"},  \
+  {"wave_low",  HAPPENING_CONDITION, "Checks whether a digital sched wave is low"},   \
+};
+/*  {"line_in",  HAPPENING_EVENT, "Checks whether a physical input line just went high" },	\ */
+
+
+
+struct happeningUserSpec
+{
+  /* To be filled in by the client: */
+  char name[MAX_HAPPENING_NAME_LENGTH];        /* name that the user gives to this happening: 
+						  e.g., "Clo" or "mywave_hi" */
+  char detectorFunctionName[MAX_HAPPENING_NAME_LENGTH]; /* from the happeningDetectorsList */
+  unsigned short inputNumber;                  /* input number to be used e.g, wave #2, or line #1, etc. */
+  unsigned short happId;                       /* number identifying this happening, unique across all happenings.
+						   This id, timestamped, is what will be reported back to the client */
+
+  /* To be filled in by FSMServer: */
+  int  detectorFunctionNumber;                 /* num of row matching detectorFunctionName in happeningDetectorsList */
+
+};
+
+
+struct stateHappening  /* Each state will have its own set of these */
+{
+  unsigned int happeningSpecNumber;  /* Identifies a happeningUserSpec */
+  unsigned int stateToJumpTo;        /* State to jump to if the above happening occurs */
+};
+
+
 
 struct EmbC;
 struct AOWaveINTERNAL; /**< opaque here */
@@ -136,7 +212,17 @@ struct FSMSpec
                                                   array -- FSM code knows how 
                                                   to interpret this as a 2D 
                                                   array based on n_rows and 
-                                                  n_cols above */
+                                                  n_cols above */      
+      unsigned int numStates;  /* total number of states in matrix */
+
+      struct happeningUserSpec happeningSpecs[MAX_HAPPENING_SPECS];
+      unsigned int numHappeningSpecs;
+      /* Map of state # --> number of stateHappening entries for that state: */
+      unsigned short numHappenings[MAX_STATES];
+      /* Map of state # --> start of input_to_statechange entries: */
+      unsigned short myHapps[MAX_STATES];
+      /* List of stateHappening entries, across all states, for entire FSM: */
+      struct stateHappening happsList[MAX_HAPPENING_LIST_LENGTH];
     } plain;
   }; 
   unsigned short ready_for_trial_jumpstate; /**< normally always 35 */
@@ -323,6 +409,9 @@ enum ShmMsgID
     CLEARSIMINPEVTS, /* clear the simulated input events */
     GETSTIMULI,  /** Returns a FSMEvents in the [from,to] range. */
     STIMULICOUNT, /** Returns the number of FSMEvents in the from,to range */
+    GETINPUTCHANNELSTATES, /** Returns a vector (1-d Matrix) with all the current 
+			      High v Low states of input s */
+
 #ifdef EMULATOR
     GETCLOCKLATCHMS, /* query fsm clock latch amount */
     SETCLOCKLATCHMS, /* turn fsm clock latching on and set it to x MS */
@@ -348,6 +437,12 @@ struct ShmMsg {
 
       /* For id == FSM */
       struct FSMSpec fsm;
+
+      /* For id = GETINPUTCHANNELSTATES */
+      struct {
+	unsigned num;
+	unsigned state[FSM_MAX_IN_CHANS];
+      } input_channels;
 
       /* For id == TRANSITIONS */
       struct {
