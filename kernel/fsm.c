@@ -113,11 +113,14 @@ static __inline__ int __ffs(int x) { return ffs(x)-1; }
 MODULE_AUTHOR("Calin A. Culianu <calin@ajvar.org>");
 MODULE_DESCRIPTION(MODULE_NAME ": The core of the rtfsm project -- executes a finite state machine spec. in hard real-time.  Optionally, can execute arbitrary C code embedded in the FSM spec.");
 
+typedef unsigned FSMID_t;  /* The id identifying each of the multiple FSMs we can run in parallel */
+
+
 int init(void);  /**< Initialize data structures and register callback */
 void cleanup(void); /**< Cleanup.. */
 
 /** Index into RunState rs array declared below.. */
-typedef unsigned FSMID_t;
+/* typedef unsigned FSMID_t; */
 
 static int initRunStates(void);
 static int initRunState(FSMID_t);
@@ -139,7 +142,50 @@ static void restartAIAcquisition(long flags);
 #endif
 static void cleanupAOWaves(volatile struct FSMSpec *);
 struct AOWaveINTERNAL;
-static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, int bufnum);
+static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, int bufnum); 
+
+
+typedef bool (*happening_detector_fn_ptr) (FSMID_t f, unsigned int input_number);
+
+// static bool line_in  (FSMID_t f, unsigned int input_number); 
+// static bool line_out (FSMID_t f, unsigned int input_number); 
+// static bool wave_in  (FSMID_t f, unsigned int input_number); 
+// static bool wave_out (FSMID_t f, unsigned int input_number); 
+static bool line_high(FSMID_t f, unsigned int line_number);   /* line numbers are counted after input routing */
+static bool line_low (FSMID_t f, unsigned int line_number); 
+static bool wave_high(FSMID_t f, unsigned int wave_id); 
+static bool wave_low (FSMID_t f, unsigned int wave_id); 
+
+struct hdetectorName2FnPtr { 
+  char name[MAX_HAPPENING_NAME_LENGTH];
+  happening_detector_fn_ptr detectorFnPtr;
+};
+
+const struct hdetectorName2FnPtr hdName2FunctionPointerMap[NUM_HAPPENING_DETECTOR_FUNCTIONS] = { \
+  { "line_high", line_high }, \
+  { "line_low",  line_low }, \
+  { "wave_high", wave_high }, \
+  { "wave_low",  wave_low }, \
+};
+ 
+
+struct happeningKernelSpec  /* Could this be written as a unios of the happeningUserSpec and the last two items? */
+{
+  /* The following four obtained from the client: */
+  char name[MAX_HAPPENING_NAME_LENGTH];         /* name that the user gives to this happening: 
+						   e.g., "Clo" or "mywave_hi" */
+  char detectorFunctionName[MAX_HAPPENING_NAME_LENGTH]; /* from the happeningDetectorsList */
+  unsigned short inputNumber;                  /* input number to be used e.g, wave #2, or line #1, etc. */
+  unsigned short happId;                       /* number identifying this happening, unique across all happenings.
+						   This id, timestamped, is what will be reported back to the client */
+
+  /* And the following two set after we receive the client's info from FSMServer.cpp: */
+  happening_detector_fn_ptr detectorFnPtr;     /* From hdname2FunctionPointerMap */
+  unsigned int happType;                       /* from happeningDetectorsList    */
+};
+
+
+
 
 /* The callback called by rtos scheduler every task period... */
 static void *doFSM (void *);
@@ -459,10 +505,27 @@ struct RunState {
       mimics contain times, relative to current_ts, at which each of the
       components of the wave are due to take place: from edge-up, to
       edge-down, to wave termination (after the refractory period). */     
+  /** The ActiveWave structure below holds things like the absolute
+      timestamps for wave up, wave down, refraction, loop_counter-- 
+      things that can change each time a wave runs. In contrast, the 
+      SchedWave structure, defined in FSM.h and shared with the user-space 
+      FSMServer.cpp, holds things that are constant for a wave: its preamble 
+      duration (relative to triggering), its loop parameter, etc. */
   struct ActiveWave {
     int64 edge_up_ts;   /**< from: current_ts + SchedWave::preamble_us       */
     int64 edge_down_ts; /**< from: edge_up_ts + SchedWave::sustain_us        */
     int64 end_ts;       /**< from: edge_down_ts + SchedWave::refractory_us   */
+    int   loop_counter; /**< from: SchedWave::loop ; decreases by 1 every time the wave
+			 reaches the end of a refractory period. If non-zero, wave preamble
+			 then restarts. If loop_conter is negative, then it doesn't change, 
+			 and restarting goes on indefinitely. */
+    unsigned wave_is_high;   /** A flag that marks whether a wave is High (in the 
+				 _In state) or Low (in the _Out state). Note that 
+				 this can be different from being active or inactive, because a 
+				 state transition that untriggers a wave during its sustain will 
+				 make it inactive while leaving this flag on. On the next clock 
+				 tick, that gets detected and a wave out event is generated. **/
+ 
   } active_wave[FSM_MAX_SCHED_WAVES];
   /** A quick mask of the currently active scheduled waves.  The set bits
       in this mask correspond to array indices of the active_wave
@@ -546,6 +609,7 @@ static void doOutput(FSMID_t);
 static void clearAllOutputLines(FSMID_t);
 static inline void clearTriggerLines(FSMID_t);
 static void dispatchEvent(FSMID_t, unsigned event_id);
+
 static void handleFifos(FSMID_t);
 static void dataWrite(unsigned chan, unsigned bit);
 static void dataWrite_NoLocks(unsigned chan, unsigned bit);
@@ -557,7 +621,14 @@ static int writeAO(unsigned chan, lsampl_t samp); /**< writes samp to our AO sub
 static int bypassDOut(unsigned f, unsigned mask);
 static void doDAQ(void); /* does the data acquisition for remaining channels that grabAI didn't get.  See STARTDAQ fifo cmd. */
 static void processSchedWaves(FSMID_t); /**< updates active wave state, does output, sets event id mask in rs[f].events_bits of any waves that generated input events */
+static void processSchedWaves_do_end_of_preamble(  FSMID_t f, unsigned int wave, 
+						   struct ActiveWave *w, const struct SchedWave *s);
+static void processSchedWaves_do_end_of_sustain(   FSMID_t f, unsigned int wave, 
+						   struct ActiveWave *w, const struct SchedWave *s, unsigned int lock_or_unset);
+static void processSchedWaves_do_end_of_refraction(FSMID_t f, unsigned int wave, 
+						   struct ActiveWave *w, const struct SchedWave *s);
 static void processSchedWavesAO(FSMID_t); /**< updates active wave state, does output, sets event id mask  in rs[f].events_bits of any waves that generated input events */
+static void processConditions(FSMID_t); /* goes through happenings in the state that are conditions; does any state updates that they mandate */
 static void scheduleWave(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveDIO(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveAO(FSMID_t, unsigned wave_id, int op);
@@ -898,6 +969,7 @@ static int initRunStates(void)
 
 static int initRunState(FSMID_t f)
 { 
+  unsigned int i;
   /* Save the embc pointer since memset clears it */
   struct EmbC *embc1 = rs[f].states1.embc, *embc2 = rs[f].states2.embc;
   /* Clear the runstate memory area.. note how we only clear the beginning
@@ -930,6 +1002,9 @@ static int initRunState(FSMID_t f)
                       to be populated later from userspace..               */
   rs[f].id = f;
   
+  /* On FSM start, all FSM wave states should be in _Out state */
+  for (i=0; i<FSM_MAX_SCHED_WAVES; i++) rs[f].active_wave[i].wave_is_high = 0;
+
   return 0;  
 }
 
@@ -2067,7 +2142,7 @@ static void *doFSM (void *arg)
               DEBUG_VERB("timer expired in state %u t_us: %lu timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
             }
             
-          }
+          } /* end if !got_timeout */
           
           /* Normal event transition code -- detectInputEvents() modifies the rs[f].events_bits
              bitfield array for all the input events we have right now.
@@ -2098,9 +2173,12 @@ static void *doFSM (void *arg)
           processSchedWavesAO(f);
           
           DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08lx\n", f, *(unsigned long *)rs[f].events_bits);
+
+	  processConditions(f);
           
-        }
+        } /* end if !paused */
         
+
         if (got_timeout) {
             fsmEventPush(f, FSM_EVT_TYPE_IN, -1, STATE_TIMEOUT_STATE(fsm, state));
             /* Timeout expired, transistion to timeout_state.. */
@@ -2111,6 +2189,7 @@ static void *doFSM (void *arg)
         for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit((const unsigned long *)rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < ((int)NUM_INPUT_EVENTS(f)) && n_evt_loops < (int)NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
             dispatchEvent(f, evt_id);
         }
+
         /*
         if (NUM_INPUT_EVENTS(f) && n_evt_loops >= NUM_INPUT_EVENTS(f)) {
           ERROR_INT("Event detection code in doFSM() for FSM %u tried to loop more than %d times!  DEBUG ME!\n", f, n_evt_loops, NUM_INPUT_EVENTS(f));
@@ -2293,15 +2372,17 @@ static int gotoState(FSMID_t f, unsigned state, int event_id)
   if (state == READY_FOR_TRIAL_JUMPSTATE(f) && rs[f].ready_for_trial_flg) {
     /* Special case of "ready for trial" flag is set so we don't go to 
        state 35, but instead to 0 */    
+    DEBUG("Jumping to state 35 when ready_for_trial_flg is set-- will go to state 0");
     state = 0;
-    stopActiveWaves(f); /* since we are starting a new trial, force any
-                           active timer waves to abort! */
   }
 
   if (state == 0) {
     /* Hack -- Rule is to only swap FSMs at state 0 crossing.*/
+    DEBUG("Now at state 0-- will swap FSMs and will stop waves");
     rs[f].ready_for_trial_flg = 0;
     if (rs[f].pending_fsm_swap) swapFSMs(f);
+    stopActiveWaves(f); /* since we are starting a new trial, force any
+                           active timer waves to abort! */
   }
 
   if (rs[f].current_state != state)
@@ -2404,11 +2485,12 @@ static void doSchedWaveOutput(FSMID_t f, int swBits)
         int op = 1;
         /* if it's negative, invert the bitpattern so we can identify
            the wave id in question, then use 'op' to supply a negative waveid to
-           scheduleWave() */
+           scheduleWave) */
         if (swBits < 0)  { op = -1; swBits = -swBits; }
         /* Do scheduled wave outputs, if any */
         while (swBits) {
           int wave = __ffs(swBits);
+	  // DEBUG("Carlos: will do op %d on wave %d", op, wave);
           swBits &= ~(0x1<<wave);
           scheduleWave(f, wave, op);
         }
@@ -2599,6 +2681,7 @@ static void detectSimulatedInputEvents(FSMID_t f, int *got_timeout_flg)
     }
 }
 
+
 static void dispatchEvent(FSMID_t f, unsigned event_id)
 {
   unsigned next_state = 0;
@@ -2653,7 +2736,8 @@ static void handleFifos(FSMID_t f)
   } else if (BUDDY_TASK_DONE) {
     /* our buddy task just finished its processing, now do:
        1. Any RT processing that needs to be done
-       2. Indicate we should reply to user fifo by setting do_reply */
+       2. Indicate we should reply to user fifo by setting do_reply 
+       3. Do BUDDY_TASK_CLEAR so the buddy task no longer registers as busy */
 
     switch(BUDDY_TASK_RESULT) {
     case FSM:
@@ -2680,6 +2764,7 @@ static void handleFifos(FSMID_t f)
           rs[f].pending_fsm_swap = 1;
       }
       do_reply = 1;
+
       break;
 
     case GETFSM:
@@ -2708,6 +2793,7 @@ static void handleFifos(FSMID_t f)
 
     case LOGITEMS:
     case TRANSITIONS:
+    case GETINPUTCHANNELSTATES:
     case GETSIMINPEVTS:
     case GETSTIMULI:
         do_reply = 1; /* just reply that it's done */
@@ -2724,7 +2810,7 @@ static void handleFifos(FSMID_t f)
 
     BUDDY_TASK_CLEAR; /* clear pending result */
 
-  } else {     /* !BUDDY_TASK_BUSY */
+  } else {     /* !BUDDY_TASK_BUSY */ /* Please do not edit this comment */
 
     /* See if a message is ready, and if so, take it from the SHM */
     struct ShmMsg *msg = (struct ShmMsg *)&shm->msg[f];
@@ -2787,6 +2873,12 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;*/
         BUDDY_TASK_PEND(TRANSITIONS);
       }
+      break;
+      
+    case GETINPUTCHANNELSTATES:
+      // DEBUG("Carlos: got GETINPUTCHANNELSTATES, will reply with bits from %d to %d", FIRST_IN_CHAN(f), AFTER_LAST_IN_CHAN(f)-1);
+      // DEBUG("Carlos: Pending task to buddy task handler");
+      BUDDY_TASK_PEND(GETINPUTCHANNELSTATES);
       break;
 
     case LOGITEMS:
@@ -3477,72 +3569,212 @@ static inline void putDebugFifo(unsigned val)
   }
 }
 
+/******** HAPPENING DETECTOR FUNCTIONS ************/
+
+bool line_high(FSMID_t f, unsigned int line_number) {
+  line_number += FIRST_IN_CHAN(f)-1;
+  if (line_number >= AFTER_LAST_IN_CHAN(f))
+    DEBUG("Warning! line_high got asked about line %d, which is out of range. Ignoring request.\n", line_number);
+  return( ((0x1 << line_number) & rs[f].input_bits) != 0);
+};
+
+bool line_low (FSMID_t f, unsigned int line_number) {
+  line_number += FIRST_IN_CHAN(f)-1;
+  if (line_number >= AFTER_LAST_IN_CHAN(f))
+    DEBUG("Warning! Fsm %d: line_high got asked about line %d, which is out of range. Ignoring request.\n", 
+	  f, line_number);
+  return( ((0x1 << line_number) & rs[f].input_bits) == 0);
+};
+
+bool wave_high(FSMID_t f, unsigned int wave_id) {
+  struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
+  if ( !FSM_PTR(f)->sched_waves[wave_id].enabled ) {
+    DEBUG("WARNING: Fsm %d: wave_high is being asked about sched wave %d, which has not been enabled. Returning false.",
+	  f, wave_id);
+    return(false);
+  }
+  if ( (rs[f].active_wave_mask & (0x1<<wave_id)) && (w->wave_is_high == 1) ) return(true);
+  else return(false);
+};
+
+bool wave_low (FSMID_t f, unsigned int wave_id) {
+  struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
+  if ( !FSM_PTR(f)->sched_waves[wave_id].enabled ) {
+    DEBUG("WARNING: Fsm %d: wave_low is being asked about sched wave %d, which has not been enabled. Returning false.",
+	  f, wave_id);
+    return(false);
+  }
+  if ( (rs[f].active_wave_mask & (0x1<<wave_id)) && (w->wave_is_high == 1) ) return(false);
+  else return(true);
+};
+
+/******** END happening detector functions END ****/
+
+
+#define SW_SET_DOUT_LOW 0
+#define SW_UNLOCK_DOUT  1
 static void processSchedWaves(FSMID_t f)
 {  
-  unsigned wave_mask = rs[f].active_wave_mask;
+  unsigned int wave_id;
+  
+  for (wave_id=0; wave_id<FSM_MAX_SCHED_WAVES; wave_id++ ) {
+    /* ActiveWave structure below holds things like the absolute timestamps 
+       for wave up, wave down, refraction, loop_counter-- things that can change 
+       each time a wave runs. */
+    struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
+    /* SchedWave structure below holds things that are constant for a wave: 
+       its preamble duration (relative to triggering), its loop parameter, etc. */
+    const struct SchedWave *s = &((struct RunState *)&rs[f])->states->sched_waves[wave_id]; 
 
-  while (wave_mask) {
-    unsigned wave = __ffs(wave_mask);
-    struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave];
-    wave_mask &= ~(0x1<<wave);
+    if (rs[f].active_wave_mask & (0x1<<wave_id)) {  /* Wave is active, do normal processing */
+      if (w->edge_up_ts && w->edge_up_ts <= rs[f].current_ts)  /* Edge up timer expired */
+	processSchedWaves_do_end_of_preamble(f, wave_id, w, s);
 
-    if (w->edge_up_ts && w->edge_up_ts <= rs[f].current_ts) {
-      /* Edge-up timer expired, set the wave high either virtually or
-         physically or both. */
-          int id = SW_INPUT_ROUTING(f, wave*2);
-          if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
-           /* mark the event as having occurred
-              for the in-event of the matrix, if
-              it's routed as an input event wave
-              for edge-up transitions. */
-              set_bit(id, rs[f].events_bits); 
-          }
-          
-          id = SW_DOUT_ROUTING(f, wave);
-          if ( id > -1 ) 
-            dataWrite_NoLocks(id, 1); /* if it's routed to do digital output, set line high. */
-          
+      if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts)  /* sustain timer expired */
+	/* normal end of sustain, so we use SW_SET_DOUT_LOW flag */
+	processSchedWaves_do_end_of_sustain(f, wave_id, w, s, SW_SET_DOUT_LOW);  
 
-          id = SW_EXTOUT_ROUTING(f, wave);
-          if ( id > 0 ) /* if it's routed to do ext trigs */
-            doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), id); /* trigger sound, etc */
-              
-          w->edge_up_ts = 0; /* mark this component done */
+      if (w->end_ts && w->end_ts <= rs[f].current_ts) /* refraction timer expired */
+	processSchedWaves_do_end_of_refraction(f, wave_id, w, s);
     }
-    if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts) {
-      /* Edge-down timer expired, set the wave high either virtually or
-         physically or both. */
-          int id = SW_INPUT_ROUTING(f, wave*2+1);
-          if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
-             /* mark the event as having occurred
-                for the in-event of the matrix, if
-                it's routed as an input event wave
-                for edge-up transitions. */
-            set_bit(id, rs[f].events_bits);
-          }
-          
-          id = SW_DOUT_ROUTING(f, wave);
-          if ( id > -1 ) 
-            dataWrite_NoLocks(id, 0); /* if it's routed to do digital output, set line low. */
-
-          id = SW_EXTOUT_ROUTING(f, wave);
-          if ( id > 0 ) /* if it's routed to do ext trigs */
-            doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), -id); /* untrigger sound, etc */
-
-          w->edge_down_ts = 0; /* mark this wave component done */
-    } 
-    if (w->end_ts && w->end_ts <= rs[f].current_ts) {
-          int chan = SW_DOUT_ROUTING(f, wave);
-          
-          /* Refractory period ended and/or wave is deactivated */
-          rs[f].active_wave_mask &= ~(0x1<<wave); /* deactivate the wave */
-          w->end_ts = 0; /* mark this wave component done */
-          if (chan > -1) /* if it's routed to do digital output,
-                            unlock the DOUT channel so the FSM can use it again */
-              UNLOCK_DO_CHAN(chan);
+    else if (  !(rs[f].active_wave_mask & (0x1<<wave_id))  &&  (rs[f].active_wave[wave_id].wave_is_high)  ) {
+      /* Wave must have been actively untriggered during its sustain; do all end-of-sustain
+	 processing, but unlock DOut channels instead of setting them low  */
+      processSchedWaves_do_end_of_sustain(f, wave_id, w, s, SW_UNLOCK_DOUT);  
     }
   }
 }
+
+
+static void processSchedWaves_do_end_of_preamble(FSMID_t f, 
+						 unsigned int wave, 
+						 struct ActiveWave *w, 
+						 const struct SchedWave *s) 
+/* Edge-up timer expired:
+      * set any corresponding [events bits; DOut channels; trigger sounds; trigger other waves]
+*/
+{
+  int id = SW_INPUT_ROUTING(f, wave*2);
+  if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
+    /* mark the event as having occurred for the in-event of the matrix, if
+       it's routed as an input event wave for edge-up transitions. */
+    set_bit(id, rs[f].events_bits); 
+  }
+          
+  id = SW_DOUT_ROUTING(f, wave);
+  if ( id > -1 ) 
+    dataWrite_NoLocks(id, 1); /* if it's routed to do digital output, set line high. */
+          
+  id = SW_EXTOUT_ROUTING(f, wave);
+  if ( id > 0 ) /* if it's routed to do ext trigs */
+    doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), id); /* trigger sound, etc */
+
+  w->edge_up_ts = 0; /* mark this component done */
+  w->wave_is_high = 1; /* wave is entering its sustain, turn High bit on */
+             
+  /* Now loop through all waves that need to be triggered
+     when this wave goes high, and trigger, i.e., schedule them: */
+  {
+    unsigned waves_to_trigger_mask = s->sw_trigger_on_up;
+    unsigned wave_to_trigger;
+    while (waves_to_trigger_mask) {
+      /* Find the first set bit in the trigger mask: */
+      wave_to_trigger = __ffs(waves_to_trigger_mask); 
+      /* turn that wave on: */
+      scheduleWave(f, wave_to_trigger, 1);
+      /* Unset bit in the mask; will repeat if any set bits left: */
+      waves_to_trigger_mask &= ~(0x1<<wave_to_trigger);
+    }
+  }
+}
+
+
+static void processSchedWaves_do_end_of_sustain(FSMID_t f, 
+						unsigned int wave, 
+						struct ActiveWave *w, 
+						const struct SchedWave *s, 
+						unsigned int lock_or_unset)
+/* Edge-down timer expired:
+     * set any corresponding [events bits; DOut channels; untrigger sounds; untrigger other waves]
+   if lock_or_unset is SW_UNLOCK_DOUT, we don't set Dout bits low, we just unlock them 
+   for the rest of the FSM
+*/
+{
+  int id = SW_INPUT_ROUTING(f, wave*2+1);
+  if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
+    /* mark the event as having occurred for the in-event of the matrix, if
+       it's routed as an input event wave for edge-down transitions. */
+    set_bit(id, rs[f].events_bits);
+  }
+          
+  id = SW_DOUT_ROUTING(f, wave);
+  if ( id > -1 ) { /* if it's routed to do digital output, process that. */
+    if (lock_or_unset == SW_SET_DOUT_LOW ) /* Normal end of sustain, set bit low */
+      dataWrite_NoLocks(id, 0); 
+    else if (lock_or_unset == SW_UNLOCK_DOUT )
+      /* Wave has been untriggered, unlock channels to let FSM use them */
+      UNLOCK_DO_CHAN(id);
+    else 
+      DEBUG("Got unknown lock_or_unset signal in processSchedWaves_do_end_of_sustain, having to ignore it!!");
+  }
+  
+  id = SW_EXTOUT_ROUTING(f, wave);
+  if ( id > 0 ) /* if it's routed to do ext trigs */
+    doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), -id); /* untrigger sound, etc */
+
+  w->edge_down_ts = 0; /* mark this wave component done */
+  w->wave_is_high = 0; /* Mark this wave as having reached the end of sustain */
+
+  /* Now loop through all waves that need to be UNtriggered
+     when this wave goes LOW, and untrigger, i.e., de-schedule 'em: */
+  {
+    unsigned waves_to_untrigger_mask = s->sw_untrigger_on_down;
+    unsigned wave_to_untrigger;
+    while (waves_to_untrigger_mask) {
+      /* Find the first set bit in the untrigger mask: */
+      wave_to_untrigger = __ffs(waves_to_untrigger_mask); 
+      /* turn that wave off: */
+      scheduleWave(f, wave_to_untrigger, -1);
+      /* Unset bit in the mask; will repeat if any set bits left: */
+      waves_to_untrigger_mask &= ~(0x1<<wave_to_untrigger);
+    }
+  }
+}
+
+
+static void processSchedWaves_do_end_of_refraction(FSMID_t f, 
+						   unsigned int wave, 
+						   struct ActiveWave *w, 
+						   const struct SchedWave *s)
+// Refraction timer expired:
+//    * process any looping wave requirements
+//    * unlock Dout channels if wave is not looping further.
+{
+  if (w->loop_counter < 0) {
+    /* looping indefinitely: restart the wave */	        
+    w->edge_up_ts = rs[f].current_ts + (int64)s->preamble_us*1000LL;
+    w->edge_down_ts = w->edge_up_ts + (int64)s->sustain_us*1000LL;
+    w->end_ts = w->edge_down_ts + (int64)s->refraction_us*1000LL;
+
+  } else if ( w->loop_counter > 0) {
+    /* looping a finite number of times; still have at least
+       one to go. Decrement loop counter and restart the wave. */
+    w->loop_counter -= 1;
+    w->edge_up_ts = rs[f].current_ts + (int64)s->preamble_us*1000LL;
+    w->edge_down_ts = w->edge_up_ts + (int64)s->sustain_us*1000LL;
+    w->end_ts = w->edge_down_ts + (int64)s->refraction_us*1000LL;
+  } else {
+    /* Wave has run its course, deactivate and release DIO channels */
+    rs[f].active_wave_mask &= ~(0x1<<wave); /* deactivate the wave */
+    w->end_ts = 0; /* mark this wave component done */
+    int id = SW_DOUT_ROUTING(f, wave);
+    if (id > -1) /* if it's routed to do digital output,
+		    unlock the DOUT channel so the FSM can use it again */
+      UNLOCK_DO_CHAN(id);
+  }
+}
+
+
 
 static void processSchedWavesAO(FSMID_t f)
 {  
@@ -3572,7 +3804,94 @@ static void processSchedWavesAO(FSMID_t f)
   }
 }
 
-static void scheduleWave(FSMID_t f, unsigned wave_id, int op)
+
+
+static void processConditions(FSMID_t f) 
+{
+  int i; bool changed_state = false;
+  unsigned short myHapps = rs[f].states->plain.myHapps[rs[f].current_state];
+  happening_detector_fn_ptr detectorFunctionPointer = NULL; 
+  
+  /* {
+    FILE *fp = fopen("/Users/carlos/SVN/log.txt", "a"); fprintf(fp, "Entering processConditions\n");
+    int i, j, statenum, tothapps=0, actualhapps=0;
+    
+    fprintf(fp, "myHapps[1] == 0? : %d\n", rs[f].states->plain.myHapps[1] == 0);
+    for( tothapps = 0, i=0; i<(int)rs[f].states->plain.numStates; i++ ) tothapps += rs[f].states->plain.numHappenings[i];
+    for( statenum=0; statenum<(int)rs[f].states->plain.numStates; statenum++ ) {
+      int myhapps = rs[f].states->plain.numHappenings[statenum];
+      for ( j=0; j<myhapps; j++, actualhapps++ ) {
+	fprintf(fp, "Happ %d in state %d: happeningSpecNumber=%d, jumpTo=%d.   By pointer, specNum=%d and jumpTo=%d\n",
+		j, statenum, rs[f].states->plain.happsList[actualhapps].happeningSpecNumber, 
+		rs[f].states->plain.happsList[actualhapps].stateToJumpTo, 
+		rs[f].states->plain.happsList[rs[f].states->plain.myHapps[statenum]+j].happeningSpecNumber,
+		rs[f].states->plain.happsList[rs[f].states->plain.myHapps[statenum]+j].stateToJumpTo);
+      }
+    }
+    fprintf(fp, "%d total happs\n", actualhapps);
+    fclose(fp);
+  }; */
+  
+  i = 0;  
+  while( i < rs[f].states->plain.numHappenings[rs[f].current_state] ) {
+    if ( i==0 ) { /* starting a fresh list of conditions, possibly after changing state */
+      myHapps =  rs[f].states->plain.myHapps[rs[f].current_state];
+      changed_state=false; 
+    }
+
+    int specNumber = rs[f].states->plain.happsList[myHapps+i].happeningSpecNumber;  /* identify spec in big spec list */
+    if ( specNumber < 0 || specNumber >= (int)rs[f].states->plain.numHappeningSpecs) 
+      DEBUG("ERROR! Happening %d in state %d asked for specNumber %d, which is out of range. Ignoring the request.\n",
+	    i, rs[f].current_state, specNumber);
+
+    int detectorFunctionNumber = rs[f].states->plain.happeningSpecs[specNumber].detectorFunctionNumber; 
+    if ( detectorFunctionNumber < 0 || detectorFunctionNumber >= NUM_HAPPENING_DETECTOR_FUNCTIONS) 
+      DEBUG("ERROR! Happening %d in state %d asked for detectorFunctionNumber %d, which is out of range. %s\n", 
+	    i, rs[f].current_state, specNumber, "Ignoring the request.");
+
+    if ( happeningDetectorsList[detectorFunctionNumber].happType==HAPPENING_CONDITION ) { /* we only do conditions here */
+      bool detected;
+      int inputNumber = rs[f].states->plain.happeningSpecs[specNumber].inputNumber;
+
+      detectorFunctionPointer = hdName2FunctionPointerMap[detectorFunctionNumber].detectorFnPtr;
+
+      if ( (detected = (*detectorFunctionPointer)(f, inputNumber)) ) { /* this is where we actually call the detector fn */
+	int jumpState  = rs[f].states->plain.happsList[myHapps+i].stateToJumpTo;
+	int happId     = rs[f].states->plain.happeningSpecs[specNumber].happId;
+	fsmEventPush(f, FSM_EVT_TYPE_IN, happId, jumpState);
+	if ( gotoState(f, jumpState, happId)==1 ) changed_state = true;
+      }
+      
+    } /* end if happening_condition */
+
+    if ( changed_state ) i=0; /* Will need to check all conditions in new state */
+    else i++;                 /* didn't change state, move on to next happening */
+  } /* end while */
+
+}
+
+static void scheduleWave(FSMID_t f, unsigned wave_id, int op) /*
+Trigger/untrigger a wave. Ignores trigger requests for already active waves.
+Ignores UNtrigger requests for already INactive waves. For DIO waves: ignores 
+requests for waves that don't have their .enabled flag set (see struct ScehdWave 
+in FSM.h). For AO waves: ignores requests for invalid fsms, waves without an 
+aowaves[wave_id] pointer, or waves with zero aowaves[wave_id].nsamples (see 
+struct AOWave in FSM.h)
+When triggering a wave,
+   * sets the absolute preamble, sustain, and refraction times in active_wave[wave_id].
+   * sets the loop_counter in active_wave[wave_id] to be equal to rs[f].states.sched_waves[wave_id].loop
+   * sets the wave's bit in active_wave_mask 
+When UNtriggering a wave,
+   * UNsets the wave's bit in active_wave_mask 
+
+---PARAMETERS:
+
+FSMID_t f         The id of the fsm that we're working with.
+
+unsigned wave_id  The id of the fsm f's wave to work with
+
+int op            >0 to trigger; else UNtrigger
+							      */
 {
   if (wave_id >= FSM_MAX_SCHED_WAVES)
   {
@@ -3583,10 +3902,34 @@ static void scheduleWave(FSMID_t f, unsigned wave_id, int op)
   scheduleWaveAO(f, wave_id, op);
 }
 
-static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
+static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op) /*
+Trigger/untrigger a DIO wave. Ignores trigger requests for already active waves.
+Ignores UNtrigger requests for already INactive waves. Ignores requests for waves
+that don't have their .enabled flag set (see struct ScehdWave in FSM.h).
+When triggering a wave,
+   * sets the absolute preamble, sustain, and refraction times in active_wave[wave_id].
+   * sets the loop_counter in active_wave[wave_id] to be equal to rs[f].states.sched_waves[wave_id].loop
+   * sets the wave's bit in active_wave_mask 
+When UNtriggering a wave,
+   * UNsets the wave's bit in active_wave_mask 
+   * unlocks any DIO channels this wave may have been controlling
+
+---PARAMETERS:
+
+FSMID_t f         The id of the fsm that we're working with.
+
+unsigned wave_id  The id of the fsm f's wave to work with
+
+int op            >0 to trigger; else UNtrigger
+								 */
 {
-  struct ActiveWave *w;
-  const struct SchedWave *s;
+  struct ActiveWave *w;   /* ActiveWave structure holds things like the absolute
+			     timestamps for wave up, wave down, refraction, 
+			     loop_counter-- things that can change each time a wave 
+			     runs. */
+  const struct SchedWave *s;  /* SchedWave structure holds things that are constant for 
+				 a wave: it's preamble duration (relative to triggering), 
+				 it's loop parameter, etc. */
   int do_chan;
 
   if (wave_id >= FSM_MAX_SCHED_WAVES  /* it's an invalid id */
@@ -3610,6 +3953,7 @@ static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
     w->edge_up_ts = rs[f].current_ts + (int64)s->preamble_us*1000LL;
     w->edge_down_ts = w->edge_up_ts + (int64)s->sustain_us*1000LL;
     w->end_ts = w->edge_down_ts + (int64)s->refraction_us*1000LL;
+    w->loop_counter = s->loop;
     rs[f].active_wave_mask |= 0x1<<wave_id; /* set the bit, enable */
     if (do_chan > -1)
         LOCK_DO_CHAN(do_chan); /* lock the digital out chan so the FSM's own 
@@ -3629,7 +3973,27 @@ static void scheduleWaveDIO(FSMID_t f, unsigned wave_id, int op)
   }
 }
 
-static void scheduleWaveAO(FSMID_t f, unsigned wave_id, int op)
+static void scheduleWaveAO(FSMID_t f, unsigned wave_id, int op)/*
+Trigger/untrigger an AO wave. Ignores trigger requests for already active waves.
+Ignores UNtrigger requests for already INactive waves. Ignores requests for 
+invalid fsms, waves without an aowaves[wave_id] pointer, or waves with zero
+aowaves[wave_id].nsamples (see struct AOWave in FSM.h)
+that don't have their .enabled flag set (see struct ScehdWave in FSM.h).
+When triggering a wave,
+   * sets the absolute preamble, sustain, and refraction times in active_wave[wave_id].
+   * sets the loop_counter in active_wave[wave_id] to be equal to rs[f].states.sched_waves[wave_id].loop
+   * sets the wave's bit in active_wave_mask 
+When UNtriggering a wave,
+   * UNsets the wave's bit in active_wave_mask 
+
+---PARAMETERS:
+
+FSMID_t f         The id of the fsm that we're working with.
+
+unsigned wave_id  The id of the fsm f's wave to work with
+
+int op            >0 to trigger; else UNtrigger
+								 */
 {
   volatile struct AOWaveINTERNAL *w = 0;
   if (wave_id >= FSM_MAX_SCHED_WAVES  /* it's an invalid id */
@@ -3664,19 +4028,23 @@ static void scheduleWaveAO(FSMID_t f, unsigned wave_id, int op)
 
 static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
 {  
+  unsigned int i;
+  DEBUG("Entered stopActiveWaves with mask %d", rs[f].active_wave_mask);
   while (rs[f].active_wave_mask) { 
     unsigned wave = __ffs(rs[f].active_wave_mask);
     int do_chan = -1;
     struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave];
     rs[f].active_wave_mask &= ~(1<<wave); /* clear bit */
-    if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts) {
+    if (w->edge_down_ts && w->edge_down_ts >= rs[f].current_ts) {
           /* The wave was in the middle of a high, so set the line back low
              (if there actually is a line). */
           int id = do_chan = SW_DOUT_ROUTING(f, wave);
+	  DEBUG("Wave %d still high at trial end; forcing its output channel %d low", wave, id);
 
-          if (id > -1) 
+          if (id > -1) {
             dataWrite_NoLocks(id, 0); /* if it's routed to do output, set line back to low. */
-          
+          }
+
           id = SW_EXTOUT_ROUTING(f, wave);
           
           if (id > 0) /* if it's routed to play sounds, untrigger sound */
@@ -3694,6 +4062,8 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
     scheduleWaveAO(f, wave, -1); /* should clear bit in rs.active_ao_wave_mask */
     rs[f].active_ao_wave_mask &= ~(0x1<<wave); /* just in case */
   }
+  /* On new trial start, all FSM wave states go to _Out -- unlike pokes! */
+  for (i=0; i<FSM_MAX_SCHED_WAVES; i++) rs[f].active_wave[i].wave_is_high = 0;
 }
 
 static void buddyTaskHandler(void *arg)
@@ -3722,6 +4092,7 @@ static void buddyTaskHandler(void *arg)
     /* first, free alternate FSM */
     unloadDetachFSM(fsm); /* NB: may be a noop if no old fsm exists
                              or if old fsm is of type FSM_TYPE_PLAIN.. */
+
     /* now copy in the fsm from usersopace */
     memcpy(fsm, (void *)&msg->u.fsm, sizeof(*fsm));  
     *embc = 0;/* make SURE the ptr starts off NULL, this prevents userspace from crashing us.. */
@@ -3879,6 +4250,18 @@ static void buddyTaskHandler(void *arg)
                     sizeof(struct StateTransition));
     }
     break;
+
+  case GETINPUTCHANNELSTATES: {
+        // DEBUG("Carlos: ** starting GETINPUTCHANNELSTATES from within the buddy task, in buddyTaskHandler");
+        unsigned int i, j;
+	msg->u.input_channels.num = AFTER_LAST_IN_CHAN(f) - FIRST_IN_CHAN(f);
+	for( i=FIRST_IN_CHAN(f), j=0; i < AFTER_LAST_IN_CHAN(f); ++i, ++j ) {
+	  msg->u.input_channels.state[j] = (((0x1 << i) & rs[f].input_bits) > 0);
+	}
+        // DEBUG("Carlos: finished ** GETINPUTCHANNELSTATES from within the buddy task, in buddyTaskHandler");
+    }
+    break;
+
   case GETSTIMULI: {
         unsigned const from = msg->u.fsm_events.from; /* Shorthand alias.. */
         unsigned const num = msg->u.fsm_events.num; /* alias.. */
@@ -4291,6 +4674,7 @@ static void emblib_trigExt(unsigned fsm_id, unsigned which, unsigned trig)
 
 static void swapFSMs(FSMID_t f)
 {
+  DEBUG("Swapping FSMs");
   stopActiveWaves(f); /* since we are starting a new trial, force any
                          active timer waves to abort! */ 
   rs[f].states = OTHER_FSM_PTR(f); /* swap in the new fsm.. */
