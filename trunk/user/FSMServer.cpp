@@ -838,7 +838,7 @@ bool ConnectionThread::happeningSpecsAreLegal(int num_specs, happeningUserSpec *
 bool ConnectionThread::sockReadHappeningsSpecs()
 /* return TRUE if read was fine*/
 {
-  // Log() << "Carlos: Got 'SET HAPPENINGS SPEC'" << std::endl;
+  // Log() << "Carlos: entered sockReadHappeningSpecs()" << std::endl;
   int i, num_specs = 0; std::string line;
   if ((line = sockReceiveLine()).length() == 0) { error_string.str("");
     error_string << "ERROR: expecting a line with the number of happening specs and not finding it!" << std::endl;
@@ -986,7 +986,7 @@ bool ConnectionThread::sockReadHappeningsList()
       msg.u.fsm.plain.happsList[totalReadHapps].happeningSpecNumber = (unsigned)myHappSpecNum;
       msg.u.fsm.plain.happsList[totalReadHapps].stateToJumpTo       = (unsigned)myJumpState;
     } /* end iterate over happenings for one state */
-    Log() << "Read " << my_num_happs << " happenings for state " << i << std::endl;
+    // Log() << "Read " << my_num_happs << " happenings for state " << i << std::endl;
   } /* end iterate over states */	
 
   if ( totalReadHapps != num_happenings ) { error_string.str("");
@@ -1091,6 +1091,8 @@ void *ConnectionThread::threadFunc(void)
 			  if (!matrixToRT(mat, num_Events, num_SchedWaves, inChanType, 
 					  readyForTrialState, outputSpecStr, state0_fsm_swap_flg)) break;
 			  
+                          // Log() << "Carlos: Just received the matrix" << std::endl;
+
 			  if ( fsms[fsm_id].use_happenings ) {
 			    std::string line;   
 			    if ((line = sockReceiveLine()).length() == 0) { 
@@ -1103,7 +1105,7 @@ void *ConnectionThread::threadFunc(void)
 			      Log() << error_string.str(); sockSend(error_string.str()); break;			    
 			    } else 
 			      sockSend("OK\n");
-			    
+
 			    if ((line = sockReceiveLine()).length() == 0) { 
 			      error_string.str("");
 			      error_string << "ERROR: expecting a line with SET HAPPENINGS LIST " 
