@@ -2,11 +2,13 @@
 #  define FSM_H
 
 #include "IntTypes.h" // for int8 int16 int32, etc
+#ifdef EMULATOR
 #  if defined(OS_LINUX) || defined(OS_OSX) 
 #    include <dlfcn.h>  // for type bool
 #  else
 #    include "windows_dlemul.h"
 #  endif
+#endif
 
 
 #ifdef __cplusplus
