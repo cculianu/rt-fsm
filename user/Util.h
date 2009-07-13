@@ -22,6 +22,7 @@
 #include <vector>
 #include <pthread.h>
 #include <string>
+#include <string.h>
 #include <sstream>
 #include "Mutex.h"
 #include <sys/time.h> /* for struct timeval and gettimeofday -- for non-Unix we need to figure out a way to handle this */

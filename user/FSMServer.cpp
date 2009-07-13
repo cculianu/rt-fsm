@@ -367,9 +367,9 @@ private:
 
   std::ostringstream error_string;  /* used for error messages to be sent back to Client if error during reading */
 
-  int  ConnectionThread::mapHappName2ID(std::string myHappSpecName);
-  bool ConnectionThread::sockReadHappeningsSpecs();
-  bool ConnectionThread::sockReadHappeningsList();
+  int  mapHappName2ID(std::string myHappSpecName);
+  bool sockReadHappeningsSpecs();
+  bool sockReadHappeningsList();
   /* Check whether happening specs user asked for are legal, and map detectorFunctionNames to detectorFunctionNumbers: */
   bool happeningSpecsAreLegal(int num_specs, happeningUserSpec *happeningSpecs);
 
