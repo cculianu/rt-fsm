@@ -988,7 +988,7 @@ bool ConnectionThread::sockReadHappeningsList()
     } /* end iterate over happenings for one state */
     // Log() << "Read " << my_num_happs << " happenings for state " << i << std::endl;
   } /* end iterate over states */	
-
+  
   if ( totalReadHapps != num_happenings ) { error_string.str("");
     error_string << "ERROR: I was told that the sum of happenings across states was " << num_happenings 
 		 << " but after reading all states, I only got " << totalReadHapps << std::endl;
@@ -1118,13 +1118,15 @@ void *ConnectionThread::threadFunc(void)
 			      sockSend("OK\n");
 			  } /* end if use_happenings */
 
+                          msg.u.fsm.plain.use_happenings = fsms[fsm_id].use_happenings;
  			  sendToRT(msg); 
 			  cmd_error = false;
                         } else if (count <= 0) {
                             break;
-                        }
-                } 
-            }
+                        } /* end if/else if count == (int)mat.bufSuize() */
+                } /* end if m && n */
+            } /* end if (pos != std::string::npos) */
+            
         } else if (line.find("GET STATE MATRIX") == 0) {
             cmd_error = !sendStringMatrix(matrixFromRT());
         } else if (line.find("GET STATE PROGRAM") == 0) {
@@ -2686,7 +2688,7 @@ bool ConnectionThread::matrixToRT(const Matrix & m,
     }
     w.enabled = true;
     if (debug) 
-      Log() << "Sched wave " << id << " says preamble=" << w.preamble_us << " sustain=" << w.sustain_us << " refraction=" << w.refraction_us << " loop=" << w.loop << "\n";
+      Log() << "Sched wave " << id << " says preamble=" << w.preamble_us << " sustain=" << w.sustain_us << " refraction=" << w.refraction_us << " loop=" << w.loop << " and enable bit=" << w.enabled << "\n";
   }
 #undef NEXT_COL
 

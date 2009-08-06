@@ -479,6 +479,11 @@ void set_bit(unsigned bit, volatile unsigned long *bits)
 
 }
 
+int test_bit (unsigned bit, volatile unsigned long *bits) {
+    unsigned word = bit/(sizeof(*bits)*8), rem =  bit%(sizeof(*bits)*8);
+    return((bits[word] & (1UL<<rem))>0);
+}
+
 #define BITS_PER_LONG (sizeof(long)*8)
 #define BITOP_WORD(nr)          ((nr) / BITS_PER_LONG)
 

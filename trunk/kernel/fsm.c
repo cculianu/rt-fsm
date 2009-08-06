@@ -147,10 +147,10 @@ static void cleanupAOWave(volatile struct AOWaveINTERNAL *, const char *name, in
 
 typedef bool (*happening_detector_fn_ptr) (FSMID_t f, unsigned int input_number);
 
-// static bool line_in  (FSMID_t f, unsigned int input_number); 
-// static bool line_out (FSMID_t f, unsigned int input_number); 
-// static bool wave_in  (FSMID_t f, unsigned int input_number); 
-// static bool wave_out (FSMID_t f, unsigned int input_number); 
+static bool line_in  (FSMID_t f, unsigned int input_number); 
+static bool line_out (FSMID_t f, unsigned int input_number); 
+static bool wave_in  (FSMID_t f, unsigned int input_number); 
+static bool wave_out (FSMID_t f, unsigned int input_number); 
 static bool line_high(FSMID_t f, unsigned int line_number);   /* line numbers are counted after input routing */
 static bool line_low (FSMID_t f, unsigned int line_number); 
 static bool wave_high(FSMID_t f, unsigned int wave_id); 
@@ -161,11 +161,18 @@ struct hdetectorName2FnPtr {
   happening_detector_fn_ptr detectorFnPtr;
 };
 
+/* TODO:!!!  We currently depend on the following list being in the same order as happeningDetectorsList
+ in FSM.h. That's bad!!! We should use the names to fill out the second column upon receipt of an FSM command */
+
 const struct hdetectorName2FnPtr hdName2FunctionPointerMap[NUM_HAPPENING_DETECTOR_FUNCTIONS] = { \
+  { "line_in",   line_in   }, \
+  { "line_out",  line_out  }, \
+  { "wave_in",   wave_in   }, \
+  { "wave_out",  wave_out  }, \
   { "line_high", line_high }, \
-  { "line_low",  line_low }, \
+  { "line_low",  line_low  }, \
   { "wave_high", wave_high }, \
-  { "wave_low",  wave_low }, \
+  { "wave_low",  wave_low  }, \
 };
  
 
@@ -519,12 +526,15 @@ struct RunState {
 			 reaches the end of a refractory period. If non-zero, wave preamble
 			 then restarts. If loop_conter is negative, then it doesn't change, 
 			 and restarting goes on indefinitely. */
-    unsigned wave_is_high;   /** A flag that marks whether a wave is High (in the 
-				 _In state) or Low (in the _Out state). Note that 
-				 this can be different from being active or inactive, because a 
-				 state transition that untriggers a wave during its sustain will 
-				 make it inactive while leaving this flag on. On the next clock 
-				 tick, that gets detected and a wave out event is generated. **/
+    bool wave_is_high;   /** A flag that marks whether a wave is High (in the _In state) or Low 
+                             (in the _Out state). Note that this can be different from being active 
+                             or inactive, because a state transition that untriggers a wave during 
+                             its sustain will make it inactive while leaving this flag on. On the 
+                             next clock tick, that gets detected and a wave out event is generated. **/
+    bool wave_edge_up;   /** flag that indicates an edge up event in this clock tick. Set by 
+                             processSchedWaves and used by event detector functions wave_in() and wave_out() **/
+    bool wave_edge_down; /** flag that indicates an edge down event in this clock tick. Set by 
+                             processSchedWaves and used by event detector functions wave_in() and wave_out() **/
  
   } active_wave[FSM_MAX_SCHED_WAVES];
   /** A quick mask of the currently active scheduled waves.  The set bits
@@ -608,7 +618,7 @@ static int  do_dio_config(unsigned chan, int mode);
 static void doOutput(FSMID_t);
 static void clearAllOutputLines(FSMID_t);
 static inline void clearTriggerLines(FSMID_t);
-static void dispatchEvent(FSMID_t, unsigned event_id);
+static void dispatchEvent(FSMID_t, unsigned event_id); /* if use_happenings is true, this fn is not used */
 
 static void handleFifos(FSMID_t);
 static void dataWrite(unsigned chan, unsigned bit);
@@ -629,6 +639,7 @@ static void processSchedWaves_do_end_of_refraction(FSMID_t f, unsigned int wave,
 						   struct ActiveWave *w, const struct SchedWave *s);
 static void processSchedWavesAO(FSMID_t); /**< updates active wave state, does output, sets event id mask  in rs[f].events_bits of any waves that generated input events */
 static void processConditions(FSMID_t); /* goes through happenings in the state that are conditions; does any state updates that they mandate */
+static void processEvents    (FSMID_t); /* goes through happenings in the state that are events;     does any state updates that they mandate */
 static void scheduleWave(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveDIO(FSMID_t, unsigned wave_id, int op);
 static void scheduleWaveAO(FSMID_t, unsigned wave_id, int op);
@@ -1003,7 +1014,11 @@ static int initRunState(FSMID_t f)
   rs[f].id = f;
   
   /* On FSM start, all FSM wave states should be in _Out state */
-  for (i=0; i<FSM_MAX_SCHED_WAVES; i++) rs[f].active_wave[i].wave_is_high = 0;
+  for (i=0; i<FSM_MAX_SCHED_WAVES; i++) {
+    rs[f].active_wave[i].wave_edge_up   = false;
+    rs[f].active_wave[i].wave_edge_down = false;
+    rs[f].active_wave[i].wave_is_high   = false;
+  }
 
   return 0;  
 }
@@ -2174,28 +2189,29 @@ static void *doFSM (void *arg)
           
           DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08lx\n", f, *(unsigned long *)rs[f].events_bits);
 
-	  processConditions(f);
-          
-        } /* end if !paused */
-        
-
-        if (got_timeout) {
+          if (got_timeout) {
             fsmEventPush(f, FSM_EVT_TYPE_IN, -1, STATE_TIMEOUT_STATE(fsm, state));
             /* Timeout expired, transistion to timeout_state.. */
             gotoState(f, STATE_TIMEOUT_STATE(fsm, state), -1);
-        }
-        /* Normal event transition code, keep popping ones off our 
-           bitfield array, events_bits. */
-        for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit((const unsigned long *)rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < ((int)NUM_INPUT_EVENTS(f)) && n_evt_loops < (int)NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
-            dispatchEvent(f, evt_id);
-        }
+          }
 
-        /*
-        if (NUM_INPUT_EVENTS(f) && n_evt_loops >= NUM_INPUT_EVENTS(f)) {
-          ERROR_INT("Event detection code in doFSM() for FSM %u tried to loop more than %d times!  DEBUG ME!\n", f, n_evt_loops, NUM_INPUT_EVENTS(f));
-        }*/
+	  processConditions(f);
+
+          /* Events only use the happening structure if use_happenings flag is on */
+          if ( rs[f].states->plain.use_happenings ) processEvents(f);
+
+        } /* end if !paused */
+
         
-      }
+        if ( !rs[f].states->plain.use_happenings ) { /* Old event transition code, 
+                                                  keep popping ones off our bitfield array, events_bits: */
+          for (n_evt_loops = 0, evt_id = 0; (evt_id = find_next_bit((const unsigned long *)rs[f].events_bits, NUM_INPUT_EVENTS(f), evt_id)) < ((int)NUM_INPUT_EVENTS(f)) && n_evt_loops < (int)NUM_INPUT_EVENTS(f); ++n_evt_loops, ++evt_id) {
+            dispatchEvent(f, evt_id);
+          }
+        }
+                
+
+      } /* end if rs[f].valid */
     } /* end loop through each state machine */
 
     commitDIOWrites();   
@@ -2695,7 +2711,7 @@ static void dispatchEvent(FSMID_t f, unsigned event_id)
   next_state = (event_id == NUM_INPUT_EVENTS(f)) ? STATE_TIMEOUT_STATE(fsm, state) : STATE_COL(fsm, state, event_id); 
   fsmEventPush(f, FSM_EVT_TYPE_IN, event_id == NUM_INPUT_EVENTS(f) ? -1 : (int)event_id, next_state);
   gotoState(f, next_state, event_id);
-}
+} 
 
 /* Set everything to zero to start fresh */
 static void clearAllOutputLines(FSMID_t f)
@@ -3571,6 +3587,31 @@ static inline void putDebugFifo(unsigned val)
 
 /******** HAPPENING DETECTOR FUNCTIONS ************/
 
+bool line_in(FSMID_t f, unsigned int line_number) {
+  bool this_bit, last_bit;
+
+  line_number += FIRST_IN_CHAN(f)-1;
+  if (line_number >= AFTER_LAST_IN_CHAN(f))
+    DEBUG("Warning! line_in got asked about line %d, which is out of range. Ignoring request.\n", line_number);
+
+  this_bit = ((0x1 << line_number) & rs[f].input_bits)      != 0;
+  last_bit = ((0x1 << line_number) & rs[f].input_bits_prev) != 0;
+  return( !last_bit && this_bit );
+};
+
+
+bool line_out(FSMID_t f, unsigned int line_number) {
+  bool this_bit, last_bit;
+
+  line_number += FIRST_IN_CHAN(f)-1;
+  if (line_number >= AFTER_LAST_IN_CHAN(f))
+    DEBUG("Warning! line_in got asked about line %d, which is out of range. Ignoring request.\n", line_number);
+
+  this_bit = ((0x1 << line_number) & rs[f].input_bits)      != 0;
+  last_bit = ((0x1 << line_number) & rs[f].input_bits_prev) != 0;
+  return( last_bit && !this_bit );
+};
+
 bool line_high(FSMID_t f, unsigned int line_number) {
   line_number += FIRST_IN_CHAN(f)-1;
   if (line_number >= AFTER_LAST_IN_CHAN(f))
@@ -3581,10 +3622,32 @@ bool line_high(FSMID_t f, unsigned int line_number) {
 bool line_low (FSMID_t f, unsigned int line_number) {
   line_number += FIRST_IN_CHAN(f)-1;
   if (line_number >= AFTER_LAST_IN_CHAN(f))
-    DEBUG("Warning! Fsm %d: line_high got asked about line %d, which is out of range. Ignoring request.\n", 
+    DEBUG("Warning! Fsm %d: line_low got asked about line %d, which is out of range. Ignoring request.\n", 
 	  f, line_number);
   return( ((0x1 << line_number) & rs[f].input_bits) == 0);
 };
+
+bool wave_in(FSMID_t f, unsigned int wave_id) {
+  struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
+  if ( !FSM_PTR(f)->sched_waves[wave_id].enabled ) {
+    DEBUG("WARNING: Fsm %d: wave_in is being asked about sched wave %d, which has not been enabled. Returning false.",
+	  f, wave_id);
+    return(false);
+  }
+  return( w->wave_edge_up );
+};
+
+
+bool wave_out(FSMID_t f, unsigned int wave_id) {
+  struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
+  if ( !FSM_PTR(f)->sched_waves[wave_id].enabled ) {
+    DEBUG("WARNING: Fsm %d: wave_out is being asked about sched wave %d, which has not been enabled. Returning false.",
+	  f, wave_id);
+    return(false);
+  }
+  return( w->wave_edge_down );
+};
+
 
 bool wave_high(FSMID_t f, unsigned int wave_id) {
   struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
@@ -3593,19 +3656,20 @@ bool wave_high(FSMID_t f, unsigned int wave_id) {
 	  f, wave_id);
     return(false);
   }
-  if ( (rs[f].active_wave_mask & (0x1<<wave_id)) && (w->wave_is_high == 1) ) return(true);
-  else return(false);
+  /* sustain=0 is a special case, where in a single clock tick the wave goes high, goes low, and becomes inactive.
+     In that case, both edge_up and edge_down will be true simultaneously. Otherwise, check that the wave is active 
+     and high. */
+  return(  (w->wave_edge_up && w->wave_edge_down) || ( (rs[f].active_wave_mask & (0x1<<wave_id)) && w->wave_is_high ) );
 };
 
 bool wave_low (FSMID_t f, unsigned int wave_id) {
-  struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave_id];  
   if ( !FSM_PTR(f)->sched_waves[wave_id].enabled ) {
     DEBUG("WARNING: Fsm %d: wave_low is being asked about sched wave %d, which has not been enabled. Returning false.",
 	  f, wave_id);
     return(false);
   }
-  if ( (rs[f].active_wave_mask & (0x1<<wave_id)) && (w->wave_is_high == 1) ) return(false);
-  else return(true);
+
+  return( !wave_high(f, wave_id) );
 };
 
 /******** END happening detector functions END ****/
@@ -3616,7 +3680,7 @@ bool wave_low (FSMID_t f, unsigned int wave_id) {
 static void processSchedWaves(FSMID_t f)
 {  
   unsigned int wave_id;
-  
+
   for (wave_id=0; wave_id<FSM_MAX_SCHED_WAVES; wave_id++ ) {
     /* ActiveWave structure below holds things like the absolute timestamps 
        for wave up, wave down, refraction, loop_counter-- things that can change 
@@ -3626,23 +3690,30 @@ static void processSchedWaves(FSMID_t f)
        its preamble duration (relative to triggering), its loop parameter, etc. */
     const struct SchedWave *s = &((struct RunState *)&rs[f])->states->sched_waves[wave_id]; 
 
-    if (rs[f].active_wave_mask & (0x1<<wave_id)) {  /* Wave is active, do normal processing */
-      if (w->edge_up_ts && w->edge_up_ts <= rs[f].current_ts)  /* Edge up timer expired */
-	processSchedWaves_do_end_of_preamble(f, wave_id, w, s);
+    if ( s->enabled ) { /* we only run enabled waves */
+      w->wave_edge_up = w->wave_edge_down = false; /* no wave events detected unless fcns below say so */
+      
+      if (rs[f].active_wave_mask & (0x1<<wave_id)) {  /* Wave is active, do normal processing */
 
-      if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts)  /* sustain timer expired */
-	/* normal end of sustain, so we use SW_SET_DOUT_LOW flag */
-	processSchedWaves_do_end_of_sustain(f, wave_id, w, s, SW_SET_DOUT_LOW);  
+        if (w->edge_up_ts && w->edge_up_ts <= rs[f].current_ts)  /* Edge up timer expired */
+          processSchedWaves_do_end_of_preamble(f, wave_id, w, s);
 
-      if (w->end_ts && w->end_ts <= rs[f].current_ts) /* refraction timer expired */
-	processSchedWaves_do_end_of_refraction(f, wave_id, w, s);
-    }
-    else if (  !(rs[f].active_wave_mask & (0x1<<wave_id))  &&  (rs[f].active_wave[wave_id].wave_is_high)  ) {
-      /* Wave must have been actively untriggered during its sustain; do all end-of-sustain
-	 processing, but unlock DOut channels instead of setting them low  */
-      processSchedWaves_do_end_of_sustain(f, wave_id, w, s, SW_UNLOCK_DOUT);  
-    }
-  }
+        if (w->edge_down_ts && w->edge_down_ts <= rs[f].current_ts) /* sustain timer expired */
+          /* normal end of sustain, so we use SW_SET_DOUT_LOW flag */
+          processSchedWaves_do_end_of_sustain(f, wave_id, w, s, SW_SET_DOUT_LOW);  
+        
+        if (w->end_ts && w->end_ts <= rs[f].current_ts) /* refraction timer expired */
+          processSchedWaves_do_end_of_refraction(f, wave_id, w, s);
+      } 
+      else if (  !(rs[f].active_wave_mask & (0x1<<wave_id))  &&  (rs[f].active_wave[wave_id].wave_is_high)  ) {
+        /* Wave must have been actively untriggered during its sustain; do all end-of-sustain
+           processing, but unlock DOut channels instead of setting them low  */
+        processSchedWaves_do_end_of_sustain(f, wave_id, w, s, SW_UNLOCK_DOUT);  
+      } /* end if/else rs[f].active_wave_mask */
+
+    } /* end if s->enabled */
+
+  } /* end for wave_id */
 }
 
 
@@ -3670,7 +3741,8 @@ static void processSchedWaves_do_end_of_preamble(FSMID_t f,
     doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), id); /* trigger sound, etc */
 
   w->edge_up_ts = 0; /* mark this component done */
-  w->wave_is_high = 1; /* wave is entering its sustain, turn High bit on */
+  w->wave_edge_up  = true; /* we had an edge up in this clock tick */
+  w->wave_is_high  = true; /* wave is entering its sustain, turn High bit on */
              
   /* Now loop through all waves that need to be triggered
      when this wave goes high, and trigger, i.e., schedule them: */
@@ -3700,6 +3772,7 @@ static void processSchedWaves_do_end_of_sustain(FSMID_t f,
    for the rest of the FSM
 */
 {
+
   int id = SW_INPUT_ROUTING(f, wave*2+1);
   if (id > -1 && id <= (int)NUM_IN_EVT_COLS(f)) {
     /* mark the event as having occurred for the in-event of the matrix, if
@@ -3723,7 +3796,8 @@ static void processSchedWaves_do_end_of_sustain(FSMID_t f,
     doExtTrigOutput(f, DEFAULT_EXT_TRIG_OBJ_NUM(f), -id); /* untrigger sound, etc */
 
   w->edge_down_ts = 0; /* mark this wave component done */
-  w->wave_is_high = 0; /* Mark this wave as having reached the end of sustain */
+  w->wave_edge_down = true;  /* we had an edge down in this clock tick */
+  w->wave_is_high   = false; /* Mark this wave as having reached the end of sustain */
 
   /* Now loop through all waves that need to be UNtriggered
      when this wave goes LOW, and untrigger, i.e., de-schedule 'em: */
@@ -3806,11 +3880,12 @@ static void processSchedWavesAO(FSMID_t f)
 
 
 
+
+
 static void processConditions(FSMID_t f) 
 {
   int i; bool changed_state = false;
   unsigned short myHapps = rs[f].states->plain.myHapps[rs[f].current_state];
-  happening_detector_fn_ptr detectorFunctionPointer = NULL; 
   
   /* {
     FILE *fp = fopen("/Users/carlos/SVN/log.txt", "a"); fprintf(fp, "Entering processConditions\n");
@@ -3834,41 +3909,125 @@ static void processConditions(FSMID_t f)
   
   i = 0;  
   while( i < rs[f].states->plain.numHappenings[rs[f].current_state] ) {
-    if ( i==0 ) { /* starting a fresh list of conditions, possibly after changing state */
-      myHapps =  rs[f].states->plain.myHapps[rs[f].current_state];
-      changed_state=false; 
-    }
+    myHapps =  rs[f].states->plain.myHapps[rs[f].current_state]; /* always do this line, in case state changed */
 
     int specNumber = rs[f].states->plain.happsList[myHapps+i].happeningSpecNumber;  /* identify spec in big spec list */
-    if ( specNumber < 0 || specNumber >= (int)rs[f].states->plain.numHappeningSpecs) 
+    if ( specNumber < 0 || specNumber >= (int)rs[f].states->plain.numHappeningSpecs) {
       DEBUG("ERROR! Happening %d in state %d asked for specNumber %d, which is out of range. Ignoring the request.\n",
 	    i, rs[f].current_state, specNumber);
+    } else {
+      int detectorFunctionNumber = rs[f].states->plain.happeningSpecs[specNumber].detectorFunctionNumber; 
+      if ( detectorFunctionNumber < 0 || detectorFunctionNumber >= NUM_HAPPENING_DETECTOR_FUNCTIONS) {
+        DEBUG("ERROR! Spec %d asked for detectorFunctionNumber %d, which is out of range. %s\n", 
+              specNumber, detectorFunctionNumber, "Ignoring the request."); 
+      } else {
+        if ( happeningDetectorsList[detectorFunctionNumber].happType==HAPPENING_CONDITION ) { /* only do conditions here */
+          bool detected;
+          int inputNumber = rs[f].states->plain.happeningSpecs[specNumber].inputNumber;
 
-    int detectorFunctionNumber = rs[f].states->plain.happeningSpecs[specNumber].detectorFunctionNumber; 
-    if ( detectorFunctionNumber < 0 || detectorFunctionNumber >= NUM_HAPPENING_DETECTOR_FUNCTIONS) 
-      DEBUG("ERROR! Happening %d in state %d asked for detectorFunctionNumber %d, which is out of range. %s\n", 
-	    i, rs[f].current_state, specNumber, "Ignoring the request.");
+          happening_detector_fn_ptr dFunPtr = hdName2FunctionPointerMap[detectorFunctionNumber].detectorFnPtr;
 
-    if ( happeningDetectorsList[detectorFunctionNumber].happType==HAPPENING_CONDITION ) { /* we only do conditions here */
-      bool detected;
-      int inputNumber = rs[f].states->plain.happeningSpecs[specNumber].inputNumber;
+          if ( (detected = (*dFunPtr)(f, inputNumber)) ) { /* this is where we actually call the detector fn */
+            int jumpState  = rs[f].states->plain.happsList[myHapps+i].stateToJumpTo;
+            int happId     = rs[f].states->plain.happeningSpecs[specNumber].happId;
+            fsmEventPush(f, FSM_EVT_TYPE_IN, happId, jumpState);
+            if ( gotoState(f, jumpState, happId)==1 ) changed_state = true;
+          }
+        } /* end if HAPPENING_CONDITION */
+      } /* end if detectorFunctionNumber in range */
+    } /* end if specNumber in range */
 
-      detectorFunctionPointer = hdName2FunctionPointerMap[detectorFunctionNumber].detectorFnPtr;
+    if ( changed_state ) { i=0; changed_state = false; } /* Will need to start from first happening in new state */
+    else i++;                                            /* didn't change state, move on to next happening */
+  } /* end while */
+}
 
-      if ( (detected = (*detectorFunctionPointer)(f, inputNumber)) ) { /* this is where we actually call the detector fn */
-	int jumpState  = rs[f].states->plain.happsList[myHapps+i].stateToJumpTo;
-	int happId     = rs[f].states->plain.happeningSpecs[specNumber].happId;
-	fsmEventPush(f, FSM_EVT_TYPE_IN, happId, jumpState);
-	if ( gotoState(f, jumpState, happId)==1 ) changed_state = true;
-      }
-      
-    } /* end if happening_condition */
 
-    if ( changed_state ) i=0; /* Will need to check all conditions in new state */
-    else i++;                 /* didn't change state, move on to next happening */
+
+
+
+static void processEvents(FSMID_t f) 
+{
+  int i, hs; bool changed_state=false;
+  unsigned short myHapps;
+
+  bool already_processed[MAX_HAPPENING_SPECS];
+  for ( hs=0; hs<(int)rs[f].states->plain.numHappeningSpecs; hs++ ) already_processed[hs] = false;
+
+  /* First we process all the events that are happenings for the state we are in; 
+     later we check for any remaining events that are defined in the happening 
+     spec list but haven't been processed yet. */  
+  i = 0;  
+  while( i < rs[f].states->plain.numHappenings[rs[f].current_state] ) {
+    myHapps =  rs[f].states->plain.myHapps[rs[f].current_state]; /* always do this line, in case state changed */
+    
+    int specNumber = rs[f].states->plain.happsList[myHapps+i].happeningSpecNumber;  /* identify spec in big spec list */
+    if ( specNumber < 0 || specNumber >= (int)rs[f].states->plain.numHappeningSpecs) {
+      DEBUG("ERROR! Happening %d in state %d asked for specNumber %d, which is out of range. Ignoring the request.\n",
+            i, rs[f].current_state, specNumber); 
+    } else {
+
+      if ( !already_processed[specNumber] ) {  /* only test for this spec if we haven't used this spec already */
+        int detectorFunctionNumber = rs[f].states->plain.happeningSpecs[specNumber].detectorFunctionNumber; 
+        if ( detectorFunctionNumber < 0 || detectorFunctionNumber >= NUM_HAPPENING_DETECTOR_FUNCTIONS) {
+          DEBUG("ERROR! Happening spec %d asked for detectorFunctionNumber %d, which is out of range. %s\n", 
+                specNumber, detectorFunctionNumber, "Ignoring the request."); 
+        } else {
+
+          if ( happeningDetectorsList[detectorFunctionNumber].happType==HAPPENING_EVENT ) { /* we only do events here */
+            bool detected;
+            int inputNumber = rs[f].states->plain.happeningSpecs[specNumber].inputNumber;
+
+            happening_detector_fn_ptr dFunPtr = hdName2FunctionPointerMap[detectorFunctionNumber].detectorFnPtr;
+
+            if ( (detected = (*dFunPtr)(f, inputNumber)) ) { /* this is where we actually call the detector fn */
+              int jumpState  = rs[f].states->plain.happsList[myHapps+i].stateToJumpTo;
+              int happId     = rs[f].states->plain.happeningSpecs[specNumber].happId;
+              already_processed[specNumber] = true;  /* chomp this spec so it doesn't get used again this clock cycle */
+              fsmEventPush(f, FSM_EVT_TYPE_IN, happId, jumpState);
+              if ( gotoState(f, jumpState, happId)==1 ) changed_state = true;
+            }
+          } /* end if HAPPENING_EVENT */
+        } /* end if detectorFunctionNumber in range */
+      } /* end if !already_processed[specNumber] */
+    } /* end if specNumber in range */
+
+    if ( changed_state ) { i=0; changed_state = false; } /* Will need to start from first happening in new state */
+    else i++;                                            /* didn't change state, move on to next happening */
+
   } /* end while */
 
+
+
+  /* All happenings listed for states have now been processed-- check any remaining specs (e.g., 
+     pokes that should be detected and logged but that don't lead to state changes: */
+  for ( hs=0; hs<(int)rs[f].states->plain.numHappeningSpecs; hs++ ) {
+    int detectorFunctionNumber = rs[f].states->plain.happeningSpecs[hs].detectorFunctionNumber; 
+
+    if ( detectorFunctionNumber < 0 || detectorFunctionNumber >= NUM_HAPPENING_DETECTOR_FUNCTIONS) {
+      DEBUG("ERROR! Happening spec %d asked for detectorFunctionNumber %d, which is out of range. %s\n", 
+            hs, detectorFunctionNumber, "Ignoring the request."); 
+    } else {
+      if ( !already_processed[hs] && happeningDetectorsList[detectorFunctionNumber].happType==HAPPENING_EVENT ) {
+        bool detected;
+        int inputNumber = rs[f].states->plain.happeningSpecs[hs].inputNumber;
+        
+        happening_detector_fn_ptr dFunPtr = hdName2FunctionPointerMap[detectorFunctionNumber].detectorFnPtr;
+        
+        if ( (detected = (*dFunPtr)(f, inputNumber)) ) { /* this is where we actually call the detector fn */
+          int happId     = rs[f].states->plain.happeningSpecs[hs].happId;
+          fsmEventPush(f, FSM_EVT_TYPE_IN, happId, rs[f].current_state);
+          if ( gotoState(f, rs[f].current_state, happId)==1 ) /* By defn, since these are specs not listed for
+                                                                 the current state, they don't lead to state changes */
+            DEBUG("Fsm %d's state changed??? Just arrived in state %d, while processing happening spec %d", 
+                  f, rs[f].current_state, hs);
+        }
+      } /* end if !already_processed && HAPPENING_EVENT */
+    } /* end if detectorFunctionNumber in range */
+  } /* end for hs */
 }
+
+
 
 static void scheduleWave(FSMID_t f, unsigned wave_id, int op) /*
 Trigger/untrigger a wave. Ignores trigger requests for already active waves.
@@ -4063,7 +4222,11 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
     rs[f].active_ao_wave_mask &= ~(0x1<<wave); /* just in case */
   }
   /* On new trial start, all FSM wave states go to _Out -- unlike pokes! */
-  for (i=0; i<FSM_MAX_SCHED_WAVES; i++) rs[f].active_wave[i].wave_is_high = 0;
+  for (i=0; i<FSM_MAX_SCHED_WAVES; i++) { 
+    rs[f].active_wave[i].wave_edge_up   = false;
+    rs[f].active_wave[i].wave_edge_down = false;
+    rs[f].active_wave[i].wave_is_high   = false;
+  }
 }
 
 static void buddyTaskHandler(void *arg)
