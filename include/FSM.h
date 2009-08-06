@@ -119,9 +119,13 @@ struct happeningTypeSpec {
   char description[256];                                   /* something descriptive for end-users */
 };
 
-# define NUM_HAPPENING_DETECTOR_FUNCTIONS 4
+# define NUM_HAPPENING_DETECTOR_FUNCTIONS 8
 
 const struct happeningTypeSpec happeningDetectorsList[NUM_HAPPENING_DETECTOR_FUNCTIONS] = {	\
+  {"line_in",   HAPPENING_EVENT,     "Checks whether a physical input line changed from low to high in last clock tick"}, \
+  {"line_out",  HAPPENING_EVENT,     "Checks whether a physical input line changed from high to low in last clock tick"}, \
+  {"wave_in",   HAPPENING_EVENT,     "Checks whether a digital sched wave changed from low to high in last clock tick"}, \
+  {"wave_out",  HAPPENING_EVENT,     "Checks whether a digital sched wave changed from high to low in last clock tick"}, \
   {"line_high", HAPPENING_CONDITION, "Checks whether a physical input line is high"}, \
   {"line_low",  HAPPENING_CONDITION, "Checks whether a physical input line is low"},  \
   {"wave_high", HAPPENING_CONDITION, "Checks whether a digital sched wave is high"},  \
@@ -216,6 +220,12 @@ struct FSMSpec
                                                   array based on n_rows and 
                                                   n_cols above */      
       unsigned int numStates;  /* total number of states in matrix */
+
+      bool use_happenings;     /* When this is true, fsm.c will use new code (happenings)
+                                  exclusively; when this is false, only CONDITIONS are processed
+                                  using the happenings framework, EVENTS are processed usign the old
+                                  input_routing framework. */
+
 
       struct happeningUserSpec happeningSpecs[MAX_HAPPENING_SPECS];
       unsigned int numHappeningSpecs;
@@ -432,164 +442,164 @@ enum ShmMsgID
 };
 
 struct ShmMsg {
-    int id; /* One of ShmMsgID above.. */
+  int id; /* One of ShmMsgID above.. */
   
-    /* Which element of union is used depends on id above. */
-    union {
-
-      /* For id == FSM */
-      struct FSMSpec fsm;
-
-      /* For id = GETINPUTCHANNELSTATES */
-      struct {
-	unsigned num;
-	unsigned state[FSM_MAX_IN_CHANS];
-      } input_channels;
-
-      /* For id == TRANSITIONS */
-      struct {
-        unsigned num;
-        unsigned from; 
-#define MSG_MAX_TRANSITIONS 64
-        struct StateTransition transitions[MSG_MAX_TRANSITIONS];
-      } transitions;
-
-      /* For id == LOGITEMS */
-      struct {
-        unsigned num;
-        unsigned from;
-#define MSG_MAX_LOG_ITEMS 64
-        struct VarLogItem items[MSG_MAX_TRANSITIONS];
-      } log_items;
-
-      /* For id == TRANSITIONCOUNT */
-      unsigned transition_count;
-
-      /* For id == LOGITEMCOUNT */
-      unsigned log_item_count;
-
-      /* For id == GETPAUSE */
-      unsigned is_paused; 
-
-      /* For id == GETVALID */
-      unsigned is_valid;
-
-      /* For id == FORCEEVENT */
-      unsigned forced_event;
-
-      /* For id == FORCETRIGGER */
-      unsigned forced_triggers; /* Bitarray of ABSOLUTE channel id's.. */
-      
-      /* For id == FORCEOUTPUT */
-      unsigned forced_outputs; /* Bitarray of ABSOLUTE channel id's */
-
-      /* For id == GETRUNTIME */ 
-      long long runtime_us; /* Time since last reset, in micro-seconds */
-
-      /* For id == GETCURRENTSTATE */ 
-      unsigned current_state; /* The current state */
-
-      /* For id == FORCESTATE */
-      unsigned forced_state;  /* The forced state */
+  /* Which element of union is used depends on id above. */
+  union {
     
-      /* For id == GETFSMSIZE */
-      unsigned short fsm_size[2]; /* [0] == rows, [1] == cols */
-
-      /* For id == GETNUMINPUTEVENTS */
-      unsigned num_input_events;
-      
-      /* For id == STARTDAQ */
-      struct { 
-        unsigned chan_mask; /**< Mask of channel id's from 0-31. */
-        int range_min; /**< Range min in fixed point -- divide by 1e6 for V*/
-        int range_max; /**< Range min in fixed point -- divide by 1e6 for V*/
-        int started_ok; /**< Reply from RT to indicate STARTDAQ was accepted*/
-        unsigned maxdata;
-      } start_daq;
-
-      /* For id == GETAOMAXDATA */
-      unsigned short ao_maxdata;
-
-      /* For id == AOWAVE */
-      struct AOWave aowave;
-
-      /* For id == GETERROR -- descriptive text of last FSM error, 
-         or empty string if no errors  */
-      char error[FSM_ERROR_BUF_SIZE];
-      
-      /* For id == SETAIMODE and GETAIMODE */
-      unsigned ai_mode_is_asynch;
-
-      struct {
-          SimInpEvt evts[MAX_SIM_INP_EVTS];
-          unsigned num;
+    /* For id == FSM */
+    struct FSMSpec fsm;
+    
+    /* For id = GETINPUTCHANNELSTATES */
+    struct {
+      unsigned num;
+      unsigned state[FSM_MAX_IN_CHANS];
+    } input_channels;
+    
+    /* For id == TRANSITIONS */
+    struct {
+      unsigned num;
+      unsigned from; 
+#define MSG_MAX_TRANSITIONS 64
+      struct StateTransition transitions[MSG_MAX_TRANSITIONS];
+    } transitions;
+    
+    /* For id == LOGITEMS */
+    struct {
+      unsigned num;
+      unsigned from;
+#define MSG_MAX_LOG_ITEMS 64
+      struct VarLogItem items[MSG_MAX_TRANSITIONS];
+    } log_items;
+    
+    /* For id == TRANSITIONCOUNT */
+    unsigned transition_count;
+    
+    /* For id == LOGITEMCOUNT */
+    unsigned log_item_count;
+    
+    /* For id == GETPAUSE */
+    unsigned is_paused; 
+    
+    /* For id == GETVALID */
+    unsigned is_valid;
+    
+    /* For id == FORCEEVENT */
+    unsigned forced_event;
+    
+    /* For id == FORCETRIGGER */
+    unsigned forced_triggers; /* Bitarray of ABSOLUTE channel id's.. */
+    
+    /* For id == FORCEOUTPUT */
+    unsigned forced_outputs; /* Bitarray of ABSOLUTE channel id's */
+    
+    /* For id == GETRUNTIME */ 
+    long long runtime_us; /* Time since last reset, in micro-seconds */
+    
+    /* For id == GETCURRENTSTATE */ 
+    unsigned current_state; /* The current state */
+    
+    /* For id == FORCESTATE */
+    unsigned forced_state;  /* The forced state */
+    
+    /* For id == GETFSMSIZE */
+    unsigned short fsm_size[2]; /* [0] == rows, [1] == cols */
+    
+    /* For id == GETNUMINPUTEVENTS */
+    unsigned num_input_events;
+    
+    /* For id == STARTDAQ */
+    struct { 
+      unsigned chan_mask; /**< Mask of channel id's from 0-31. */
+      int range_min; /**< Range min in fixed point -- divide by 1e6 for V*/
+      int range_max; /**< Range min in fixed point -- divide by 1e6 for V*/
+      int started_ok; /**< Reply from RT to indicate STARTDAQ was accepted*/
+      unsigned maxdata;
+    } start_daq;
+    
+    /* For id == GETAOMAXDATA */
+    unsigned short ao_maxdata;
+    
+    /* For id == AOWAVE */
+    struct AOWave aowave;
+    
+    /* For id == GETERROR -- descriptive text of last FSM error, 
+       or empty string if no errors  */
+    char error[FSM_ERROR_BUF_SIZE];
+    
+    /* For id == SETAIMODE and GETAIMODE */
+    unsigned ai_mode_is_asynch;
+    
+    struct {
+      SimInpEvt evts[MAX_SIM_INP_EVTS];
+      unsigned num;
 #ifdef EMULATOR
-          long long ts_for_clock_latch;
-#endif
-      } sim_inp;
-
-        struct {
-            unsigned from, num;
-#define MSG_MAX_EVENTS 64
-            FSMEvent e[MSG_MAX_EVENTS];/**< for id == GETSTIMULI */
-        } fsm_events;
-
-        unsigned fsm_events_count; /**< for id == STIMULICOUNT */
-
-#ifdef EMULATOR
-      /* For id == GETCLOCKLATCHMS or SETCLOCKLATCHMS */
-      unsigned latch_time_ms;
-      /* For id ==  CLOCKISLATCHED */
-      unsigned latch_is_on;
-     /* For id == FASTCLOCK or ISFASTCLOCK */ 
-      int fast_clock_flg;
-     /* For id == CLOCKLATCHPING CLOCKLATCHQUERY */
       long long ts_for_clock_latch;
 #endif
-    } u;
-  };
+    } sim_inp;
+    
+    struct {
+      unsigned from, num;
+#define MSG_MAX_EVENTS 64
+      FSMEvent e[MSG_MAX_EVENTS];/**< for id == GETSTIMULI */
+    } fsm_events;
+    
+    unsigned fsm_events_count; /**< for id == STIMULICOUNT */
+    
+#ifdef EMULATOR
+    /* For id == GETCLOCKLATCHMS or SETCLOCKLATCHMS */
+    unsigned latch_time_ms;
+    /* For id ==  CLOCKISLATCHED */
+    unsigned latch_is_on;
+    /* For id == FASTCLOCK or ISFASTCLOCK */ 
+    int fast_clock_flg;
+    /* For id == CLOCKLATCHPING CLOCKLATCHQUERY */
+    long long ts_for_clock_latch;
+#endif
+  } u;
+};
 
-  /** Struct put into shm->fifo_daq, 1 per scan */
-  struct DAQScan 
-  {
+/** Struct put into shm->fifo_daq, 1 per scan */
+struct DAQScan 
+{
 #   define DAQSCAN_MAGIC (0x133710)
-    unsigned magic : 24;
-    unsigned nsamps : 8;
-    long long ts_nanos;    
-    unsigned short samps[0];
-  };
+  unsigned magic : 24;
+  unsigned nsamps : 8;
+  long long ts_nanos;    
+  unsigned short samps[0];
+};
 
-  /** For use in NRTOutput struct below */
-  enum NRTOutputType {
-    NRT_TCP = 1,
-    NRT_UDP = 2,
-    NRT_BINDATA = (1<<7), /* set this bit in type to suppress formatting and just send raw data*/
-  };
+/** For use in NRTOutput struct below */
+enum NRTOutputType {
+  NRT_TCP = 1,
+  NRT_UDP = 2,
+  NRT_BINDATA = (1<<7), /* set this bit in type to suppress formatting and just send raw data*/
+};
 
-  /** This struct gets written to fifo_nrt_output for userspace processing */
-  struct NRTOutput {
+/** This struct gets written to fifo_nrt_output for userspace processing */
+struct NRTOutput {
 #   define NRTOUTPUT_MAGIC (0x12c9)
 #   define NRTOUTPUT_DATA_SIZE OUTPUT_SPEC_DATA_SIZE
-    unsigned short magic;
-    unsigned short state; /* the state machine state that caused this */
-    int trig; /*  this was the value of the state machine column
-                  for this NRT trigger.. */
-    unsigned long long ts_nanos;
-    unsigned char type; /* one of NRTOutputType above */
-    unsigned char col;  /* the state machine column */
-    char ip_host[IP_HOST_LEN];
-    unsigned short ip_port;
-    union { 
-        /* - This packet gets formatted based on the 'template' below 
-             with params being interpreted based on specifal %-codes: 
-                %v - the value of the state matrix column (trig above struct)
-                %t - timestamp (floating point number, in seconds)
-                %T - timestamp (fixed point number, in nanoseconds)
-                %s - state
-                %c - col
-                %% - literal '%'
-                %(anything else) - consumed (not printed)
-                (it's ok for the same param to appear multiple times as well
+  unsigned short magic;
+  unsigned short state; /* the state machine state that caused this */
+  int trig; /*  this was the value of the state machine column
+                for this NRT trigger.. */
+  unsigned long long ts_nanos;
+  unsigned char type; /* one of NRTOutputType above */
+  unsigned char col;  /* the state machine column */
+  char ip_host[IP_HOST_LEN];
+  unsigned short ip_port;
+  union { 
+    /* - This packet gets formatted based on the 'template' below 
+       with params being interpreted based on specifal %-codes: 
+       %v - the value of the state matrix column (trig above struct)
+       %t - timestamp (floating point number, in seconds)
+       %T - timestamp (fixed point number, in nanoseconds)
+       %s - state
+       %c - col
+       %% - literal '%'
+       %(anything else) - consumed (not printed)
+       (it's ok for the same param to appear multiple times as well
                 as for a param to not exist.
                 For example: "SET ODOR Bank1 %v" would produce 
                 "SET ODOR Bank1 13" if the state matrix column (trig) had
@@ -600,53 +610,53 @@ struct ShmMsg {
              connection or a UDP datagram.  
            - The connection is then immediately terminated and/or the socket is
              closed right away. */
-        char ip_packet_fmt[FMT_TEXT_LEN]; /* for NRT_TCP or NRT_UDP */
-        struct { /* iff bit NRT_BINDATA is set in 'type', use this struct and ignore above.. */
-            unsigned datalen;
-            unsigned char data[FMT_TEXT_LEN-sizeof(unsigned)];
-        };
+    char ip_packet_fmt[FMT_TEXT_LEN]; /* for NRT_TCP or NRT_UDP */
+    struct { /* iff bit NRT_BINDATA is set in 'type', use this struct and ignore above.. */
+      unsigned datalen;
+      unsigned char data[FMT_TEXT_LEN-sizeof(unsigned)];
     };
   };
+};
 #ifdef EMULATOR
 # define NUM_STATE_MACHINES 1
 #else
 # define NUM_STATE_MACHINES 4
 #endif
-  /** 
-      The shared memory -- not every plugin needs shared memory but 
-      it's a convenient way for userspace UI to communicate with your
-      control (real-time kernel) plugin
-  */
-  struct Shm 
-  { 
-    int fifo_out[NUM_STATE_MACHINES]; /* The kernel-to-user FIFO             */
-    int fifo_in[NUM_STATE_MACHINES];  /* The user-to-kernel FIFO             */
-    int fifo_trans[NUM_STATE_MACHINES]; /* Kernel-to-user FIFO to notify of 
-                                           state transitions                 */
-    int fifo_daq[NUM_STATE_MACHINES]; /* Kernel-to-user FIFO that contains DAQ scans.. */
-    int fifo_nrt_output[NUM_STATE_MACHINES]; /* Kernel-to-user FIFO that contains NRTOutput structs for non-realtime state machine outputs! */
-    int fifo_debug; /* The kernel-to-user FIFO setup for debugging           */
-    
-    /* When fifo_in gets an int, this value is read by kernel-process.
-       (The alternative would have been to write this msg to a FIFO
-       but that's a lot of wasteful double-copying.  It's faster to
-       use the shm directly, and only use the FIFO for synchronization
-       and notification.  */
-    struct ShmMsg msg[NUM_STATE_MACHINES]; 
-    volatile int fsmCtr; /**< Incremented (by userspace) each time a new FSM is compiled.  Useful for generating unique FSM module and SHM names. */
-    int    magic;               /*< Should always equal SHM_MAGIC            */
-  };
+/** 
+    The shared memory -- not every plugin needs shared memory but 
+    it's a convenient way for userspace UI to communicate with your
+    control (real-time kernel) plugin
+*/
+struct Shm 
+{ 
+  int fifo_out[NUM_STATE_MACHINES]; /* The kernel-to-user FIFO             */
+  int fifo_in[NUM_STATE_MACHINES];  /* The user-to-kernel FIFO             */
+  int fifo_trans[NUM_STATE_MACHINES]; /* Kernel-to-user FIFO to notify of 
+                                         state transitions                 */
+  int fifo_daq[NUM_STATE_MACHINES]; /* Kernel-to-user FIFO that contains DAQ scans.. */
+  int fifo_nrt_output[NUM_STATE_MACHINES]; /* Kernel-to-user FIFO that contains NRTOutput structs for non-realtime state machine outputs! */
+  int fifo_debug; /* The kernel-to-user FIFO setup for debugging           */
+  
+  /* When fifo_in gets an int, this value is read by kernel-process.
+     (The alternative would have been to write this msg to a FIFO
+     but that's a lot of wasteful double-copying.  It's faster to
+     use the shm directly, and only use the FIFO for synchronization
+     and notification.  */
+  struct ShmMsg msg[NUM_STATE_MACHINES]; 
+  volatile int fsmCtr; /**< Incremented (by userspace) each time a new FSM is compiled.  Useful for generating unique FSM module and SHM names. */
+  int    magic;               /*< Should always equal SHM_MAGIC            */
+};
 
 
-  typedef int FifoNotify_t;  /* Write one of these to the fifo to notify
-                                that a new msg is available in the SHM       */
+typedef int FifoNotify_t;  /* Write one of these to the fifo to notify
+                              that a new msg is available in the SHM       */
 #define FIFO_SZ (sizeof(FifoNotify_t))
 #define FIFO_TRANS_SZ (sizeof(struct StateTransition)*128)
 #define FIFO_DAQ_SZ (1024*1024) /* 1MB for DAQ fifo */
 #define FIFO_NRT_OUTPUT_SZ (sizeof(struct NRTOutput)*10)
 
 #ifndef __cplusplus
-  typedef struct Shm Shm;
+typedef struct Shm Shm;
 #endif
 
 #define FSM_SHM_NAME "FSMShm"

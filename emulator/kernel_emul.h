@@ -126,6 +126,7 @@ extern "C" {
 #   define ATOMIC_INIT(i) (i)
     static __inline__ int __ffs(int x) { return ffs(x)-1; }
     void set_bit(unsigned bit, volatile unsigned long *bits);
+    int test_bit(unsigned bit, volatile unsigned long *bits);
     void clear_bit(int nr, volatile unsigned long *addr);
     unsigned long find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offset);
 #   define rt_critical(x) ((x) = rt_start_critical())
