@@ -119,7 +119,7 @@ struct happeningTypeSpec {
   char description[256];                                   /* something descriptive for end-users */
 };
 
-# define NUM_HAPPENING_DETECTOR_FUNCTIONS 8
+# define NUM_HAPPENING_DETECTOR_FUNCTIONS 9
 
 const struct happeningTypeSpec happeningDetectorsList[NUM_HAPPENING_DETECTOR_FUNCTIONS] = {	\
   {"line_in",   HAPPENING_EVENT,     "Checks whether a physical input line changed from low to high in last clock tick"}, \
@@ -130,6 +130,7 @@ const struct happeningTypeSpec happeningDetectorsList[NUM_HAPPENING_DETECTOR_FUN
   {"line_low",  HAPPENING_CONDITION, "Checks whether a physical input line is low"},  \
   {"wave_high", HAPPENING_CONDITION, "Checks whether a digital sched wave is high"},  \
   {"wave_low",  HAPPENING_CONDITION, "Checks whether a digital sched wave is low"},   \
+  {"prob_jump", HAPPENING_CONDITION, "Is true if drand48()*100 < its integer argument"},   \
 };
 /*  {"line_in",  HAPPENING_EVENT, "Checks whether a physical input line just went high" },	\ */
 

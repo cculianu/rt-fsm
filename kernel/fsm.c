@@ -155,6 +155,7 @@ static bool line_high(FSMID_t f, unsigned int line_number);   /* line numbers ar
 static bool line_low (FSMID_t f, unsigned int line_number); 
 static bool wave_high(FSMID_t f, unsigned int wave_id); 
 static bool wave_low (FSMID_t f, unsigned int wave_id); 
+static bool prob_jump(FSMID_t f, unsigned int percent);
 
 struct hdetectorName2FnPtr { 
   char name[MAX_HAPPENING_NAME_LENGTH];
@@ -173,6 +174,7 @@ const struct hdetectorName2FnPtr hdName2FunctionPointerMap[NUM_HAPPENING_DETECTO
   { "line_low",  line_low  }, \
   { "wave_high", wave_high }, \
   { "wave_low",  wave_low  }, \
+  { "prob_jump", prob_jump }, \
 };
  
 
@@ -2143,21 +2145,6 @@ static void *doFSM (void *arg)
         if ( !rs[f].paused  ) {
           
           CALL_EMBC(f, tick); /* call the embedded C tick function, if defined */
-
-          /* Check for state timeout -- 
-             IF Curent state *has* a timeout (!=0) AND the timeout expired */
-          if ( !got_timeout && state_timeout_us != 0 && TIMER_EXPIRED(f, state_timeout_us) ) {
-            
-            got_timeout = 1;
-            
-            if (debug > 1) {
-              char buf[22];
-              strncpy(buf, uint64_to_cstr(rs[f].current_ts), 21);
-              buf[21] = 0;
-              DEBUG_VERB("timer expired in state %u t_us: %lu timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
-            }
-            
-          } /* end if !got_timeout */
           
           /* Normal event transition code -- detectInputEvents() modifies the rs[f].events_bits
              bitfield array for all the input events we have right now.
@@ -2189,13 +2176,28 @@ static void *doFSM (void *arg)
           
           DEBUG_VERB("FSM %u After processSchedWavesAO(), got input events mask %08lx\n", f, *(unsigned long *)rs[f].events_bits);
 
+	  processConditions(f);
+
+          /* Check for state timeout -- 
+             IF Curent state *has* a timeout (!=0) AND the timeout expired */
+          if ( !got_timeout && state_timeout_us != 0 && TIMER_EXPIRED(f, state_timeout_us) ) {
+            
+            got_timeout = 1;
+            
+            if (debug > 1) {
+              char buf[22];
+              strncpy(buf, uint64_to_cstr(rs[f].current_ts), 21);
+              buf[21] = 0;
+              DEBUG_VERB("timer expired in state %u t_us: %lu timer: %s ts: %s\n", state, state_timeout_us, uint64_to_cstr(rs[f].current_timer_start), buf);
+            }
+            
+          } /* end if !got_timeout */
+
           if (got_timeout) {
             fsmEventPush(f, FSM_EVT_TYPE_IN, -1, STATE_TIMEOUT_STATE(fsm, state));
             /* Timeout expired, transistion to timeout_state.. */
             gotoState(f, STATE_TIMEOUT_STATE(fsm, state), -1);
           }
-
-	  processConditions(f);
 
           /* Events only use the happening structure if use_happenings flag is on */
           if ( rs[f].states->plain.use_happenings ) processEvents(f);
@@ -2684,6 +2686,10 @@ static void detectInputEvents(FSMID_t f)
 }
 
 static void detectSimulatedInputEvents(FSMID_t f, int *got_timeout_flg)
+/* Goes through events in the simulated input event queue, up to events timestamped at time less
+   than the FSM's current time. Any such event found with an ID outside the normal range is
+   interpreted as a timeut and *got_timeout_flg is set to 1 (never set to 0 in this function).
+ */
 {
     const struct SimInpEvt *sie;
     while ( (sie = simInpEvtTop(f)) && sie->ts <= rs[f].current_ts ) {
@@ -3671,6 +3677,11 @@ bool wave_low (FSMID_t f, unsigned int wave_id) {
 
   return( !wave_high(f, wave_id) );
 };
+
+bool prob_jump (FSMID_t f, unsigned int percent) {
+  return(drand48()*100 < percent);
+}
+
 
 /******** END happening detector functions END ****/
 
