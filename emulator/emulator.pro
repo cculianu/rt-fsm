@@ -11,7 +11,7 @@ CONFIG += debug
 
 # Input
 HEADERS += ComediEmul.h kernel_emul.h MainWindow.h EmulApp.h Log.h ProcFileViewer.h ModuleParmView.h ComediView.h ControlWin.h SoundPlayer.h
-SOURCES += ComediEmul.cpp kernel_emul.cpp main.cpp MainWindow.cpp  EmulApp.cpp Log.cpp ProcFileViewer.cpp ModuleParmView.cpp ComediView.cpp ControlWin.cpp SoundPlayer.cpp ../kernel/deflate_helper.c  ../kernel/extra_mathfuncs.c ../user/rtos_utility.cpp ../kernel/fsm.c
+SOURCES += ComediEmul.cpp kernel_emul.cpp main.cpp MainWindow.cpp  EmulApp.cpp Log.cpp ProcFileViewer.cpp ModuleParmView.cpp ComediView.cpp ControlWin.cpp SoundPlayer.cpp ../kernel/deflate_helper.c  ../kernel/extra_mathfuncs.c ../kernel/randomlib.c ../user/rtos_utility.cpp ../kernel/fsm.c
 
 win32 {
 	DEFINES += OS_WINDOWS WINDOWS WIN32
