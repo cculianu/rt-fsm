@@ -569,3 +569,8 @@ double round(double d)
     if (ret <= -0.5) return (long)(d-0.5);
     return (long)d;
 }
+
+double drand48()
+{
+	return RandomDouble(0.0, 0.999999999999999999999999999);
+}
