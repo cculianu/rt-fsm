@@ -1,7 +1,6 @@
 /** Math functions not provided by RTAI's rtai_math library, but that we would still like to have. */
 #ifndef EXTRA_MATHFUNCS_H
 #define EXTRA_MATHFUNCS_H
-#include "randomlib.h"
 extern double pow(double, double); /**< provided by rtmath */
 
 extern double exp2(double x);
