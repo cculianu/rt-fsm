@@ -570,7 +570,3 @@ double round(double d)
     return (long)d;
 }
 
-double drand48()
-{
-	return RandomDouble(0.0, 0.999999999999999999999999999);
-}

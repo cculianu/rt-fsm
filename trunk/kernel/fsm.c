@@ -3679,7 +3679,7 @@ bool wave_low (FSMID_t f, unsigned int wave_id) {
 };
 
 bool prob_jump (FSMID_t f, unsigned int percent) {
-  return(drand48()*100 < percent);
+  return(emblib_rand()*100 < percent);
 }
 
 

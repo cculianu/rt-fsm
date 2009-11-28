@@ -1,7 +1,7 @@
 CURRENT = $(shell uname -r)
 KDIR = /lib/modules/$(CURRENT)/build
 TARGET = RealtimeFSM
-OBJS = fsm.o softtask.o deflate_helper.o extra_mathfuncs.o float_vsnprintf.o randomlib.o
+OBJS = fsm.o softtask.o deflate_helper.o extra_mathfuncs.o float_vsnprintf.o 
 MDIR = rtai
 RTAIDIR = /usr/realtime
 COMEDIDIR = /usr/src/comedi
