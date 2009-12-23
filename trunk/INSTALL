@@ -287,6 +287,27 @@ LOADED
       # modprobe zlib_deflate
   
 
+AUTOMATED SCRIPTS TO RUN THE SOFTWARE (known to work in version 179 and above):
+
+   To run the software, you can run load-servers-onboot.sh, which is a script
+   designed to be run during booting. This script assumes that the software resides in
+   /usr/src/rtfsm. The script
+   	    in _s_prep.sh :
+	       	    (1) Unloads modules that should be discarded or reloaded afresh. 
+	    	        It tries this thrice, for mystical reasons, from the script _s_prep.sh
+	    in _s_start.sh:
+	    	    (2) Loads third party modules (in _s_start.sh)
+		    (3) Loads the RealtimeFSM.ko module at 2KHz clock. Change this to "task_rate=6000"
+		        if you want 6 KHz. For three rigs per RTLinux machine, 2 KHz is good, 6 KHz might 
+			be too much.
+		    (4) Loads the ./LynxTWO_RT.ko and ./LynxTrig_RT.ko modules
+	    back in load-servers-onbooth.sh:
+	    	    starts SoundServer and FSMServer
+
+
+    If you want to restart the software without rebooting, first kill SoundServer and FSMServer, then
+    "rmmod LynxTrig_RT.ko LynxTWO_RT.ko RealtimeFSM.ko", and then run load-servers-onboot.sh
+
 
 RUNNING THE SOFTWARE
 
