@@ -7,6 +7,16 @@
 #    include <dlfcn.h>  // for type bool
 #  else
 #    include "windows_dlemul.h"
+	#ifndef __cplusplus
+		#ifndef bool
+		typedef unsigned char bool;
+		const bool false=0;
+		const bool true=1;
+		#else
+		const bool false=0;
+		const bool true=1;
+		#endif
+	#endif
 #  endif
 #endif
 
