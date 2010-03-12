@@ -1104,18 +1104,15 @@ void *ConnectionThread::threadFunc(void)
 			    if (!sockReadHappeningsSpecs()) {
 			      Log() << error_string.str(); sockSend(error_string.str()); break;			    
 			    } else 
-			      sockSend("OK\n");
-
-			    if ((line = sockReceiveLine()).length() == 0) { 
-			      error_string.str("");
-			      error_string << "ERROR: expecting a line with SET HAPPENINGS LIST " 
-					   << "and not finding it!" << std::endl;
-			      break;
-			    }
+                              if ((line = sockReceiveLine()).length() == 0) { 
+                                error_string.str("");
+                                error_string << "ERROR: expecting a line with SET HAPPENINGS LIST " 
+                                             << "and not finding it!" << std::endl;
+                                break;
+                              }
 			    if (!sockReadHappeningsList()) {
 			      Log() << error_string.str(); sockSend(error_string.str()); break;			    
-			    } else
-			      sockSend("OK\n");
+			    } 
 			  } /* end if use_happenings */
 
                           msg.u.fsm.plain.use_happenings = fsms[fsm_id].use_happenings;
