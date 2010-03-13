@@ -3070,6 +3070,11 @@ static void handleFifos(FSMID_t f)
         do_reply = 1;
         break;
 
+    case GETTASKRATE:
+        msg->u.task_rate = task_rate;
+        do_reply = 1;
+        break;
+
     case FORCESTATE:
         if ( !rs[f].valid || gotoState(f, msg->u.forced_state, -1) < 0 )
           msg->u.forced_state = -1; /* Indicate error.. */

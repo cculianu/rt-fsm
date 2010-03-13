@@ -1112,7 +1112,7 @@ void *ConnectionThread::threadFunc(void)
                               }
 			    if (!sockReadHappeningsList()) {
 			      Log() << error_string.str(); sockSend(error_string.str()); break;			    
-			    } 
+			    }
 			  } /* end if use_happenings */
 
                           msg.u.fsm.plain.use_happenings = fsms[fsm_id].use_happenings;
@@ -1278,6 +1278,13 @@ void *ConnectionThread::threadFunc(void)
             sendToRT(msg);
             std::stringstream s;
             s << msg.u.current_state << std::endl;
+            sockSend(s.str());
+            cmd_error = false;        
+        } else if (line.find("GET TASK RATE") == 0) {
+            msg.id = GETTASKRATE;
+            sendToRT(msg);
+            std::stringstream s;
+            s << msg.u.task_rate << std::endl;
             sockSend(s.str());
             cmd_error = false;        
         } else if (line.find("GET INPUT CHANNEL STATES") == 0) {
