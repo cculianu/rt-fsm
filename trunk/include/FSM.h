@@ -434,7 +434,7 @@ enum ShmMsgID
     STIMULICOUNT, /** Returns the number of FSMEvents in the from,to range */
     GETINPUTCHANNELSTATES, /** Returns a vector (1-d Matrix) with all the current 
 			      High v Low states of input s */
-
+    GETTASKRATE, /* Get the frequency of the RTFSM cycle. Typically 6000 or 2000. (cycles/sec) */
 #ifdef EMULATOR
     GETCLOCKLATCHMS, /* query fsm clock latch amount */
     SETCLOCKLATCHMS, /* turn fsm clock latching on and set it to x MS */
@@ -512,6 +512,9 @@ struct ShmMsg {
     
     /* For id == FORCESTATE */
     unsigned forced_state;  /* The forced state */
+    
+    /* For id == GETTASKRATE */ 
+    unsigned task_rate; /* The cycle frequency of the RTFSM */
     
     /* For id == GETFSMSIZE */
     unsigned short fsm_size[2]; /* [0] == rows, [1] == cols */
