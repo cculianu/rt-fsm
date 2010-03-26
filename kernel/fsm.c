@@ -618,7 +618,8 @@ static void doSetupThatNeededFloatingPoint(void);
 static void do_dio_bitfield(unsigned, unsigned *);
 static int  do_dio_config(unsigned chan, int mode);
 static void doOutput(FSMID_t);
-static void clearAllOutputLines(FSMID_t);
+static void clearAllOutputLines(FSMID_t);      /* clear DOuts, but only unlocked ones */
+static void unlockAllOutputLines(FSMID_t f);   /* forces unlocking of all output lines */
 static inline void clearTriggerLines(FSMID_t);
 static void dispatchEvent(FSMID_t, unsigned event_id); /* if use_happenings is true, this fn is not used */
 
@@ -2731,6 +2732,18 @@ static void clearAllOutputLines(FSMID_t f)
   }
 }
 
+/* Unlock all output lines used by this FSM. Typically called upon RESET_ */
+static void unlockAllOutputLines(FSMID_t f)
+{
+  uint i, mask;
+  mask = rs[f].do_chans_trig_mask|rs[f].do_chans_cont_mask;
+  while (mask) {
+    i = __ffs(mask);
+    mask &= ~(0x1<<i);
+    UNLOCK_DO_CHAN(i);
+  }
+}
+
 static atomic_t buddyTaskCmds[NUM_STATE_MACHINES];
 
 static void handleFifos(FSMID_t f)
@@ -2856,6 +2869,7 @@ static void handleFifos(FSMID_t f)
     case RESET_:
       /* Just to make sure we start off fresh ... */
       stopActiveWaves(f);
+      unlockAllOutputLines(f);
       clearAllOutputLines(f);
       rs[f].valid = 0; /* lock fsm so buddy task can safely manipulate it */
       BUDDY_TASK_PEND(RESET_); /* slow operation because it clears FSM blob,
@@ -4210,11 +4224,12 @@ static void stopActiveWaves(FSMID_t f) /* called when FSM starts a new trial */
     int do_chan = -1;
     struct ActiveWave *w = &((struct RunState *)&rs[f])->active_wave[wave];
     rs[f].active_wave_mask &= ~(1<<wave); /* clear bit */
+    // DEBUG("(w->edge_down_ts is %lld, rs[f].current_ts is %lld, (w->edge_down_ts) >= (rs[f].current_ts) is %d", w->edge_down_ts, rs[f].current_ts, (w->edge_down_ts) >= (rs[f].current_ts));
     if (w->edge_down_ts && w->edge_down_ts >= rs[f].current_ts) {
           /* The wave was in the middle of a high, so set the line back low
              (if there actually is a line). */
           int id = do_chan = SW_DOUT_ROUTING(f, wave);
-	  DEBUG("Wave %d still high at trial end; forcing its output channel %d low", wave, id);
+	  DEBUG("Wave %d still high in a stopActiveWaves call (typically a new trial start); forcing its output channel %d low", wave, id);
 
           if (id > -1) {
             dataWrite_NoLocks(id, 0); /* if it's routed to do output, set line back to low. */
