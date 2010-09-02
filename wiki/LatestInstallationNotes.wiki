@@ -90,7 +90,7 @@ May 19th, 2010
 
 40.	Type 'nano /etc/hosts.deny' and add the lines 'ALL : ALL : DENY'. Press Ctrl+O to save
 
-41.	Type 'nano /etc/sudoers' and search for the line 'root    ALL=(ALL)    ALL'. On the next line, add 'cnmc    ALL=(ALL)    ALL'. Press Ctrl+O to save.
+41.	Type 'nano /etc/sudoers' and search for the line 'root    ALL=(ALL)    ALL'. On the next line, add 'the_username_you_chose_in_step_25    ALL=(ALL)    ALL'. Press Ctrl+O to save.
 
 42.	Type 'cd /usr/src' and press ENTER, followed by 'ln -s rt-fsm-read-only rtfsm' and ENTER again.
 
