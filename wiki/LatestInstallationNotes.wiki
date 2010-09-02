@@ -10,7 +10,7 @@ These are May 19, 2010, notes by Sundeep Tuteja, ex-Computer Analyst in the Brod
 Steps to set up a new RTLinux Machine for a rig
 May 19th, 2010
 
-1.	Make sure that you have access to the Ethernet. (For example, in the Brody lab at HHMI at Princeton University, this involves obtaining the MAC addresses of the ethernet cards inside the machine and sending them to the MolBio IT Staff along with a request to have them registered. Include the fact that as many IP addresses are needed as there are ethernet cards.) 
+1.	Make sure that you have access to the Ethernet. (For example, in the Brody lab at HHMI at Princeton University, this involves obtaining the MAC addresses of the ethernet cards inside the machine and sending them to the Molbio IT Staff along with a request to have them registered. Include the fact that as many IP addresses are needed as there are ethernet cards.) 
 
 2.	Install N Lynx L22 soundcards and one National Instruments DAQ card in the RTLinux machine. N should be the number of rigs you want to run from this Linux machine. Up to N=3 has been tested and works.
 
