@@ -2,7 +2,7 @@
 
 = Introduction =
 
-These are May 19, 2010, notes by Sundeep Tuteja, ex-Computer Analyst in the Brody lab, on how to install the code on a brand-new RTLinux machine. Your local setup may require some adjustments-- these instructions have been used, and are known to work, for Superlogics machines Model SL-3U-CL-IQ965-GA. Sundeep has changed employers; updating these notes will hopefully happen soon.
+These are May 19, 2010, notes by Sundeep Tuteja, ex-Computer Analyst in the Brody lab, on how to install the code on a brand-new RTLinux machine. Your local setup may require some adjustments-- these instructions have been used, and are known to work, for !SuperLogics machines Model SL-3U-CL-IQ965-GA. Sundeep has changed employers; updating these notes will hopefully happen soon.
 
 
 = Details =
@@ -36,7 +36,7 @@ May 19th, 2010
 
 13.	Select 'Remove all partitions on selected drives and create default layout', leave the checkbox 'Encrypt System' unchecked, and check the checkbox 'Review and modify partitioning layout'. Hit NEXT
 
-14.	Delete the logical volume group 'VolGroup00'. Select /dev/sda2 and hit EDIT. Select the file system type as 'physical volume (LVM), set the size to 40000 MB, and select 'Fixed size' in the additional size options list. Uncheck the checkbox 'Encrypt' and the checkbox 'Force to be a primary partition'. Hit OK
+14.	Delete the logical volume group '!VolGroup00'. Select /dev/sda2 and hit EDIT. Select the file system type as 'physical volume (LVM), set the size to 40000 MB, and select 'Fixed size' in the additional size options list. Uncheck the checkbox 'Encrypt' and the checkbox 'Force to be a primary partition'. Hit OK
 
 15.	Click the button LVM. Make sure that the Volume Group Name is 'VolGroup00', physical extent 32 MB, and physical volumes to use 'sda2'. Hit ADD.
 
