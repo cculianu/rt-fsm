@@ -40,7 +40,7 @@ May 19th, 2010
 
 15.	Click the button LVM. Make sure that the Volume Group Name is 'VolGroup00', physical extent 32 MB, and physical volumes to use 'sda2'. Hit ADD.
 
-16.	Select file system type 'swap', logical volume name 'LogVol01', set size to 8000 MB, uncheck 'Encrypt', and hit OK
+16.	Select file system type 'swap', logical volume name '!LogVol01', set size to 8000 MB, uncheck 'Encrypt', and hit OK
 
 17.	Hit ADD. Select the mount point as '/', file system type 'ext3', Logical volume name 'LogVol00', set the size to the maximum size possible, uncheck 'Encrypt', and hit OK. Hit OK again, followed by NEXT
 
@@ -104,6 +104,6 @@ May 19th, 2010
 
 47.	Open the firewall configuration from the start menu and select 'Other Ports'. Add user-defined TCP ports 3333 and 3334. Hit 'Apply', accept the confirmation, and close the configuration window.
 
-48.	In the terminal window, type 'shutdown -r now', and make sure the servers start up on reboot. (Namely, FSMServer and SoundServer should both be running after booting up.)
+48.	In the terminal window, type 'shutdown -r now', and make sure the servers start up on reboot. (Namely, FSMServer and !SoundServer should both be running after booting up.) 
 
 49.	Installation complete. Test your rig
