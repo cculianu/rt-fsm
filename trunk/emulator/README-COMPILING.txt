@@ -1,5 +1,21 @@
 ----------------------------------------------------------------------------------------------------
------- 2010-09-01 Notes by Praveen Karri, computer analyst in the Brody lab, on compiling the emulator on Windows: ----- 
+------ 2010-09-02 Notes by Praveen Karri, computer analyst in the Brody lab, on compiling the emulator on Windows: ----- 
+
+
+							............ To just compile the emulator and use it in the same machine read below ...............
+
+Installing MinGW on Windows:
+
+Download MinGW automated installer from here -> http://sourceforge.net/projects/mingw/files/Automated%20MinGW%20Installer/mingw-get/mingw-get-0.1-alpha-3/mingw-get-0.1-mingw32-alpha-3-bin.zip/download
+Unzip it into (say) D:\MinGW
+Goto command prompt and change directory to D:\MinGW\bin
+Type the following command -> mingw-get install gcc g++ mingw32-make gdb msys-base objc
+
+MinGW is now installed.
+
+Installing Qt on Windows:
+
+Download and install (say in D:\Qt) -> http://get.qt.nokia.com/qtsdk/qt-sdk-win-opensource-2010.04.exe
 
 The following is a summary of the changes made and the complete procedure to compile (both in debug and release modes) and run FSMEmulator on Windows:
 
@@ -14,6 +30,8 @@ the following has to be done first:
 Find user variables and system variables in 'System Properties -> Advanced -> Environment Variables' in any Windows Machine by right-clicking on 'My Computer' and going to 'Properties'.
 Add the following path 'D:\MinGW\bin;' to %PATH% in user variables. 
 Add the following paths 'D:\Qt\2010.04\qt\bin;' and D:\MinGW\bin;' to %PATH% in system variables.
+
+Restart Windows now.
 
 Compile the emulator using the following:
 
@@ -47,4 +65,18 @@ D:\rt-fsm\include\libz.dll copied to D:\rt-fsm\emulator\win32\libz.dll
 Note: Compiling in release mode is recommended because it is more mobile and can be used on other windows machines without the worry of dependencies.
 
 ----------------------------------------------------------------------------------------------------
+
+						............ To make the emulator distributable after compilation read below ...............
+
+Irrespective of compilation mode, to make the emulator distributable, copy the following four files into 'D:\rt-fsm\emulator\win32' folder
+
+D:\Qt\2010.04\qt\bin\QtCore4.dll
+D:\Qt\2010.04\qt\bin\QtGui4.dll
+D:\Qt\2010.04\qt\bin\libgcc_s_dw2-1.dll
+D:\Qt\2010.04\qt\bin\mingwm10.dll
+D:\MinGW\bin\libstdc++-6.dll
+
+Note: To use the emulator on Windows Vista or 7, run it in WinXP compatibility mode.
+
+--------------------------------------------------------------------------------------------------
 
