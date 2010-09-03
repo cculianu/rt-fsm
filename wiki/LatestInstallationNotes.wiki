@@ -2,7 +2,7 @@
 
 = Introduction =
 
-These are May 19, 2010, notes by Sundeep Tuteja, ex-Computer Analyst in the Brody lab, on how to install the code on a brand-new RTLinux machine. Your local setup may require some adjustments. Sundeep has changed employers; updating these notes will hopefully happen soon.
+These are May 19, 2010, notes by Sundeep Tuteja, ex-Computer Analyst in the Brody lab, on how to install the code on a brand-new RTLinux machine. Your local setup may require some adjustments-- these instructions have been used, and are known to work, for SuperLogics machines Model SL-3U-CL-IQ965-GA. Sundeep has changed employers; updating these notes will hopefully happen soon.
 
 
 = Details =
