@@ -5,6 +5,10 @@
 These are May 19, 2010, notes by Sundeep Tuteja, ex-Computer Analyst in the Brody lab, on how to install the code on a brand-new RTLinux machine. Your local setup may require some adjustments-- these instructions have been used, and are known to work, for !SuperLogics machines Model SL-3U-CL-IQ965-GA. Sundeep has changed employers; updating these notes will hopefully happen soon.
 
 
+These instructions use Calin's automated install.sh script that comes with the distribution-- the instructions are intended for novice users, and will only work on machines on which Fedora 9 can be installed and on which the automated script works.
+
+
+
 = Details =
 
 Steps to set up a new RTLinux Machine for a rig
