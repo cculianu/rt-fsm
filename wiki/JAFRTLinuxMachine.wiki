@@ -1,17 +1,21 @@
-#summary One-sentence summary of this page.
+#summary Ordering details of new RTLinux machines from JAF International Inc.
 #labels Featured,RTLinuxMachine-JAF
 
 = Ordering RTLinux machine from JAF International Inc. =
 
-Since Superlogics has stopped manufacturing the SL-3U-CL-IQ965-GA machine, we are now buying RTLinux machines from [http://http://www.rackmountnet.com JAF International Inc]. We have requested JAF to build a custom-made machine to suit our RTFSM needs. These machines can be identified by JAF through the model number (created for us): JAF-PU-3U01 or if necessary by sending them the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf purchasing quote].
+Since Superlogics has stopped manufacturing the SL-3U-CL-IQ965-GA machine, we are now buying RTLinux machines from [http://www.rackmountnet.com JAF International Inc]. Upon our request, JAF has agreed to build a custom-made machine to suit our RTFSM needs. These machines can be identified by JAF through the model number (created specifically for us): *JAF-PU-3U01* or if necessary by sending them the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf condensed purchasing quote]. Since these machines are custom-made for us, you might not be able to find the model number *JAF-PU-3U01* listed on their [http://www.rackmountnet.com website].
 
 
 = Details =
 
-* Download the condensed [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf JAF purchasing quote for new RTLinux machine]
+1. Download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf condensed purchasing quote] that [http://www.rackmountnet.com JAF] made for buying new RTLinux machines.
 
-* Send an email to David Huang (david@rackmountnet.com) with the item code (JAF-PU-3U01) and the quantity you would like to purchase. Attach the condensed purchasing quote if you feel necessary.
+2. Send an email to David Huang (mailto:david@rackmountnet.com) with the item code (JAF-PU-3U01) and the quantity you would like to purchase. Attach the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf condensed purchasing quote] if you feel necessary (like for e.g. David Huang might not be available).
 
-* For more details on the complete configuration of the machine, download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110367.pdf detailed quote].
+3. For more details on the complete configuration of the machine, download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110367.pdf detailed purchasing quote].
 
-* This machine works fine with the rtfsm software. There is no change in the software installation [http://rt-fsm.googlecode.com/svn/trunk/INSTALL_STEP_BY_STEP.txt procedure].
+4. This machine works fine with the current RTFSM software. There is no change in the software installation [http://rt-fsm.googlecode.com/svn/trunk/INSTALL_STEP_BY_STEP.txt procedure].
+
+5. This machine uses the *[http://www.ibase.com.tw/mb898.htm MB898F]* motherboard (manufactured by [http://www.ibase.com.tw/index.htm iBase Technology Inc.] and is supposedly supported till the end of 2013 according to them) which is the key component for compatibility with Fedora 9 & our own RTFSM. Keeping the motherboard constant, feel free to re-configure other parts (like CPU, RAM etc.) according to your choice.
+
+6. The *[http://www.ibase.com.tw/mb898.htm MB898F]* motherboard uses integrated video built on to Intel's Q965 north bridge and Intel's 82566DC Gigabit Ethernet Controller built on to its ICH8 south bridge. Both these are compatible with Fedora 9.
