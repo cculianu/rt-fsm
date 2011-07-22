@@ -3,15 +3,15 @@
 
 = Ordering RTLinux machine from JAF International Inc. =
 
-Since Superlogics has stopped manufacturing the SL-3U-CL-IQ965-GA machine, we are now buying RTLinux machines from [http://http://www.rackmountnet.com JAF International Inc]. We have requested JAF to build a custom-made machine to suit our RTFSM needs. These machines can be identified by JAF through the item code: JAF-PU-3U01 or if necessary the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf purchasing quote].
+Since Superlogics has stopped manufacturing the SL-3U-CL-IQ965-GA machine, we are now buying RTLinux machines from [http://http://www.rackmountnet.com JAF International Inc]. We have requested JAF to build a custom-made machine to suit our RTFSM needs. These machines can be identified by JAF through the model number (created for us): JAF-PU-3U01 or if necessary by sending them the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf purchasing quote].
 
 
 = Details =
 
-* Download the condensed [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf JAF quote for new RTLinux machine]
+* Download the condensed [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf JAF purchasing quote for new RTLinux machine]
 
-* Send an email to David Huang (sales contact at JAF) with the item code (included in the quote) and the quantity you would like to purchase.
+* Send an email to David Huang (david@rackmountnet.com) with the item code (JAF-PU-3U01) and the quantity you would like to purchase. Attach the condensed purchasing quote if you feel necessary.
 
-* For more details on the complete configuration of the machine, download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110367.pdf detailed quote]
+* For more details on the complete configuration of the machine, download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110367.pdf detailed quote].
 
-* This machine works fine with the rtfsm software.
+* This machine works fine with the rtfsm software. There is no change in the software installation [http://rt-fsm.googlecode.com/svn/trunk/INSTALL_STEP_BY_STEP.txt procedure].
