@@ -1655,6 +1655,18 @@ static int initRT(void)
   }
 #endif
   sched_param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+
+/* Added  the emulator on linux
+   Credit to Hessameddin Akhlaghpour
+   It's not known if the ifdefs are required. They are there for paranoia since we think the extra
+   line is only required for compiling this on linux 
+*/
+#ifdef EMULATOR
+ #ifdef OS_LINUX
+  pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+ #endif
+#endif
+
   error = pthread_attr_setschedparam(&attr, &sched_param);  
   if (error) {
     ERROR("pthread_attr_setschedparam(): %d\n", error);
