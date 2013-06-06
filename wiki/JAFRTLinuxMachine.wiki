@@ -10,7 +10,7 @@ Since Superlogics has stopped manufacturing the SL-3U-CL-IQ965-GA machine, we ar
 
 1. Download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf condensed purchasing quote] that [http://www.rackmountnet.com JAF] made for buying new RTLinux machines.
 
-2. Send an email to David Huang (mailto:david@rackmountnet.com) with the item code (JAF-PU-3U01) and the quantity you would like to purchase. Attach the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf condensed purchasing quote] if you feel necessary (like for e.g. David Huang might not be available).
+2. Send an email to David Huang (mailto:david@jafint.com) with the item code (JAF-PU-3U01) and the quantity you would like to purchase. Attach the [http://rt-fsm.googlecode.com/files/Quote%23%2020110333.pdf condensed purchasing quote] if you feel necessary (like for e.g. David Huang might not be available).
 
 3. For more details on the complete configuration of the machine, download this [http://rt-fsm.googlecode.com/files/Quote%23%2020110367.pdf detailed purchasing quote].
 
